@@ -1,14 +1,15 @@
 # frozen_string_literal: true
 
 # ==============================================================================
-# lib/latex_it/compatibility.rb
+# lib/leeni/compatibility.rb
 #
 # Vendor compatibility environment injection (REVTeX 4.0 fallback).
 # ==============================================================================
 
 module LaTeXCompatibility
   REPO_TEXMF = File.expand_path('../../vendor/revtex4', __dir__).freeze
-  INSTALLED_TEXMF = File.expand_path('~/.local/share/latex_it/texmf').freeze
+  INSTALLED_TEXMF = File.expand_path('~/.local/share/leeni/texmf').freeze
+  LEGACY_INSTALLED_TEXMF = File.expand_path('~/.local/share/latex_it/texmf').freeze
 
   def self.source_needs_revtex4?(path_or_content)
     return false if path_or_content.nil?
@@ -23,13 +24,13 @@ module LaTeXCompatibility
   end
 
   def self.candidate_texmf_dirs(options = {})
-    return [] if ENV['LATEX_IT_DISABLE_BUNDLED_REVTeX'] == '1'
+    return [] if (ENV['LEENI_DISABLE_BUNDLED_REVTeX'] || ENV['LATEX_IT_DISABLE_BUNDLED_REVTeX']) == '1'
 
     cfg = options[:revtex4].is_a?(Hash) ? options[:revtex4] : {}
     return [] if cfg['enabled'] == false
 
     configured = Array(cfg['texmf_dirs']).map { |path| File.expand_path(path.to_s) }
-    candidates = [INSTALLED_TEXMF, REPO_TEXMF] + configured
+    candidates = [INSTALLED_TEXMF, REPO_TEXMF, LEGACY_INSTALLED_TEXMF] + configured
     candidates.select { |path| File.directory?(path) }.uniq
   end
 

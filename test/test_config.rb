@@ -3,13 +3,50 @@
 require 'minitest/autorun'
 require 'tmpdir'
 require 'fileutils'
+require 'open3'
+require 'rbconfig'
 
-require_relative '../lib/latex_it/config'
-require_relative '../lib/latex_it/utils'
-require_relative '../lib/latex_it/flattener'
-require_relative '../lib/latex_it/builder'
+require_relative '../lib/leeni/config'
+require_relative '../lib/leeni/utils'
+require_relative '../lib/leeni/flattener'
+require_relative '../lib/leeni/builder'
 
 class TestLaTeXConfigAndConventions < Minitest::Test
+  def test_legacy_global_config_is_migrated_without_losing_settings
+    Dir.mktmpdir('leeni_config_migration') do |home|
+      legacy = File.join(home, '.config', 'latex_it', 'config.jsonc')
+      FileUtils.mkdir_p(File.dirname(legacy))
+      File.write(legacy, "{\"passes\": 7}\n")
+
+      script = 'require "./lib/leeni/config"; puts LaTeXConfig.load_merged_config.fetch("passes")'
+      output, status = Open3.capture2e({ 'HOME' => home }, RbConfig.ruby, '-e', script)
+
+      assert status.success?, output
+      assert_equal "7\n", output
+      assert_equal File.read(legacy), File.read(File.join(home, '.config', 'leeni', 'config.jsonc'))
+    end
+  end
+
+  def test_vscode_template_replaces_legacy_recipe_and_task
+    Dir.mktmpdir('leeni_vscode_migration') do |dir|
+      vscode = File.join(dir, '.vscode')
+      FileUtils.mkdir_p(vscode)
+      File.write(File.join(vscode, 'tasks.json'), JSON.generate('tasks' => [{ 'label' => 'Build LaTeX (latex_it)' }]))
+      File.write(File.join(vscode, 'settings.json'), JSON.generate(
+        'latex-workshop.latex.tools' => [{ 'name' => 'latex_it' }],
+        'latex-workshop.latex.recipes' => [{ 'name' => 'latex_it' }]
+      ))
+
+      LaTeXConfig.create_vscode_template!(dir)
+
+      tasks = JSON.parse(File.read(File.join(vscode, 'tasks.json'))).fetch('tasks')
+      settings = JSON.parse(File.read(File.join(vscode, 'settings.json')))
+      assert_equal ['Build LaTeX (leeni)'], tasks.map { |task| task.fetch('label') }
+      assert_equal ['leeni'], settings.fetch('latex-workshop.latex.tools').map { |tool| tool.fetch('name') }
+      assert_equal ['leeni'], settings.fetch('latex-workshop.latex.recipes').map { |recipe| recipe.fetch('name') }
+    end
+  end
+
   def test_default_config_keys
     cfg = LaTeXConfig.parse_jsonc(LaTeXConfig::DEFAULT_CONFIG_TEMPLATE)
 
@@ -29,7 +66,7 @@ class TestLaTeXConfigAndConventions < Minitest::Test
   end
 
   def test_candidate_tex_files_default_exclusions
-    Dir.mktmpdir('latex_it_cand_test') do |dir|
+    Dir.mktmpdir('leeni_cand_test') do |dir|
       FileUtils.touch(File.join(dir, 'main.tex'))
       FileUtils.touch(File.join(dir, 'prefix.tex'))
       FileUtils.touch(File.join(dir, 'prefix_defs.tex'))
@@ -47,7 +84,7 @@ class TestLaTeXConfigAndConventions < Minitest::Test
   end
 
   def test_candidate_tex_files_custom_exclusions
-    Dir.mktmpdir('latex_it_custom_cand_test') do |dir|
+    Dir.mktmpdir('leeni_custom_cand_test') do |dir|
       FileUtils.touch(File.join(dir, 'main.tex'))
       FileUtils.touch(File.join(dir, 'prefix.tex'))
       FileUtils.touch(File.join(dir, 'custom_header.tex'))
@@ -60,7 +97,7 @@ class TestLaTeXConfigAndConventions < Minitest::Test
   end
 
   def test_find_main_latex_file_with_defaults
-    Dir.mktmpdir('latex_it_find_main_test') do |dir|
+    Dir.mktmpdir('leeni_find_main_test') do |dir|
       File.write(File.join(dir, 'main.tex'), "\\begin{document}\nHello\n\\end{document}\n")
       File.write(File.join(dir, 'prefix.tex'), "\\usepackage{amsmath}\n")
       File.write(File.join(dir, 'preamble.tex'), "\\usepackage{amssymb}\n")
@@ -91,7 +128,7 @@ class TestLaTeXConfigAndConventions < Minitest::Test
   end
 
   def test_builder_junk_subdirs_auto_mirroring
-    Dir.mktmpdir('latex_it_junk_mirror_test') do |dir|
+    Dir.mktmpdir('leeni_junk_mirror_test') do |dir|
       FileUtils.mkdir_p(File.join(dir, 'sections'))
       FileUtils.mkdir_p(File.join(dir, 'figs'))
       FileUtils.mkdir_p(File.join(dir, 'custom_code'))
@@ -111,7 +148,7 @@ class TestLaTeXConfigAndConventions < Minitest::Test
   end
 
   def test_builder_collect_bib_candidates_custom_dirs
-    Dir.mktmpdir('latex_it_bib_test') do |dir|
+    Dir.mktmpdir('leeni_bib_test') do |dir|
       FileUtils.mkdir_p(File.join(dir, 'my_bibs'))
       FileUtils.touch(File.join(dir, 'my_bibs', 'refs.bib'))
 
@@ -126,7 +163,7 @@ class TestLaTeXConfigAndConventions < Minitest::Test
   end
 
   def test_create_vscode_template_from_scratch
-    Dir.mktmpdir('latex_it_vscode_test') do |dir|
+    Dir.mktmpdir('leeni_vscode_test') do |dir|
       tasks_path, settings_path = LaTeXConfig.create_vscode_template!(dir)
 
       assert File.file?(tasks_path)
@@ -137,22 +174,22 @@ class TestLaTeXConfigAndConventions < Minitest::Test
       tasks = tasks_data['tasks']
       assert_equal 1, tasks.length
       task = tasks.first
-      assert_equal 'Build LaTeX (latex_it)', task['label']
+      assert_equal 'Build LaTeX (leeni)', task['label']
       assert_equal 'l', task['command']
       assert_equal ['--compile'], task['args']
       assert_equal true, task.dig('group', 'isDefault')
       assert_equal 'latex', task.dig('problemMatcher', 'owner')
 
       settings_data = JSON.parse(File.read(settings_path))
-      assert_equal 'latex_it', settings_data['latex-workshop.latex.recipe.default']
+      assert_equal 'leeni', settings_data['latex-workshop.latex.recipe.default']
       assert_equal '%DIR%/junk', settings_data['latex-workshop.latex.outDir']
-      assert settings_data['latex-workshop.latex.tools'].any? { |t| t['name'] == 'latex_it' }
-      assert settings_data['latex-workshop.latex.recipes'].any? { |r| r['name'] == 'latex_it' }
+      assert settings_data['latex-workshop.latex.tools'].any? { |t| t['name'] == 'leeni' }
+      assert settings_data['latex-workshop.latex.recipes'].any? { |r| r['name'] == 'leeni' }
     end
   end
 
   def test_create_vscode_template_preserves_existing_configurations
-    Dir.mktmpdir('latex_it_vscode_merge_test') do |dir|
+    Dir.mktmpdir('leeni_vscode_merge_test') do |dir|
       vscode_dir = File.join(dir, '.vscode')
       FileUtils.mkdir_p(vscode_dir)
 
@@ -177,14 +214,14 @@ class TestLaTeXConfigAndConventions < Minitest::Test
       merged_tasks = JSON.parse(File.read(File.join(vscode_dir, 'tasks.json')))
       labels = merged_tasks['tasks'].map { |t| t['label'] }
       assert_includes labels, 'Custom Test'
-      assert_includes labels, 'Build LaTeX (latex_it)'
+      assert_includes labels, 'Build LaTeX (leeni)'
       assert_equal 2, merged_tasks['tasks'].length
 
       merged_settings = JSON.parse(File.read(File.join(vscode_dir, 'settings.json')))
       assert_equal 2, merged_settings['editor.tabSize']
       tool_names = merged_settings['latex-workshop.latex.tools'].map { |t| t['name'] }
       assert_includes tool_names, 'pdflatex'
-      assert_includes tool_names, 'latex_it'
+      assert_includes tool_names, 'leeni'
 
       # Idempotency: re-running should not duplicate
       LaTeXConfig.create_vscode_template!(dir)
@@ -194,8 +231,8 @@ class TestLaTeXConfigAndConventions < Minitest::Test
   end
 
   def test_cli_vscode_init_flag
-    Dir.mktmpdir('latex_it_cli_vscode') do |dir|
-      bin = File.expand_path('../latex_it', __dir__)
+    Dir.mktmpdir('leeni_cli_vscode') do |dir|
+      bin = File.expand_path('../leeni', __dir__)
       out, status = Open3.capture2(bin, '--vscode-init', chdir: dir)
       assert_equal 0, status.exitstatus
       assert_includes out, 'Configured VS Code workspace'
@@ -205,7 +242,7 @@ class TestLaTeXConfigAndConventions < Minitest::Test
   end
 
   def test_init_gitignore_creates_new_file
-    Dir.mktmpdir('latex_it_gi_new') do |dir|
+    Dir.mktmpdir('leeni_gi_new') do |dir|
       _target, action = LaTeXConfig.init_gitignore!(dir)
       assert_equal :created, action
 
@@ -222,7 +259,7 @@ class TestLaTeXConfigAndConventions < Minitest::Test
   end
 
   def test_init_gitignore_additive_and_idempotent
-    Dir.mktmpdir('latex_it_gi_add') do |dir|
+    Dir.mktmpdir('leeni_gi_add') do |dir|
       gi = File.join(dir, '.gitignore')
       File.write(gi, "custom_secret.env\n*.aux\njunk/\n")
 
@@ -231,12 +268,12 @@ class TestLaTeXConfigAndConventions < Minitest::Test
 
       content = File.read(gi)
       assert_includes content, 'custom_secret.env'
-      assert_includes content, '# Added by latex_it --gitignore-init'
+      assert_includes content, '# Added by leeni --gitignore-init'
       assert_includes content, '.junk/'
       assert_includes content, '*.synctex.gz'
 
       # junk/ should not be duplicated in the addition block
-      added_section = content.split('# Added by latex_it --gitignore-init').last
+      added_section = content.split('# Added by leeni --gitignore-init').last
       refute_match(%r{^junk/?$}, added_section)
 
       # Idempotency: second run when fully populated does not add anything
@@ -246,8 +283,8 @@ class TestLaTeXConfigAndConventions < Minitest::Test
   end
 
   def test_cli_gitignore_init_flag
-    Dir.mktmpdir('latex_it_cli_gi') do |dir|
-      bin = File.expand_path('../latex_it', __dir__)
+    Dir.mktmpdir('leeni_cli_gi') do |dir|
+      bin = File.expand_path('../leeni', __dir__)
       out, status = Open3.capture2(bin, '--gitignore-init', chdir: dir)
       assert_equal 0, status.exitstatus
       assert_includes out, 'Created'
@@ -256,7 +293,7 @@ class TestLaTeXConfigAndConventions < Minitest::Test
   end
 
   def test_junk_dir_auto_detection_and_fallback
-    Dir.mktmpdir('latex_it_junk_detect') do |dir|
+    Dir.mktmpdir('leeni_junk_detect') do |dir|
       Dir.chdir(dir) do
         File.write('paper.tex', "\\documentclass{article}\n")
 
@@ -290,7 +327,7 @@ class TestLaTeXConfigAndConventions < Minitest::Test
   end
 
   def test_clean_directory_removes_both_junk_and_dot_junk
-    Dir.mktmpdir('latex_it_clean_both') do |dir|
+    Dir.mktmpdir('leeni_clean_both') do |dir|
       Dir.chdir(dir) do
         FileUtils.mkdir_p(['junk', '.junk', 'styles/junk', 'styles/.junk'])
         File.write('junk/temp.aux', 'test')
@@ -309,7 +346,7 @@ class TestLaTeXConfigAndConventions < Minitest::Test
   end
 
   def test_config_save_junk_dir
-    Dir.mktmpdir('latex_it_save_junk') do |dir|
+    Dir.mktmpdir('leeni_save_junk') do |dir|
       config_file = File.join(dir, '.l.jsonc')
       options = {
         config_save: true,

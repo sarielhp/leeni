@@ -3,7 +3,7 @@
 
 require 'minitest/autorun'
 require 'tmpdir'
-load File.expand_path('../latex_it', __dir__)
+load File.expand_path('../leeni', __dir__)
 
 class TestErrorCatalog < Minitest::Test
   def test_classify_misplaced_alignment_tab

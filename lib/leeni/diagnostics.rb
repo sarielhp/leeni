@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 # ==============================================================================
-# lib/latex_it/diagnostics.rb
+# lib/leeni/diagnostics.rb
 #
 # LaTeX compilation log diagnostic analysis, AUCTeX error extraction,
 # 4-tier categorization (Errors, Alerts, Warnings, Whatevers), and scoring.
@@ -113,7 +113,7 @@ module LaTeXDiagnostics
     "\e]8;;#{uri}\e\\#{styled}\e]8;;\e\\"
   end
 
-  UNDERFULL_GUIDE_URL = 'https://sarielhp.github.io/latex_it/docs/guides/underfull_boxes/'
+  UNDERFULL_GUIDE_URL = 'https://sarielhp.github.io/leeni/docs/guides/underfull_boxes/'
 
   def format_terminal_url(url, display_str, underline: false, color: nil)
     return display_str unless link_enabled? && url && !url.to_s.empty?
@@ -264,17 +264,17 @@ module LaTeXDiagnostics
 
     term_width = terminal_columns
     formatted_msg = highlight_line_numbers(clean_msg, base_color)
-    formatted_msg = highlight_latex_it_tag(formatted_msg, base_color)
+    formatted_msg = highlight_leeni_tag(formatted_msg, base_color)
 
     wrap_diagnostic_message(full_prefix, sub_indent, formatted_msg, term_width)
   end
 
-  def highlight_latex_it_tag(str, base_color = :red)
+  def highlight_leeni_tag(str, base_color = :red)
     return str if @options[:emacs] || @options[:color] == false
-    return str unless str.include?('[latex_it]')
+    return str unless str.include?('[leeni]')
 
-    tag = Rainbow('[latex_it]').magenta.bold.to_s
-    parts = str.split('[latex_it]', -1)
+    tag = Rainbow('[leeni]').magenta.bold.to_s
+    parts = str.split('[leeni]', -1)
     return str if parts.size <= 1
 
     first = parts[0]
@@ -341,11 +341,11 @@ module LaTeXDiagnostics
                   end
 
     colored = highlight_line_numbers(header_text, :red, bright: true)
-    highlight_latex_it_tag(colored, :red)
+    highlight_leeni_tag(colored, :red)
   end
 
   def extract_clean_error_message(line)
-    return Regexp.last_match(1).strip if line =~ /^!\s*\[latex_it\]\s*(.*)/
+    return Regexp.last_match(1).strip if line =~ /^!\s*\[leeni\]\s*(.*)/
     return Regexp.last_match(1).strip if line =~ /^.+?:\d+:\s*(.*)/
     return Regexp.last_match(1).strip if line =~ /^!\s*(.*)/
 
@@ -1156,7 +1156,7 @@ module LaTeXDiagnostics
     field_text = loc[:field_text]
 
     display_file = format_display_path(file_name)
-    first_line = "#{display_file}:#{line_no}: [latex_it] Bibliography error in entry '#{citekey}'"
+    first_line = "#{display_file}:#{line_no}: [leeni] Bibliography error in entry '#{citekey}'"
     lines = [first_line]
     lines << (field_text ? "l.#{line_no} #{field_text}" : "l.#{line_no}")
 
@@ -1170,7 +1170,7 @@ module LaTeXDiagnostics
       base_color: :red,
       index: (parent_err[:index] || 0) + 1,
       catalog: { hint: hint },
-      source: :latex_it,
+      source: :leeni,
       synthetic: true,
       companion_to: format_display_path(parent_err[:file]),
       citekey: citekey,
@@ -2102,7 +2102,7 @@ module LaTeXDiagnostics
 
   def primary_error_file(groups)
     groups.keys.find do |f|
-      groups[f].any? { |e| e[:source] != :latex_it && !e[:synthetic] }
+      groups[f].any? { |e| e[:source] != :leeni && !e[:synthetic] }
     end || groups.keys.first
   end
 
@@ -2159,12 +2159,12 @@ module LaTeXDiagnostics
     note_label = (@options && @options[:color] == false) ? 'note:' : Rainbow('note:').cyan.bright.bold.to_s
     if cascade_info[:remaining_in_first].to_i > 0
       msg = "#{cascade_info[:remaining_in_first]} more errors in #{cascade_info[:first_file]} were truncated"
-      io.puts "latex_it: #{note_label} #{msg} (run with 'l -a' to display all)"
+      io.puts "leeni: #{note_label} #{msg} (run with 'l -a' to display all)"
     end
     if cascade_info[:other_errors_count].to_i > 0
       files_str = format_other_files_list(cascade_info[:other_files])
       msg = "#{cascade_info[:other_errors_count]} more errors detected across #{cascade_info[:other_files].size} other files (#{files_str})"
-      io.puts "latex_it: #{note_label} #{msg} (run with 'l -a' to display all)"
+      io.puts "leeni: #{note_label} #{msg} (run with 'l -a' to display all)"
     end
   end
 
@@ -2649,7 +2649,7 @@ module LaTeXDiagnostics
     return unless @options[:werror] && (alerts.positive? || warnings.positive?)
 
     if compile_mode?
-      warn 'latex_it: error: warnings being treated as errors (--werror)' unless json_mode?
+      warn 'leeni: error: warnings being treated as errors (--werror)' unless json_mode?
     else
       puts Rainbow("\n[Werror] Warnings treated as fatal errors.").red.bright
     end

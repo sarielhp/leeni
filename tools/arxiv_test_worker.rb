@@ -34,8 +34,8 @@ module ArxivTestWorker
       @main = File.join(root, 'paper', main_entry)
       @project = File.dirname(@main)
       @pdf = @main.sub(/\.tex\z/i, '.pdf')
-      @latex = File.join(root, 'latex_it')
-      raise CheckError, "#{@latex}: latex_it was not staged into the workspace" unless File.file?(@latex)
+      @latex = File.join(root, 'leeni')
+      raise CheckError, "#{@latex}: leeni was not staged into the workspace" unless File.file?(@latex)
 
       @logs = File.join(root, 'test-logs')
       @counter = File.join(@logs, 'engine-invocations.jsonl')
@@ -43,7 +43,7 @@ module ArxivTestWorker
       @restores = {}
       install_signal_traps
       @report = { status: 'RUNNING', completed: false, main: main_entry, engine: @engine || 'automatic',
-                  latex_it_sha256: Digest::SHA256.file(@latex).hexdigest, locale: 'C.UTF-8', checks: [] }
+                  leeni_sha256: Digest::SHA256.file(@latex).hexdigest, locale: 'C.UTF-8', checks: [] }
       save
     end
 
@@ -145,7 +145,7 @@ module ArxivTestWorker
       latex_out, latex_st = Open3.capture2e(RbConfig.ruby, @latex, '--version')
       assert(latex_st.success?,
              "#{@latex} --version failed (exit #{latex_st.exitstatus}): #{latex_out.lines.first(3).join}")
-      @report[:latex_it_version] = latex_out.strip
+      @report[:leeni_version] = latex_out.strip
 
       install_engine_wrappers(candidates)
       { detail: 'Required tools available; compiler invocations recorded independently.' }
@@ -230,7 +230,7 @@ module ArxivTestWorker
         stat = @restores[path][1]
         check('dependency_change') do
           original = @restores[path][0]
-          probe = "\n% latex_it dependency probe\n% %%latex_it-probe\n"
+          probe = "\n% leeni dependency probe\n% %%leeni-probe\n"
           File.binwrite(path, original + probe)
           File.utime(stat.atime, stat.mtime, path)
           result = compile
@@ -246,7 +246,7 @@ module ArxivTestWorker
       with_original(@main) do
         check('invalid_tex') do
           original = @restores[@main][0]
-          probe = "\\latexItDeliberatelyUndefinedProbe\n% %%latex_it-probe\n"
+          probe = "\\latexItDeliberatelyUndefinedProbe\n% %%leeni-probe\n"
           File.binwrite(@main, probe + original)
           result = compile
           assert(result[:passes].positive?, 'Invalid-input check never invoked the compiler')

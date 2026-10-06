@@ -6,7 +6,7 @@ require 'minitest/mock'
 require 'tmpdir'
 
 class TestAuthorVerification < Minitest::Test
-  BIN = File.expand_path('../latex_it', __dir__)
+  BIN = File.expand_path('../leeni', __dir__)
   load BIN
 
   def setup
@@ -46,7 +46,7 @@ class TestAuthorVerification < Minitest::Test
   end
 
   def with_source(source)
-    Dir.mktmpdir('latex_it_authors_') do |dir|
+    Dir.mktmpdir('leeni_authors_') do |dir|
       path = File.join(dir, 'paper.tex')
       File.write(path, source)
       @packager.instance_variable_set(:@filename, path)

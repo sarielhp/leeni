@@ -9,7 +9,7 @@ require 'rbconfig'
 
 class ErrorCorpusRunner
   ROOT = File.expand_path('..', __dir__)
-  LATEX_IT = File.join(ROOT, 'latex_it')
+  LEENI = File.join(ROOT, 'leeni')
   CORPUS_DIR = File.join(ROOT, 'docs', 'errors')
 
   def self.run
@@ -76,7 +76,7 @@ class ErrorCorpusRunner
   end
 
   def test_example(dir)
-    cmd = [RbConfig.ruby, LATEX_IT, '--no-lock', '-f', 'example.tex']
+    cmd = [RbConfig.ruby, LEENI, '--no-lock', '-f', 'example.tex']
     out, status = Open3.capture2e(*cmd, chdir: dir)
     cleanup_junk(dir)
 

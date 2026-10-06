@@ -1,9 +1,9 @@
 # frozen_string_literal: true
 
 # ==============================================================================
-# lib/latex_it/help_manual.rb
+# lib/leeni/help_manual.rb
 #
-# Comprehensive man-page style manual generator for latex_it (-H, --help-all).
+# Comprehensive man-page style manual generator for leeni (-H, --help-all).
 # Detailed explanations and practical usage examples for every CLI option.
 # ==============================================================================
 
@@ -26,7 +26,7 @@ module LaTeXHelpManual
     [
       'Usage: l [options] [document.tex]',
       '',
-      'latex_it compiles LaTeX documents incrementally using XeLaTeX, LuaLaTeX,',
+      'leeni compiles LaTeX documents incrementally using XeLaTeX, LuaLaTeX,',
       'or pdfLaTeX. It isolates auxiliary build files into junk/, manages convergence',
       'rerun loops, filters engine logs into clean tiered diagnostics, and provides',
       'paper packaging, arXiv submission preparation, and editor integration.'
@@ -60,7 +60,7 @@ module LaTeXHelpManual
       '',
       '  -b, --[no-]bib',
       '      Explicitly enable or skip bibliography resolution pass (BibTeX or Biber).',
-      '      By default, latex_it automatically detects whether a pass is required.',
+      '      By default, leeni automatically detects whether a pass is required.',
       '      Example:',
       '        l --no-bib paper.tex',
       '        l -b paper.tex',
@@ -331,7 +331,7 @@ module LaTeXHelpManual
       '        l -e lualatex --config-save',
       '',
       '  --global',
-      '      Target global configuration (~/.config/latex_it/config.jsonc) for config operations',
+      '      Target global configuration (~/.config/leeni/config.jsonc) for config operations',
       '      such as --config-save or --config-show.',
       '      Example:',
       '        l -I --config-save --global',

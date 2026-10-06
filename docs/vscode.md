@@ -1,6 +1,6 @@
-# VS Code Integration with latex_it
+# VS Code Integration with leeni
 
-`latex_it` integrates with Visual Studio Code in two ways:
+`leeni` integrates with Visual Studio Code in two ways:
 1. **Native VS Code Tasks** (zero extensions required).
 2. **LaTeX Workshop Extension** (the full IDE LaTeX setup).
 
@@ -14,8 +14,8 @@ Run the following command inside your LaTeX project root:
 l --vscode-init
 ```
 
-`latex_it` automatically creates or updates the `.vscode/` configuration files:
-* **`.vscode/tasks.json`**: Sets up `Build LaTeX (latex_it)` with `l --compile` as the default build task (`Ctrl+Shift+B` / `Cmd+Shift+B`) and matches error/warning/alert/note messages into the **Problems** panel.
+`leeni` automatically creates or updates the `.vscode/` configuration files:
+* **`.vscode/tasks.json`**: Sets up `Build LaTeX (leeni)` with `l --compile` as the default build task (`Ctrl+Shift+B` / `Cmd+Shift+B`) and matches error/warning/alert/note messages into the **Problems** panel.
 * **`.vscode/settings.json`**: Configures LaTeX Workshop tools, recipes, and sets `outDir: "%DIR%/junk"` so diagnostics and previewers synchronize cleanly.
 * **Non-destructive & Idempotent**: If `.vscode/tasks.json` or `.vscode/settings.json` already exist, your other tasks and settings are preserved.
 
@@ -32,7 +32,7 @@ Create `.vscode/tasks.json` in your project root:
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "Build LaTeX (latex_it)",
+      "label": "Build LaTeX (leeni)",
       "type": "shell",
       "command": "l",
       "args": ["--compile"],
@@ -70,13 +70,13 @@ Create `.vscode/tasks.json` in your project root:
 
 ## Workflow 2: LaTeX Workshop Extension
 
-If you use the popular [LaTeX Workshop](https://marketplace.visualstudio.com/items?itemName=James-Yu.latex-workshop) extension, configure `latex_it` as a custom compiler tool and recipe in `.vscode/settings.json` (or your global User Settings):
+If you use the popular [LaTeX Workshop](https://marketplace.visualstudio.com/items?itemName=James-Yu.latex-workshop) extension, configure `leeni` as a custom compiler tool and recipe in `.vscode/settings.json` (or your global User Settings):
 
 ```json
 {
   "latex-workshop.latex.tools": [
     {
-      "name": "latex_it",
+      "name": "leeni",
       "command": "l",
       "args": ["--vscode-lw", "%DOC%"],
       "env": {}
@@ -84,24 +84,24 @@ If you use the popular [LaTeX Workshop](https://marketplace.visualstudio.com/ite
   ],
   "latex-workshop.latex.recipes": [
     {
-      "name": "latex_it",
-      "tools": ["latex_it"]
+      "name": "leeni",
+      "tools": ["leeni"]
     }
   ],
-  "latex-workshop.latex.recipe.default": "latex_it",
+  "latex-workshop.latex.recipe.default": "leeni",
   "latex-workshop.latex.outDir": "%DIR%/junk",
   "latex-workshop.latex.autoClean.run": "never"
 }
 ```
 
 ### Why set `outDir` to `junk`?
-`latex_it` isolates temporary build artifacts (`.log`, `.aux`, `.fls`) in `junk/`. Telling LaTeX Workshop that `"latex-workshop.latex.outDir": "%DIR%/junk"` ensures its internal log parser can find `junk/<doc>.log` and correctly populate VS Code's diagnostic view.
+`leeni` isolates temporary build artifacts (`.log`, `.aux`, `.fls`) in `junk/`. Telling LaTeX Workshop that `"latex-workshop.latex.outDir": "%DIR%/junk"` ensures its internal log parser can find `junk/<doc>.log` and correctly populate VS Code's diagnostic view.
 
 ---
 
 ## SyncTeX (Forward & Reverse Search)
 
-`latex_it` compiles documents with `-synctex=1` by default and automatically exports `<doc>.synctex.gz` (and `<doc>.pdf`) to the project root directory, while also preserving copies in `junk/`.
+`leeni` compiles documents with `-synctex=1` by default and automatically exports `<doc>.synctex.gz` (and `<doc>.pdf`) to the project root directory, while also preserving copies in `junk/`.
 
 ### In LaTeX Workshop (Internal Viewer):
 * **Forward Search** (editor $\rightarrow$ PDF): `Ctrl+Alt+J` (macOS: `Cmd+Option+J`) jumps to the corresponding line in the PDF viewer.

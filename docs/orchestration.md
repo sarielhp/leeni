@@ -1,8 +1,8 @@
 # Orchestrating Complex Multi-Chapter & Book Setups with `just`
 
-While `latex_it` (`l`) manages the LaTeX compilation lifecycle—automating engine selection, bibliography convergence, `junk/` isolation, and diagnostic parsing—large book and multi-chapter projects often require **external upstream tasks** before LaTeX runs (such as generating plots from raw data, building shared tables, or compiling standalone figures).
+While `leeni` (`l`) manages the LaTeX compilation lifecycle—automating engine selection, bibliography convergence, `junk/` isolation, and diagnostic parsing—large book and multi-chapter projects often require **external upstream tasks** before LaTeX runs (such as generating plots from raw data, building shared tables, or compiling standalone figures).
 
-This guide explains how to orchestrate complex setups using **[`just`](https://github.com/casey/just)** alongside `latex_it`.
+This guide explains how to orchestrate complex setups using **[`just`](https://github.com/casey/just)** alongside `leeni`.
 
 ---
 
@@ -17,9 +17,9 @@ flowchart TD
         Generator --> Fig["figures/*.pdf / tables/*.tex"]
     end
 
-    subgraph Latex ["Inner Loop: Typesetting & Writing (latex_it / l)"]
+    subgraph Latex ["Inner Loop: Typesetting & Writing (leeni / l)"]
         Fig --> Tex["chapters/ch03/ch03.tex"]
-        Tex --> L["latex_it (l)"]
+        Tex --> L["leeni (l)"]
         L --> PDF["ch03.pdf"]
     end
 ```
@@ -35,9 +35,9 @@ flowchart TD
 
 ---
 
-## 2. Why `latex_it` Delegates Upstream Orchestration
+## 2. Why `leeni` Delegates Upstream Orchestration
 
-`latex_it` deliberately does not crawl parent directories or execute arbitrary shell scripts from configuration files:
+`leeni` deliberately does not crawl parent directories or execute arbitrary shell scripts from configuration files:
 - **Security (No Untrusted RCE)**: Document repositories are widely shared across collaborators and students. Auto-executing shell commands from tracked project configs creates an immediate remote code execution vulnerability (CWE-426).
 - **Sub-Second Latency Protection**: Running external Python or shell pipelines before every compile permanently destroys the instant sub-second feedback loop required when editing LaTeX prose.
 - **Deadlock & Recursion Prevention**: If a pre-build script calls `l` internally (e.g. to compile a standalone figure), naive hook runners create infinite fork-bombs or deadlock on build locks.
@@ -90,7 +90,7 @@ default:
             (cd "$INVOKED_DIR" && ./local_prep.sh)
         fi
         
-        # 3. Compile the chapter with latex_it
+        # 3. Compile the chapter with leeni
         (cd "$INVOKED_DIR" && l)
     else
         echo "==> Building entire book..."

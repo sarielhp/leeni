@@ -1,6 +1,6 @@
 # Diagnostic Output Modernization & Noise Reduction Plan
 
-This document details required enhancements to `latex_it`'s standard diagnostic display, addressing line-number clickability, message verbosity, redundant line references, and raw TeX jargon. It includes a comprehensive analysis of the diagnostic run on `~/rand_alg/notes/book.tex`.
+This document details required enhancements to `leeni`'s standard diagnostic display, addressing line-number clickability, message verbosity, redundant line references, and raw TeX jargon. It includes a comprehensive analysis of the diagnostic run on `~/rand_alg/notes/book.tex`.
 
 ---
 
@@ -72,11 +72,11 @@ This document details required enhancements to `latex_it`'s standard diagnostic 
   1. A single file's warnings section unpredictably switches between pastel yellow, harsh dark magenta, and cyan across adjacent lines.
   2. File banners switch colors multiple times within the same horizontal line (colored dashes $\rightarrow$ uncolored filename $\rightarrow$ uncolored count $\rightarrow$ colored dashes).
   3. Themes drop from 24-bit TrueColor pastels into raw 16-color ANSI codes on certain message types.
-  4. Tags like `[latex_it]` strip all remaining color from subsequent text on the line.
+  4. Tags like `[leeni]` strip all remaining color from subsequent text on the line.
 - **Target State**:
   Strictly cohesive, predictable color hierarchy:
   1. All items in the **warnings** tier consistently use warning yellow (or theme warning tone). No random switching to magenta or cyan.
-  2. Every color used in diagnostics has an explicit palette entry in [`lib/latex_it/color.rb`](file:///home/sariel/prog/26/latex_it/lib/latex_it/color.rb) so TrueColor pastels never abruptly downgrade to 16-color ANSI.
+  2. Every color used in diagnostics has an explicit palette entry in [`lib/leeni/color.rb`](file:///home/sariel/prog/26/leeni/lib/leeni/color.rb) so TrueColor pastels never abruptly downgrade to 16-color ANSI.
   3. Header banners maintain harmonious styling without mid-line resets to raw terminal default.
   4. Text following embedded tags retains its active tier color without being reset to terminal default.
 
@@ -218,7 +218,7 @@ Summary stats: `Errors: 0, Alerts: 193, Warnings: 114, Whatevers: 92 (Whatevers 
 Empirical analysis of the diagnostic run on `~/rand_alg/notes/book.tex` identified 5 distinct root causes responsible for the user-reported "colors changing in mid flight":
 
 ### 4.1 Intra-Tier Color Flipping (Yellow ↔ Magenta ↔ Cyan within Warnings)
-- **Location**: [`lib/latex_it/diagnostics.rb`](file:///home/sariel/prog/26/latex_it/lib/latex_it/diagnostics.rb#L396-L404) and [`lib/latex_it/diagnostics.rb`](file:///home/sariel/prog/26/latex_it/lib/latex_it/diagnostics.rb#L501).
+- **Location**: [`lib/leeni/diagnostics.rb`](file:///home/sariel/prog/26/leeni/lib/leeni/diagnostics.rb#L396-L404) and [`lib/leeni/diagnostics.rb`](file:///home/sariel/prog/26/leeni/lib/leeni/diagnostics.rb#L501).
 - **Mechanism**:
   When LaTeX log items are parsed, `Overfull \hbox` is unconditionally assigned `base_color: :magenta` and `Underfull \hbox` is assigned `base_color: :cyan`.
   If an overfull box has severity $\ge 20\,\text{pt}$, `extract_alerts` reassigns its `base_color` to `:red` and promotes it to the `alerts` tier.
@@ -236,17 +236,17 @@ Empirical analysis of the diagnostic run on `~/rand_alg/notes/book.tex` identifi
   Within the same file and tier, text flips between Yellow, Magenta, and Cyan.
 
 ### 4.2 Theme Palettes Omit `:magenta` & `:blue` (Abrupt TrueColor Fallback)
-- **Location**: [`lib/latex_it/color.rb`](file:///home/sariel/prog/26/latex_it/lib/latex_it/color.rb#L10-L59) and [`lib/latex_it/color.rb`](file:///home/sariel/prog/26/latex_it/lib/latex_it/color.rb#L194-L208).
+- **Location**: [`lib/leeni/color.rb`](file:///home/sariel/prog/26/leeni/lib/leeni/color.rb#L10-L59) and [`lib/leeni/color.rb`](file:///home/sariel/prog/26/leeni/lib/leeni/color.rb#L194-L208).
 - **Mechanism**:
-  [`LatexColor::THEMES`](file:///home/sariel/prog/26/latex_it/lib/latex_it/color.rb#L10) defines 6 color themes (`blush`, `catppuccin`, `tokyo-night`, `dracula`, `nord`, `ansi`). Every theme defines hex codes for `:red`, `:yellow`, `:cyan`, and `:green`.
+  [`LatexColor::THEMES`](file:///home/sariel/prog/26/leeni/lib/leeni/color.rb#L10) defines 6 color themes (`blush`, `catppuccin`, `tokyo-night`, `dracula`, `nord`, `ansi`). Every theme defines hex codes for `:red`, `:yellow`, `:cyan`, and `:green`.
   **Neither `:magenta` nor `:blue` is defined in any theme.**
   When TrueColor output is active, `RainbowThemeOverride` matches `:red`, `:yellow`, `:cyan`, `:green` to 24-bit TrueColor pastel escape sequences (e.g. `\e[38;2;255;204;204m`).
-  When Rainbow encounters `:magenta` (used for overfull box warnings and `[latex_it]` tags) or `:blue` (used for cyan line numbers in `colorize_line_num`), `colors[values.first]` returns `nil`. Rainbow calls `super`, abruptly falling back to standard 16-color ANSI (`\e[35m` and `\e[34m`).
+  When Rainbow encounters `:magenta` (used for overfull box warnings and `[leeni]` tags) or `:blue` (used for cyan line numbers in `colorize_line_num`), `colors[values.first]` returns `nil`. Rainbow calls `super`, abruptly falling back to standard 16-color ANSI (`\e[35m` and `\e[34m`).
 - **Visual Impact**:
   Harsh, highly saturated, dark 16-color ANSI purple and blue suddenly flash amid smooth, high-luminance pastel peach and pink tones.
 
 ### 4.3 Mid-Line Banner Color Flip
-- **Location**: [`lib/latex_it/diagnostics.rb`](file:///home/sariel/prog/26/latex_it/lib/latex_it/diagnostics.rb#L959-L972).
+- **Location**: [`lib/leeni/diagnostics.rb`](file:///home/sariel/prog/26/leeni/lib/leeni/diagnostics.rb#L959-L972).
 - **Mechanism**:
   `format_file_separator` constructs:
   ```ruby
@@ -263,16 +263,16 @@ Empirical analysis of the diagnostic run on `~/rand_alg/notes/book.tex` identifi
   The line changes color mid-flight twice across a single banner.
 
 ### 4.4 Broken `reassert` Reset in Tag Highlighting
-- **Location**: [`lib/latex_it/diagnostics.rb`](file:///home/sariel/prog/26/latex_it/lib/latex_it/diagnostics.rb#L142-L149).
+- **Location**: [`lib/leeni/diagnostics.rb`](file:///home/sariel/prog/26/leeni/lib/leeni/diagnostics.rb#L142-L149).
 - **Mechanism**:
   ```ruby
-  def highlight_latex_it_tag(str, base_color = :red)
+  def highlight_leeni_tag(str, base_color = :red)
     return str if @options[:emacs] || @options[:color] == false
-    return str unless str.include?('[latex_it]')
+    return str unless str.include?('[leeni]')
 
     reassert = Rainbow('').send(base_color).bright.to_s
-    tag = "#{Rainbow('[latex_it]').magenta.bold}#{reassert}"
-    str.gsub('[latex_it]', tag)
+    tag = "#{Rainbow('[leeni]').magenta.bold}#{reassert}"
+    str.gsub('[leeni]', tag)
   end
   ```
   Calling `Rainbow('').send(base_color).bright.to_s` on an empty string emits `"\e[38;2;...m\e[0m\e[1m\e[0m"`.
@@ -280,7 +280,7 @@ Empirical analysis of the diagnostic run on `~/rand_alg/notes/book.tex` identifi
   Instead of restoring `base_color`, `reassert` executes `\e[0m`, immediately stripping all foreground color and weight from the rest of the diagnostic message! The remainder of the line bleeds into plain uncolored text.
 
 ### 4.5 Split Tier Iteration vs. File-Grouped Traversal
-- **Location**: [`lib/latex_it/diagnostics.rb`](file:///home/sariel/prog/26/latex_it/lib/latex_it/diagnostics.rb#L1792-L1800).
+- **Location**: [`lib/leeni/diagnostics.rb`](file:///home/sariel/prog/26/leeni/lib/leeni/diagnostics.rb#L1792-L1800).
 - **Mechanism**:
   `render_non_error_tiers` executes:
   ```ruby
@@ -298,7 +298,7 @@ Empirical analysis of the diagnostic run on `~/rand_alg/notes/book.tex` identifi
 Empirical analysis identified 5 distinct mechanisms causing line number instability, ordering jumps, and color mutations:
 
 ### 5.1 Non-Monotonic / Jumbled Line Ordering (Severity-Sorted Overfull Boxes)
-- **Location**: [`lib/latex_it/diagnostics.rb`](file:///home/sariel/prog/26/latex_it/lib/latex_it/diagnostics.rb#L798-L813).
+- **Location**: [`lib/leeni/diagnostics.rb`](file:///home/sariel/prog/26/leeni/lib/leeni/diagnostics.rb#L798-L813).
 - **Mechanism**:
   In `sort_diagnostic_items`, overfull box warnings are partitioned into `sorted_overfull` and sorted by `sev.to_f` (box width), rather than source line number:
   ```ruby
@@ -320,7 +320,7 @@ Empirical analysis identified 5 distinct mechanisms causing line number instabil
   Instead of progressing downward monotonically through the source file (`99 -> 121 -> 157 -> 304 -> 371 -> 546`), line numbers jump back and forth erratically because severity sorting overrides document order.
 
 ### 5.2 Intra-File Line Number Color Flipping (Cyan vs. Blue)
-- **Location**: [`lib/latex_it/diagnostics.rb`](file:///home/sariel/prog/26/latex_it/lib/latex_it/diagnostics.rb#L71-L75).
+- **Location**: [`lib/leeni/diagnostics.rb`](file:///home/sariel/prog/26/leeni/lib/leeni/diagnostics.rb#L71-L75).
 - **Mechanism**:
   ```ruby
   def colorize_line_num(str, base_color = nil)
@@ -337,21 +337,21 @@ Empirical analysis identified 5 distinct mechanisms causing line number instabil
   Two adjacent lines with the exact same line number render in two completely different colors, making it appear that line numbers are glitching or mutating mid-stream.
 
 ### 5.3 Redundant Range Formatting (`108--108` vs `108`)
-- **Location**: [`lib/latex_it/diagnostics.rb`](file:///home/sariel/prog/26/latex_it/lib/latex_it/diagnostics.rb#L509).
+- **Location**: [`lib/leeni/diagnostics.rb`](file:///home/sariel/prog/26/leeni/lib/leeni/diagnostics.rb#L509).
 - **Mechanism**:
   TeX logs report paragraph-level boxes as `in paragraph at lines 108--108`, but statement-level boxes as `detected at line 125`.
   The parser extracts `line_str = "108--108"` and directly prints it as `108--108:`.
   This causes line representations to mutate arbitrarily between single integers and redundant ranges within the same file.
 
 ### 5.4 Multi-Pass Convergence Shifts (Unresolved `??` vs Resolved Citations)
-- **Location**: [`lib/latex_it/diagnostics.rb`](file:///home/sariel/prog/26/latex_it/lib/latex_it/diagnostics.rb#L1847-L1853).
+- **Location**: [`lib/leeni/diagnostics.rb`](file:///home/sariel/prog/26/leeni/lib/leeni/diagnostics.rb#L1847-L1853).
 - **Mechanism**:
   `find_last_latex_log` reads the log from the latest available pass (`err_xelatex_3`, `_2`, or `_1`).
   On pass 1, references are unresolved (`??`), equations lack numbers, and bibliographies are empty. On pass 3, resolved text expands paragraphs and pushes subsequent lines down.
   If an error or aborted pass leaves an earlier pass log in `junk/`, or if a user checks diagnostics during intermediate passes, box warning lines shift across builds.
 
 ### 5.5 TeX Log 79-Column Line-Wrapping Corrupting `file_stack`
-- **Location**: [`lib/latex_it/diagnostics.rb`](file:///home/sariel/prog/26/latex_it/lib/latex_it/diagnostics.rb#L20) and [`lib/latex_it/diagnostics.rb`](file:///home/sariel/prog/26/latex_it/lib/latex_it/diagnostics.rb#L407-L431).
+- **Location**: [`lib/leeni/diagnostics.rb`](file:///home/sariel/prog/26/leeni/lib/leeni/diagnostics.rb#L20) and [`lib/leeni/diagnostics.rb`](file:///home/sariel/prog/26/leeni/lib/leeni/diagnostics.rb#L407-L431).
 - **Mechanism**:
   TeX hard-wraps log lines at 79 columns. When a file inclusion path spans a line break, `LOG_FILE_PATTERN` fails to recognize the file extension on the continuation line, pushing `nil` onto `file_stack`.
   Subsequent closing parentheses `)` pop the stack prematurely, causing `current_log_file` to fall back to `@filename` (`book.tex`) or an earlier chapter.
@@ -376,7 +376,7 @@ Empirical analysis identified 5 distinct mechanisms causing line number instabil
    - Replace `LaTeX Warning: (?:Hyper reference|Reference) \`([^\']+)\' on page (\d+) undefined on input line \d+\.?` with `undefined reference '$1' (page $2)`.
    - Replace `LaTeX Warning: Citation '([^']+)' on page (\d+) undefined on input line \d+\.?` with `undefined citation '$1' (page $2)`.
 4. **Duplicate Label Cross-Reference Aggregation**:
-   - During cataloging in `lib/latex_it/diagnostics.rb`, build a label index: `{ label_name => [ { file: f, line: l }, ... ] }`.
+   - During cataloging in `lib/leeni/diagnostics.rb`, build a label index: `{ label_name => [ { file: f, line: l }, ... ] }`.
    - When rendering duplicate label warnings, list other target definitions: `also at #{other_locations.map { |loc| "#{loc[:file]}:#{loc[:line]}" }.join(', ')}`.
 
 ### Phase 2: Color & Line-Gutter Stabilization
@@ -389,11 +389,11 @@ Empirical analysis identified 5 distinct mechanisms causing line number instabil
 4. **Cohesive File Banners**:
    - Ensure `format_file_separator` styles the filename and count consistently (e.g. bold white/bright with tier-colored brackets) without stripping or resetting mid-line.
 5. **Fix Tag / Hint Escape Sequences**:
-   - Fix `highlight_latex_it_tag` so that ANSI color codes are cleanly reasserted without emitting premature `\e[0m` resets.
+   - Fix `highlight_leeni_tag` so that ANSI color codes are cleanly reasserted without emitting premature `\e[0m` resets.
 
 ### Phase 3: Terminal Link Integration (Regular Display)
 1. **Format Location Links**:
-   - In `lib/latex_it/diagnostics.rb`'s standard human-readable printer, wrap line numbers in OSC 8 escape sequences when `link_enabled?` is active:
+   - In `lib/leeni/diagnostics.rb`'s standard human-readable printer, wrap line numbers in OSC 8 escape sequences when `link_enabled?` is active:
      ```ruby
      def format_line_prefix(file, line_str, link_enabled: true)
        return line_str.rjust(10) unless link_enabled
@@ -416,7 +416,7 @@ Empirical analysis identified 5 distinct mechanisms causing line number instabil
    - `test/test_diagnostic_formatting.rb`: Verifies regex transformations on box warnings, reference deduplication, duplicate label cross-referencing, monotonic line sorting, and consistent color assignments.
    - `test/test_regular_terminal_links.rb`: Verifies OSC 8 sequences in regular mode when run in simulated PTY.
 2. Verify sizing constraints:
-   - Keep [`lib/latex_it/diagnostics.rb`](file:///home/sariel/prog/26/latex_it/lib/latex_it/diagnostics.rb) and [`lib/latex_it/builder.rb`](file:///home/sariel/prog/26/latex_it/lib/latex_it/builder.rb) within standards.
+   - Keep [`lib/leeni/diagnostics.rb`](file:///home/sariel/prog/26/leeni/lib/leeni/diagnostics.rb) and [`lib/leeni/builder.rb`](file:///home/sariel/prog/26/leeni/lib/leeni/builder.rb) within standards.
    - Run `tools/gate_audit_code`, `tools/bundle --check`, and `tools/gate --medium`.
 
 

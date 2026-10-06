@@ -1,11 +1,11 @@
 # frozen_string_literal: true
 
 require 'minitest/autorun'
-require_relative '../lib/latex_it/diagnostic_record'
+require_relative '../lib/leeni/diagnostic_record'
 
 class TestDiagnosticRecord < Minitest::Test
   def test_record_initialization_and_helpers
-    rec = LatexIt::DiagnosticRecord.new(
+    rec = Leeni::DiagnosticRecord.new(
       file: 'paper.tex',
       line: 42,
       col: 5,
@@ -30,7 +30,7 @@ class TestDiagnosticRecord < Minitest::Test
   end
 
   def test_result_serialization
-    rec = LatexIt::DiagnosticRecord.new(
+    rec = Leeni::DiagnosticRecord.new(
       file: 'paper.tex',
       line: 10,
       tier: 'warnings',
@@ -38,7 +38,7 @@ class TestDiagnosticRecord < Minitest::Test
       message: "undefined citation 'knuth1984'"
     )
 
-    res = LatexIt::DiagnosticResult.new(
+    res = Leeni::DiagnosticResult.new(
       success: true,
       exit_code: 0,
       pdf_path: 'paper.pdf',

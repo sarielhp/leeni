@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 # ==============================================================================
-# lib/latex_it/packager.rb
+# lib/leeni/packager.rb
 #
 # Bundles LaTeX documents, active styles, and figure sources into portable
 # zip archives (-z / --zip). Verifies self-contained build in sandbox (-t).
@@ -234,7 +234,7 @@ class LatexPackager
 
     candidate = archive_candidate_path(zip_filename)
     FileUtils.rm_f(candidate)
-    succeeded = Dir.mktmpdir('latex_it_stage_') do |stage_dir|
+    succeeded = Dir.mktmpdir('leeni_stage_') do |stage_dir|
       return false unless stage_all_assets(stage_dir, deps, fig_sources)
 
       zip_out, zip_status = Dir.chdir(stage_dir) { Open3.capture2e('zip', '-q', '-r', candidate, '.') }
@@ -339,7 +339,7 @@ class LatexPackager
       return false
     end
 
-    Dir.mktmpdir('latex_it_verify_') do |tmpdir|
+    Dir.mktmpdir('leeni_verify_') do |tmpdir|
       unzip_out, unzip_stat = Open3.capture2e('unzip', '-q', zip_abs, '-d', tmpdir)
       unless unzip_stat.success?
         warn Rainbow("[FAIL] Failed to extract #{zip_filename}: #{unzip_out}").red.bright
@@ -356,7 +356,7 @@ class LatexPackager
     FileUtils.mv(bundled_pdf, backup_pdf) if File.file?(bundled_pdf)
 
     ruby_bin = RbConfig.ruby
-    script_bin = LATEX_IT_EXECUTABLE
+    script_bin = LEENI_EXECUTABLE
     cmd = [ruby_bin, script_bin, '--no-env', '--engine', @builder.engine_name]
     cmd += ['--timeout', @options[:timeout].to_s] if @options[:timeout]
     cmd << @filename
@@ -416,7 +416,7 @@ class LatexPackager
       'TEXMFCACHE' => texmf_cache,
       'XDG_CONFIG_HOME' => xdg_config,
       'XDG_CACHE_HOME' => xdg_cache,
-      'LATEX_IT_DISABLE_BUNDLED_REVTeX' => '1'
+      'LEENI_DISABLE_BUNDLED_REVTeX' => '1'
     )
   end
 end

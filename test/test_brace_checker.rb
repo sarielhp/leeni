@@ -4,8 +4,8 @@
 require 'minitest/autorun'
 require 'tmpdir'
 
-require_relative '../lib/latex_it/utils'
-require_relative '../lib/latex_it/brace_checker'
+require_relative '../lib/leeni/utils'
+require_relative '../lib/leeni/brace_checker'
 
 # The brace checker runs on every failed build and its findings are stamped
 # index: -1000, which sorts them ahead of every real TeX error. A false positive
@@ -13,7 +13,7 @@ require_relative '../lib/latex_it/brace_checker'
 # these tests are mostly about valid LaTeX it must stay silent on.
 class TestBraceChecker < Minitest::Test
   def check(source)
-    Dir.mktmpdir('latex_it_brace_test') do |dir|
+    Dir.mktmpdir('leeni_brace_test') do |dir|
       path = File.join(dir, 'doc.tex')
       File.write(path, source)
       LaTeXBraceChecker.check_file(path)
@@ -157,7 +157,7 @@ class TestBraceChecker < Minitest::Test
     text = errors.first[:text]
 
     # AUCTeX matches: ^! (.*) followed by ^l.<line> <snippet>
-    assert_match(/\A! \[latex_it\] /, text, 'must start with ! [latex_it] for AUCTeX error matching and attribution')
+    assert_match(/\A! \[leeni\] /, text, 'must start with ! [leeni] for AUCTeX error matching and attribution')
     assert_match(/^l\.\d+ /, text, 'must include standard TeX l.<line> line for AUCTeX navigation')
   end
 end

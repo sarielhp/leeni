@@ -3,7 +3,7 @@
 require 'strscan'
 
 # ==============================================================================
-# lib/latex_it/color.rb
+# lib/leeni/color.rb
 #
 # Terminal color output abstraction, TrueColor support, and theme presets.
 # ==============================================================================

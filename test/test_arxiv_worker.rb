@@ -15,7 +15,7 @@ class TestArxivWorker < Minitest::Test
     old_encoding = Encoding.default_external
     Dir.mktmpdir('arxiv_worker_review_') do |root|
       File.write(File.join(root, 'test-config.json'), JSON.generate(main: 'paper.tex', engine: 'xelatex'))
-      File.write(File.join(root, 'latex_it'), '# fixture executable')
+      File.write(File.join(root, 'leeni'), '# fixture executable')
       FileUtils.mkdir_p(File.join(root, 'paper'))
       File.write(File.join(root, 'paper/paper.tex'), "\\documentclass{article}\n\\begin{document}Test\\end{document}\n")
       yield ArxivTestWorker::Runner.new(root), root
@@ -203,7 +203,7 @@ class TestArxivWorker < Minitest::Test
   def test_prepare_raises_actionable_error_when_no_latex_engine_found
     Dir.mktmpdir('arxiv_worker_no_engine_') do |root|
       File.write(File.join(root, 'test-config.json'), JSON.generate(main: 'paper.tex'))
-      File.write(File.join(root, 'latex_it'), '# fixture executable')
+      File.write(File.join(root, 'leeni'), '# fixture executable')
       FileUtils.mkdir_p(File.join(root, 'paper'))
       File.write(File.join(root, 'paper/paper.tex'), "\\documentclass{article}\n")
       runner = ArxivTestWorker::Runner.new(root)
@@ -215,7 +215,7 @@ class TestArxivWorker < Minitest::Test
     end
   end
 
-  def test_prepare_fails_when_engine_or_latex_it_version_probe_fails
+  def test_prepare_fails_when_engine_or_leeni_version_probe_fails
     worker do |runner, _root|
       def runner.executable(_name); '/usr/bin/xelatex'; end
       def runner.install_engine_wrappers(_candidates); nil; end
@@ -256,7 +256,7 @@ class TestArxivWorker < Minitest::Test
     end
   end
 
-  def test_initialize_validates_config_and_staged_latex_it
+  def test_initialize_validates_config_and_staged_leeni
     Dir.mktmpdir('arxiv_worker_init_') do |root|
       err = assert_raises(ArxivTestWorker::CheckError) { ArxivTestWorker::Runner.new(root) }
       assert_includes err.message, 'config file not found'
@@ -267,7 +267,7 @@ class TestArxivWorker < Minitest::Test
 
       File.write(File.join(root, 'test-config.json'), JSON.generate(main: 'paper.tex'))
       err = assert_raises(ArxivTestWorker::CheckError) { ArxivTestWorker::Runner.new(root) }
-      assert_includes err.message, 'latex_it was not staged'
+      assert_includes err.message, 'leeni was not staged'
     end
   end
 

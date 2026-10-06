@@ -4,7 +4,7 @@
 # ==============================================================================
 # tools/bundle
 #
-# Bundles modular lib/latex_it/ components into a standalone single-file executable.
+# Bundles modular lib/leeni/ components into a standalone single-file executable.
 # Usage:
 #   tools/bundle               # outputs bundled script to stdout
 #   tools/bundle -o <path>     # writes to output path and chmod 0755
@@ -17,9 +17,9 @@ require 'optparse'
 
 module LatexBundler
   REPO_ROOT = File.expand_path('..', __dir__)
-  VERSION_FILE = File.join(REPO_ROOT, 'lib', 'latex_it', 'version.rb')
-  ENTRY_FILE = File.join(REPO_ROOT, 'latex_it')
-  LIB_DIR = File.join(REPO_ROOT, 'lib', 'latex_it')
+  VERSION_FILE = File.join(REPO_ROOT, 'lib', 'leeni', 'version.rb')
+  ENTRY_FILE = File.join(REPO_ROOT, 'leeni')
+  LIB_DIR = File.join(REPO_ROOT, 'lib', 'leeni')
 
   MODULE_ORDER = %w[
     version.rb
@@ -100,7 +100,7 @@ module LatexBundler
     missing = actual_files - MODULE_ORDER
     return if missing.empty?
 
-    raise "tools/bundle: lib/latex_it/ contains modules not in MODULE_ORDER: #{missing.join(', ')}"
+    raise "tools/bundle: lib/leeni/ contains modules not in MODULE_ORDER: #{missing.join(', ')}"
   end
 
   def self.bundle
@@ -125,9 +125,9 @@ module LatexBundler
       # frozen_string_literal: true
 
       # ==============================================================================
-      # latex_it (v#{version}) - Standalone Bundle
+      # leeni (v#{version}) - Standalone Bundle
       # Generated automatically by tools/bundle. Do not edit directly.
-      # Edit source files in lib/latex_it/ and latex_it, then run tools/bundle.
+      # Edit source files in lib/leeni/ and leeni, then run tools/bundle.
       # ==============================================================================
 
       #{reqs}

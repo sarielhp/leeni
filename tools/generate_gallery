@@ -5,7 +5,7 @@
 # tools/generate_gallery
 #
 # Generates side-by-side terminal comparison cards (SVG and PNG) and
-# docs/gallery.md from genuine, unedited compilations of latexmk vs latex_it.
+# docs/gallery.md from genuine, unedited compilations of latexmk vs leeni.
 # ==============================================================================
 
 require 'fileutils'
@@ -15,7 +15,7 @@ require 'tmpdir'
 
 module GalleryGenerator
   REPO_ROOT = File.expand_path('..', __dir__)
-  LATEX_IT = File.join(REPO_ROOT, 'latex_it')
+  LEENI = File.join(REPO_ROOT, 'leeni')
   DOCS_DIR = File.join(REPO_ROOT, 'docs')
   IMAGES_DIR = File.join(DOCS_DIR, 'images')
   GALLERY_MD = File.join(DOCS_DIR, 'gallery.md')
@@ -49,7 +49,7 @@ module GalleryGenerator
       TEX
       problem: "An unclosed `$` on line 4 propagates across five lines of dense mathematical prose, inverting text and math across multiple formulas until TeX crashes far downstream.",
       standard_fails: "TeX halts on line 8 (`$1 + \\epsilon$`) with `! Missing $ inserted.`, blaming an innocent, well-formed formula for missing a dollar sign and completely concealing that math mode was opened four lines earlier on line 4.",
-      latex_it_wins: "Performs candidate pair scoring across the paragraph, recognizes that downstream formulas are valid, and pinpoints the true culprit: `Unclosed '$' opened on line 4 (col 5); insert closing '$'`."
+      leeni_wins: "Performs candidate pair scoring across the paragraph, recognizes that downstream formulas are valid, and pinpoints the true culprit: `Unclosed '$' opened on line 4 (col 5); insert closing '$'`."
     },
     {
       id: :unclosed_brace,
@@ -68,7 +68,7 @@ module GalleryGenerator
       TEX
       problem: "A macro argument or group opened with `{` is left unclosed across a paragraph or EOF.",
       standard_fails: "Standard TeX parsers only complain when they encounter `\\par` or EOF (`Runaway argument?`, `! File ended while scanning use of \\textbf`). The terminal fills with 70+ lines of internal macro call traces and rule checks, but completely obscures where the `{` was actually typed.",
-      latex_it_wins: "Runs an AST-aware lexical brace scanner with environment scoping that identifies the exact line (`line 3`), column (`col 34`), and enclosing environment (`document`) where the unclosed brace started, along with an actionable remediation hint."
+      leeni_wins: "Runs an AST-aware lexical brace scanner with environment scoping that identifies the exact line (`line 3`), column (`col 34`), and enclosing environment (`document`) where the unclosed brace started, along with an actionable remediation hint."
     },
     {
       id: :misplaced_tab,
@@ -87,7 +87,7 @@ module GalleryGenerator
       TEX
       problem: "The author used `&` to align multi-part equations, but placed it inside `equation*` instead of `align*`.",
       standard_fails: "Standard LaTeX emits a generic `! Misplaced alignment tab character &.`, followed by 45 lines of engine state and generic failure boilerplate. It offers zero explanation of *why* the ampersand is invalid or how to structure the math environment.",
-      latex_it_wins: "Performs backwards AST scope resolution, detects that the tab character resides inside `equation*`, and delivers an immediate, tailored hint: `Misplaced '&' in 'equation*'; switch to 'align*' (or use 'aligned' / 'split')`."
+      leeni_wins: "Performs backwards AST scope resolution, detects that the tab character resides inside `equation*`, and delivers an immediate, tailored hint: `Misplaced '&' in 'equation*'; switch to 'align*' (or use 'aligned' / 'split')`."
     },
     {
       id: :macro_typo,
@@ -103,7 +103,7 @@ module GalleryGenerator
       TEX
       problem: "A minor typo in a common macro name (`\\includegrahics` instead of `\\includegraphics`).",
       standard_fails: "TeX fails on the unknown macro and attempts to recover by misinterpreting underscores (`_`) in filenames as text-mode subscripts, causing a cascade of misleading secondary errors (`Missing $ inserted`, `Extra }, or forgotten $`).",
-      latex_it_wins: "Uses Levenshtein edit distance against standard LaTeX commands and package signatures, identifying the intended macro with: `Did you mean '\\includegraphics'? (requires \\usepackage{graphicx})`."
+      leeni_wins: "Uses Levenshtein edit distance against standard LaTeX commands and package signatures, identifying the intended macro with: `Did you mean '\\includegraphics'? (requires \\usepackage{graphicx})`."
     },
     {
       id: :missing_package,
@@ -122,7 +122,7 @@ module GalleryGenerator
       TEX
       problem: "Using standard publication-quality table markup (`\\toprule`) without importing the prerequisite package.",
       standard_fails: "Reports `! Undefined control sequence. <recently read> \\toprule`. Standard tools do not associate macro names with external CTAN packages, leaving the author to manually look up what package supplies the command.",
-      latex_it_wins: "Looks up the command signature in its package index and reports: `Command '\\toprule' requires \\usepackage{booktabs}`."
+      leeni_wins: "Looks up the command signature in its package index and reports: `Command '\\toprule' requires \\usepackage{booktabs}`."
     },
     {
       id: :inverted_label,
@@ -143,7 +143,7 @@ module GalleryGenerator
       TEX
       problem: "Placing `\\label{...}` before `\\caption{...}` inside a floating `figure` or `table`.",
       standard_fails: "Standard compilers are **completely silent** and exit with code 0. However, `\\caption` is what increments the float counter; placing `\\label` before it causes `\\ref{fig:myfig}` to quietly bind to Section 1 instead of Figure 1, producing corrupt citations in published papers.",
-      latex_it_wins: "Inspects float structure and elevates this silent bug to the **Alert** diagnostic tier: `6: Inverted \\label{fig:myfig} before \\caption in figure environment. Move \\label after or inside \\caption.`"
+      leeni_wins: "Inspects float structure and elevates this silent bug to the **Alert** diagnostic tier: `6: Inverted \\label{fig:myfig} before \\caption in figure environment. Move \\label after or inside \\caption.`"
     },
     {
       id: :bib_syntax_error,
@@ -172,7 +172,7 @@ module GalleryGenerator
       },
       problem: "An unescaped underscore (`_`) in a `.bib` database field (such as `journal = {NORDIC_J_COMP}`).",
       standard_fails: "TeX crashes during `\\printbibliography` with `! Missing $ inserted.` or `! Double subscript.` on line 7 of `paper.tex`. It offers zero indication of which citation key failed, which `.bib` file it came from, or what field caused the syntax crash, forcing authors into tedious binary-search debugging.",
-      latex_it_wins: "Injects an AST hook into BibLaTeX's entry pipeline to capture the active citation key at the instant of failure, locates the entry and line in `refs.bib`, and prints an actionable companion error: `refs.bib:4: [latex_it] Bibliography error in entry 'grss95'` with `▸ Hint: Offending token 'NORDIC_J_COMP' found on this line.`."
+      leeni_wins: "Injects an AST hook into BibLaTeX's entry pipeline to capture the active citation key at the instant of failure, locates the entry and line in `refs.bib`, and prints an actionable companion error: `refs.bib:4: [leeni] Bibliography error in entry 'grss95'` with `▸ Hint: Offending token 'NORDIC_J_COMP' found on this line.`."
     }
   ].freeze
 
@@ -312,7 +312,7 @@ module GalleryGenerator
     panel_w = 576
 
     left_panel = render_panel('Standard Tool: latexmk', left_lines, left_pill, true, panel_w, panel_h, line_h)
-    right_panel = render_panel('latex_it (l)', right_lines, right_pill, false, panel_w, panel_h, line_h)
+    right_panel = render_panel('leeni (l)', right_lines, right_pill, false, panel_w, panel_h, line_h)
 
     <<~SVG
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 #{total_w} #{total_h}" width="#{total_w}" height="#{total_h}">
@@ -407,7 +407,7 @@ module GalleryGenerator
       end
 
       out_mk, _ = Open3.capture2e('latexmk', '-xelatex', '-halt-on-error', 'paper.tex', chdir: dir)
-      out_l, _ = Open3.capture2e({ 'CLICOLOR_FORCE' => '1' }, LATEX_IT, '--no-lock', '-f', 'paper.tex', chdir: dir)
+      out_l, _ = Open3.capture2e({ 'CLICOLOR_FORCE' => '1' }, LEENI, '--no-lock', '-f', 'paper.tex', chdir: dir)
 
       right_raw = ['$ l paper.tex'] + out_l.lines.map(&:chomp)
       right_display = build_display_lines(right_raw, is_ansi: true)
@@ -433,10 +433,12 @@ module GalleryGenerator
     puts "      Wrote #{svg_path}"
 
     png_path = File.join(IMAGES_DIR, "#{scenario[:filename]}.png")
-    if system('which', 'convert', out: File::NULL, err: File::NULL)
+    if system('which', 'rsvg-convert', out: File::NULL, err: File::NULL)
+      system('rsvg-convert', '-o', png_path, svg_path)
+    elsif system('which', 'convert', out: File::NULL, err: File::NULL)
       system('convert', '-density', '150', svg_path, png_path)
-      puts "      Wrote #{png_path}" if File.exist?(png_path)
     end
+    puts "      Wrote #{png_path}" if File.exist?(png_path)
   end
 
   def self.build_markdown_content(image_prefix: 'images/')
@@ -465,7 +467,7 @@ module GalleryGenerator
         ### Commentary & Diagnosis
 
         - **Standard Tool (`latexmk` / `xelatex`)**: #{s[:standard_fails]}
-        - **`latex_it` Resolution**: #{s[:latex_it_wins]}
+        - **`leeni` Resolution**: #{s[:leeni_wins]}
 
         ---
       SECTION
@@ -483,7 +485,7 @@ module GalleryGenerator
 
       # Diagnostic Showcase Gallery
 
-      This gallery presents **unedited, real-world terminal runs** comparing standard LaTeX compilation tools (`latexmk` on `xelatex`) directly against `latex_it`.
+      This gallery presents **unedited, real-world terminal runs** comparing standard LaTeX compilation tools (`latexmk` on `xelatex`) directly against `leeni`.
 
       Every comparison below was generated by running genuine compilations of both tools on the exact same `.tex` source files.
 

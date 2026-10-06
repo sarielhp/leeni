@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 # ==============================================================================
-# lib/latex_it/meta_extractor.rb
+# lib/leeni/meta_extractor.rb
 #
 # Metadata extractor for LaTeX papers (Title, Authors, Abstract, Page Count).
 # Formats output for arXiv submissions, preserving supported inline MathJax.

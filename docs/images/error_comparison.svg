@@ -17,7 +17,7 @@
   <g transform="translate(24, 24)" filter="url(#shadow)">
     <rect width="528" height="530" rx="10" fill="#1a1b26" stroke="#2f334d" stroke-width="1.5"/>
     <path d="M 0,10 A 10,10 0 0,1 10,0 L 518,0 A 10,10 0 0,1 528,10 L 528,40 L 0,40 Z" fill="#16161e"/>
-    <circle cx="20" cy="20" r="6" fill="#f7768e"/>
+    <circle cx="20" cy="20" r="6" fill="#ff6b6b"/>
     <circle cx="38" cy="20" r="6" fill="#e0af68"/>
     <circle cx="56" cy="20" r="6" fill="#414868"/>
     <text x="264" y="25" fill="#787c99" text-anchor="middle" class="title">latexmk (Standard TeX Log)</text>
@@ -34,49 +34,45 @@
         <text x="0" y="168" fill="#565f89" >(junk/paper.aux))</text>
         <text x="0" y="189" fill="#ff9e64" font-weight="bold">Runaway argument?</text>
         <text x="0" y="210" fill="#c0caf5" >{that forgot the closing brace. \par And here... \ETC.</text>
-        <text x="0" y="231" fill="#f7768e" font-weight="bold">! File ended while scanning use of \textbf .</text>
+        <text x="0" y="231" fill="#ff6b6b" font-weight="bold">! File ended while scanning use of \textbf .</text>
         <text x="0" y="252" fill="#565f89" >&lt;inserted text&gt;</text>
         <text x="0" y="273" fill="#565f89" >                \par</text>
-        <text x="0" y="294" fill="#f7768e" >&lt;*&gt; .../paper.tex</text>
-        <text x="0" y="315" fill="#f7768e" font-weight="bold">! Emergency stop.</text>
+        <text x="0" y="294" fill="#ff6b6b" >&lt;*&gt; .../paper.tex</text>
+        <text x="0" y="315" fill="#ff6b6b" font-weight="bold">! Emergency stop.</text>
         <text x="0" y="336" fill="#565f89" >Transcript written on junk/paper.log.</text>
         <text x="0" y="357" fill="#ff9e64" >Latexmk: Errors, so I did not complete making targets</text>
-        <text x="0" y="378" fill="#f7768e" >Collected error summary: 'xelatex' return code 1</text>
+        <text x="0" y="378" fill="#ff6b6b" >Collected error summary: 'xelatex' return code 1</text>
     </g>
 
     <g transform="translate(20, 478)">
-            <rect width="488" height="34" rx="6" fill="#2d1c24" stroke="#f7768e" stroke-width="1.2"/>
-            <text x="244" y="21" fill="#f7768e" text-anchor="middle" class="badge">❌ 50+ lines of noise — line of unclosed brace is unknown!</text>
+            <rect width="488" height="34" rx="6" fill="#2d1c24" stroke="#ff6b6b" stroke-width="1.2"/>
+            <text x="244" y="21" fill="#ff6b6b" text-anchor="middle" class="badge">❌ 50+ lines of noise — line of unclosed brace is unknown!</text>
           </g>
   </g>
 
-  <!-- Right Panel: latex_it -->
+  <!-- Right Panel: leeni -->
   <g transform="translate(588, 24)" filter="url(#shadow)">
     <rect width="528" height="530" rx="10" fill="#1a1b26" stroke="#384a68" stroke-width="1.5"/>
     <path d="M 0,10 A 10,10 0 0,1 10,0 L 518,0 A 10,10 0 0,1 528,10 L 528,40 L 0,40 Z" fill="#16161e"/>
-    <circle cx="20" cy="20" r="6" fill="#f7768e"/>
+    <circle cx="20" cy="20" r="6" fill="#ff6b6b"/>
     <circle cx="38" cy="20" r="6" fill="#e0af68"/>
     <circle cx="56" cy="20" r="6" fill="#9ece6a"/>
-    <text x="264" y="25" fill="#c0caf5" text-anchor="middle" class="title">latex_it (l)</text>
+    <text x="264" y="25" fill="#c0caf5" text-anchor="middle" class="title">leeni (l)</text>
 
     <g transform="translate(20, 66)" class="code">
       <text x="0" y="0" fill="#7dcfff" font-weight="bold">$ l paper.tex</text>
-        <text x="0" y="21" fill="#565f89" >      xelatex (1)</text>
-        <text x="0" y="42" fill="#f7768e" font-weight="bold">==========================================================</text>
-        <text x="0" y="63" fill="#f7768e" font-weight="bold"> ERROR: LaTeX Compilation Failed!</text>
-        <text x="0" y="84" fill="#f7768e" font-weight="bold">==========================================================</text>
-        <text x="0" y="105" fill="#c0caf5" ></text>
-        <text x="0" y="126" fill="#bb9af7" font-weight="bold">── paper.tex (2 errors) ──────────────────────────────────</text>
-        <text x="0" y="147" fill="#f7768e" font-weight="bold">6: ! Unclosed open brace '{' (opened on line 6, col 34)</text>
-        <text x="0" y="168" fill="#f7768e" >   inside environment 'document' (ended at line 9)</text>
-        <text x="0" y="189" fill="#c0caf5" font-weight="bold">   l.6 Here is an unclosed macro \textbf{that forgot...</text>
-        <text x="0" y="210" fill="#ff9e64" font-weight="bold"> : Runaway argument?</text>
-        <text x="0" y="231" fill="#c0caf5" >   {that forgot the closing brace. \par And here...</text>
-        <text x="0" y="252" fill="#9ece6a" font-weight="bold">   ▸ Hint: Unclosed brace across paragraph; insert '}'</text>
-        <text x="0" y="273" fill="#f7768e" font-weight="bold">==========================================================</text>
-        <text x="0" y="294" fill="#565f89" >See junk/err_xelatex_1 for full error details.</text>
-        <text x="0" y="315" fill="#c0caf5" ></text>
-        <text x="0" y="336" fill="#7aa2f7" >Errors: 2, Alerts: 0, Warnings: 0, Whatevers: 0</text>
+        <text x="0" y="21" fill="#ff6b6b" font-weight="bold">      xelatex (1): Latex compilation failed! (Status: 1)</text>
+        <text x="0" y="42" fill="#c0caf5" ></text>
+        <text x="0" y="63" fill="#ff6b6b" font-weight="bold">── paper.tex (2 errors) ──────────────────────────────────</text>
+        <text x="0" y="84" fill="#ff6b6b" font-weight="bold">6: ! Unclosed open brace '{' (opened on line 6, col 34)</text>
+        <text x="0" y="105" fill="#ff6b6b" >   inside environment 'document' (ended at line 9)</text>
+        <text x="0" y="126" fill="#c0caf5" font-weight="bold">   l.6 Here is an unclosed macro \textbf{that forgot...</text>
+        <text x="0" y="147" fill="#ff9e64" font-weight="bold"> : Runaway argument?</text>
+        <text x="0" y="168" fill="#c0caf5" >   {that forgot the closing brace. \par And here...</text>
+        <text x="0" y="189" fill="#9ece6a" font-weight="bold">   ▸ Hint: Unclosed brace across paragraph; insert '}'</text>
+        <text x="0" y="210" fill="#565f89" >See junk/err_xelatex_1 for full error details.</text>
+        <text x="0" y="231" fill="#c0caf5" ></text>
+        <text x="0" y="252" fill="#7aa2f7" >Errors: 2, Alerts: 0, Warnings: 0, Whatevers: 0</text>
     </g>
 
     <g transform="translate(20, 478)">

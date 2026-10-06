@@ -3,8 +3,8 @@
 require 'minitest/autorun'
 require 'tmpdir'
 require 'fileutils'
-require_relative '../lib/latex_it/macro_harvester'
-require_relative '../lib/latex_it/error_catalog'
+require_relative '../lib/leeni/macro_harvester'
+require_relative '../lib/leeni/error_catalog'
 
 class TestMacroHarvester < Minitest::Test
   def setup
@@ -16,7 +16,7 @@ class TestMacroHarvester < Minitest::Test
   end
 
   def test_harvest_extracts_various_macro_definition_forms
-    Dir.mktmpdir('latex_it_harvest_test') do |dir|
+    Dir.mktmpdir('leeni_harvest_test') do |dir|
       main_file = File.join(dir, 'main.tex')
       File.write(main_file, <<~TEX)
         \\documentclass{article}
@@ -46,7 +46,7 @@ class TestMacroHarvester < Minitest::Test
   end
 
   def test_harvest_includes_sty_and_subdirectories_but_ignores_junk
-    Dir.mktmpdir('latex_it_harvest_test') do |dir|
+    Dir.mktmpdir('leeni_harvest_test') do |dir|
       sub_dir = File.join(dir, 'styles')
       junk_dir = File.join(dir, 'junk')
       FileUtils.mkdir_p(sub_dir)
@@ -69,7 +69,7 @@ class TestMacroHarvester < Minitest::Test
   end
 
   def test_suggest_command_fuzzy_matches_project_macro_typo
-    Dir.mktmpdir('latex_it_harvest_test') do |dir|
+    Dir.mktmpdir('leeni_harvest_test') do |dir|
       main_file = File.join(dir, 'k_wise_reviewed.tex')
       File.write(main_file, <<~TEX)
         \\documentclass{article}
@@ -85,7 +85,7 @@ class TestMacroHarvester < Minitest::Test
   end
 
   def test_classify_with_project_macro_typo
-    Dir.mktmpdir('latex_it_harvest_test') do |dir|
+    Dir.mktmpdir('leeni_harvest_test') do |dir|
       main_file = File.join(dir, 'k_wise_reviewed.tex')
       File.write(main_file, <<~TEX)
         \\documentclass{article}
@@ -120,7 +120,7 @@ class TestMacroHarvester < Minitest::Test
   end
 
   def test_harvest_resolves_project_root_from_nested_file
-    Dir.mktmpdir('latex_it_harvest_test') do |dir|
+    Dir.mktmpdir('leeni_harvest_test') do |dir|
       root_sty = File.join(dir, 'macros.sty')
       File.write(root_sty, "\\newcommand{\\RootMacro}{hello}\n")
 
@@ -136,7 +136,7 @@ class TestMacroHarvester < Minitest::Test
   end
 
   def test_caching_and_cache_invalidation
-    Dir.mktmpdir('latex_it_harvest_test') do |dir|
+    Dir.mktmpdir('leeni_harvest_test') do |dir|
       main_file = File.join(dir, 'main.tex')
       File.write(main_file, "\\newcommand{\\InitialMacro}{1}\n")
 
@@ -156,7 +156,7 @@ class TestMacroHarvester < Minitest::Test
   end
 
   def test_suggest_command_suggests_nothing_when_edit_distance_too_large_or_ambiguous
-    Dir.mktmpdir('latex_it_harvest_test') do |dir|
+    Dir.mktmpdir('leeni_harvest_test') do |dir|
       main_file = File.join(dir, 'main.tex')
       File.write(main_file, <<~TEX)
         \\newcommand{\\QuotePExt}[1]{``#1''}
@@ -191,7 +191,7 @@ class TestMacroHarvester < Minitest::Test
   end
 
   def test_harvest_discovers_macros_from_fls_recorder
-    Dir.mktmpdir('latex_it_harvest_test') do |dir|
+    Dir.mktmpdir('leeni_harvest_test') do |dir|
       main_file = File.join(dir, 'doc.tex')
       File.write(main_file, "\\documentclass{article}\n\\begin{document}\n\\end{document}\n")
 
@@ -215,7 +215,7 @@ class TestMacroHarvester < Minitest::Test
   end
 
   def test_harvest_discovers_macros_from_symlinked_directory
-    Dir.mktmpdir('latex_it_harvest_test') do |dir|
+    Dir.mktmpdir('leeni_harvest_test') do |dir|
       shared_styles = File.join(dir, 'shared_styles')
       FileUtils.mkdir_p(shared_styles)
       File.write(File.join(shared_styles, 'macros.tex'), "\\newcommand{\\SymlinkedDirMacro}{val}\n")

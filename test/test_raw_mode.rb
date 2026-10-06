@@ -6,11 +6,11 @@ require 'open3'
 require 'tmpdir'
 require 'fileutils'
 
-load File.expand_path('../latex_it', __dir__)
+load File.expand_path('../leeni', __dir__)
 
 class TestRawMode < Minitest::Test
   def setup
-    @bin_path = File.expand_path('../latex_it', __dir__)
+    @bin_path = File.expand_path('../leeni', __dir__)
   end
 
   def test_help_includes_raw_flag

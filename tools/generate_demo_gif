@@ -196,31 +196,29 @@ module DemoRecorder
     def process_banner(b)
       @banner_counter ||= 0
       @banner_counter += 1
-      title = b['title'] || 'latex_it'
+      title = b['title'] || 'leeni'
       sub = b['subtitle']
-      url = b['url'] || 'https://github.com/sarielhp/latex_it'
+      url = b['url'] || 'https://github.com/sarielhp/leeni'
       delay = b['delay_after'] || '3s'
 
-      banner_filename = "_banner_#{@banner_counter}.sh"
+      banner_filename = "_banner_#{@banner_counter}.rb"
       banner_path = File.join(@work_dir, banner_filename)
-      script = [
-        '#!/usr/bin/env bash',
-        'clear',
-        'echo ""',
-        %(if command -v cfonts >/dev/null 2>&1; then),
-        %(  cfonts "#{escape_quotes(title)}" -f block -g cyan,magenta -a left -s),
-        %(elif command -v figlet >/dev/null 2>&1; then),
-        %(  echo -e "  \\e[1;36m\$(figlet -f slant '#{escape_quotes(title)}')\\e[0m"),
-        %(else),
-        %(  echo -e "  \\e[1;36m=== #{escape_quotes(title)} ===\\e[0m"),
-        %(fi),
-        sub ? %(echo -e "\n  \\e[1;33m#{escape_quotes(sub)}\\e[0m") : nil,
-        %(echo -e "  \\e[1;34m#{escape_quotes(url)}\\e[0m\n")
-      ].compact.join("\n") + "\n"
+      script = <<~RUBY
+        #!/usr/bin/env ruby
+        # frozen_string_literal: true
+        system('clear')
+        puts
+        print "\e[1;36m"
+        rendered = system('figlet', '-f', 'slant', #{title.inspect})
+        puts #{title.inspect} unless rendered
+        print "\e[0m"
+        puts "\n  \e[1;33m" + #{sub.to_s.inspect} + "\e[0m"
+        puts "  \e[1;34m" + #{url.inspect} + "\e[0m\n"
+      RUBY
       File.write(banner_path, script)
 
       @lines << 'Hide'
-      @lines << %(Type "bash #{banner_filename}")
+      @lines << %(Type "ruby #{banner_filename}")
       @lines << 'Enter'
       @lines << 'Sleep 100ms'
       @lines << 'Show'
@@ -251,7 +249,7 @@ module DemoRecorder
     end
 
     def run
-      Dir.mktmpdir('latex_it_demo_') do |tmpdir|
+      Dir.mktmpdir('leeni_demo_') do |tmpdir|
         setup_workspace_files(tmpdir)
         tape_content = TapeBuilder.new(@scenario, tmpdir).build
 
@@ -267,6 +265,8 @@ module DemoRecorder
     private
 
     def setup_workspace_files(dir)
+      executable = File.expand_path('../leeni', __dir__)
+      %w[leeni l].each { |name| FileUtils.ln_s(executable, File.join(dir, name)) }
       @scenario.files.each do |rel_path, content|
         target = File.join(dir, rel_path)
         FileUtils.mkdir_p(File.dirname(target))
@@ -282,7 +282,7 @@ module DemoRecorder
       FileUtils.mkdir_p(File.dirname(@scenario.output_path))
 
       puts "==> Running VHS to render: #{@scenario.output_path}"
-      env = { 'PATH' => @env.path_env }
+      env = { 'PATH' => [dir, @env.path_env].join(File::PATH_SEPARATOR) }
       success = system(env, @env.vhs_path, tape_path)
       status = $?.exitstatus || (success ? 0 : 1)
 

@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 # ==============================================================================
-# lib/latex_it/bib_locator.rb
+# lib/leeni/bib_locator.rb
 #
 # Resolves citation keys and offending tokens to exact .bib file and line numbers.
 # ==============================================================================

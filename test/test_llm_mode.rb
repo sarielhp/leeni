@@ -8,7 +8,7 @@ require 'fileutils'
 
 class TestLLMMode < Minitest::Test
   def setup
-    @bin_path = File.expand_path('../latex_it', __dir__)
+    @bin_path = File.expand_path('../leeni', __dir__)
   end
 
   def test_clean_build_in_llm_mode_is_100_percent_silent
@@ -88,7 +88,7 @@ class TestLLMMode < Minitest::Test
       # Fold note should be emitted
       fold_note = lines.find { |l| l.include?('more undefined citations') }
       refute_nil fold_note, "Expected folding note in output: #{out}"
-      assert_match(/latex_it: note: 3 more undefined citations in cites\.tex \(pass -a to show all\)/, fold_note)
+      assert_match(/leeni: note: 3 more undefined citations in cites\.tex \(pass -a to show all\)/, fold_note)
       assert_equal 3, lines.size
     end
   end

@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 # ==============================================================================
-# lib/latex_it/bib_manager.rb
+# lib/leeni/bib_manager.rb
 #
 # Manages bibliography tool detection (Biber / BibTeX), citation extraction,
 # dependency discovery, execution lifecycle, and staleness detection.

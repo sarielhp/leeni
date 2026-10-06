@@ -7,9 +7,9 @@ require 'fileutils'
 require 'json'
 require 'digest'
 
-require_relative '../lib/latex_it/utils'
-require_relative '../lib/latex_it/builder'
-load File.expand_path('../latex_it', __dir__)
+require_relative '../lib/leeni/utils'
+require_relative '../lib/leeni/builder'
+load File.expand_path('../leeni', __dir__)
 
 # targets_up_to_date? decides whether to skip the build entirely, so anything
 # it fails to watch produces a silently stale PDF and an "up-to-date" message.
@@ -20,7 +20,7 @@ class TestBuildCache < Minitest::Test
 
   # Builds a project that is genuinely up to date, with a .bib in `bib_subdir`.
   def in_cached_project(bib_subdir, opts = {})
-    Dir.mktmpdir('latex_it_cache_test') do |dir|
+    Dir.mktmpdir('leeni_cache_test') do |dir|
       Dir.chdir(dir) do
         FileUtils.mkdir_p(['junk', bib_subdir])
         File.write('paper.tex', "\\documentclass{article}\n\\begin{document}\nx\n\\end{document}\n")
@@ -78,7 +78,7 @@ class TestBuildCache < Minitest::Test
   end
 
   def test_discover_bib_files_honours_configured_dirs
-    Dir.mktmpdir('latex_it_discover_test') do |dir|
+    Dir.mktmpdir('leeni_discover_test') do |dir|
       Dir.chdir(dir) do
         FileUtils.mkdir_p(%w[citations refs])
         File.write('citations/a.bib', '@book{a,}')
@@ -107,7 +107,7 @@ class TestBuildCache < Minitest::Test
   end
 
   def test_magic_comment_selects_the_engine
-    Dir.mktmpdir('latex_it_engine_test') do |dir|
+    Dir.mktmpdir('leeni_engine_test') do |dir|
       Dir.chdir(dir) do
         File.write('paper.tex', "% !TEX TS-program = lualatex\n\\documentclass{article}\n\\begin{document}\nx\n\\end{document}\n")
         FileUtils.mkdir_p('junk')
@@ -120,7 +120,7 @@ class TestBuildCache < Minitest::Test
   end
 
   def test_explicit_engine_outranks_the_magic_comment
-    Dir.mktmpdir('latex_it_engine_test') do |dir|
+    Dir.mktmpdir('leeni_engine_test') do |dir|
       Dir.chdir(dir) do
         File.write('paper.tex', "% !TEX TS-program = lualatex\n\\documentclass{article}\n")
         builder = LatexBuilder.new('paper.tex', options(engine: 'pdflatex', engine_explicit: true))
@@ -130,7 +130,7 @@ class TestBuildCache < Minitest::Test
   end
 
   def test_magic_comment_outranks_the_configured_default
-    Dir.mktmpdir('latex_it_engine_test') do |dir|
+    Dir.mktmpdir('leeni_engine_test') do |dir|
       Dir.chdir(dir) do
         File.write('paper.tex', "% !TEX TS-program = lualatex\n\\documentclass{article}\n")
         builder = LatexBuilder.new('paper.tex', options(engine: nil, config_engine: 'xelatex'))
@@ -140,7 +140,7 @@ class TestBuildCache < Minitest::Test
   end
 
   def test_configured_default_is_used_without_a_magic_comment
-    Dir.mktmpdir('latex_it_engine_test') do |dir|
+    Dir.mktmpdir('leeni_engine_test') do |dir|
       Dir.chdir(dir) do
         File.write('paper.tex', "\\documentclass{article}\n")
         builder = LatexBuilder.new('paper.tex', options(engine: nil, config_engine: 'lualatex'))
@@ -150,7 +150,7 @@ class TestBuildCache < Minitest::Test
   end
 
   def test_default_is_xelatex_when_nothing_is_specified
-    Dir.mktmpdir('latex_it_engine_test') do |dir|
+    Dir.mktmpdir('leeni_engine_test') do |dir|
       Dir.chdir(dir) do
         File.write('paper.tex', "\\documentclass{article}\n")
         builder = LatexBuilder.new('paper.tex', options(engine: nil, config_engine: nil))
@@ -301,7 +301,7 @@ class TestBuildCache < Minitest::Test
   end
 
   def test_undefined_reference_stabilizes_and_caches
-    Dir.mktmpdir('latex_it_undef_ref_test') do |dir|
+    Dir.mktmpdir('leeni_undef_ref_test') do |dir|
       tex_file = File.join(dir, 'doc.tex')
       File.write(tex_file, <<~TEX)
         \\documentclass{article}
@@ -311,7 +311,7 @@ class TestBuildCache < Minitest::Test
         \\end{document}
       TEX
 
-      bin = File.expand_path('../latex_it', __dir__)
+      bin = File.expand_path('../leeni', __dir__)
       out, status = Open3.capture2e(bin, '--no-color', 'doc.tex', chdir: dir)
       assert_equal 0, status.exitstatus, "Expected exit 0. Output: #{out}"
       assert File.file?(File.join(dir, 'doc.pdf'))
@@ -332,7 +332,7 @@ class TestBuildCache < Minitest::Test
   end
 
   def test_build_with_dot_junk_dir
-    Dir.mktmpdir('latex_it_dot_junk_build') do |dir|
+    Dir.mktmpdir('leeni_dot_junk_build') do |dir|
       tex_file = File.join(dir, 'doc.tex')
       File.write(tex_file, <<~TEX)
         \\documentclass{article}
@@ -341,7 +341,7 @@ class TestBuildCache < Minitest::Test
         \\end{document}
       TEX
 
-      bin = File.expand_path('../latex_it', __dir__)
+      bin = File.expand_path('../leeni', __dir__)
       out, status = Open3.capture2e(bin, '--no-color', '--junk-dir', '.junk', 'doc.tex', chdir: dir)
       assert_equal 0, status.exitstatus, "Expected exit 0. Output: #{out}"
       assert File.file?(File.join(dir, 'doc.pdf'))

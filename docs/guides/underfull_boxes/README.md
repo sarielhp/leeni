@@ -6,7 +6,7 @@ A plain-English guide to understanding, diagnosing, and fixing one of LaTeX's mo
 
 ## 1. The Horror at Line 256
 
-You run `latex_it` (or `pdflatex`), and the compiler reports:
+You run `leeni` (or `pdflatex`), and the compiler reports:
 
 ```text
 256: Note: underfull \hbox (badness 10000)

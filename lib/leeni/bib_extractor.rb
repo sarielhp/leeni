@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 # ==============================================================================
-# lib/latex_it/bib_extractor.rb
+# lib/leeni/bib_extractor.rb
 #
 # Extracts cited bibliography entries and dependent @string macros from
 # global or referenced .bib databases into a self-contained local .bib file.

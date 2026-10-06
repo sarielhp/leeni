@@ -1,6 +1,6 @@
 # LaTeX & TeX Error Reference Catalog
 
-This catalog documents common LaTeX and TeX compilation errors, their root causes, canonical reference links, and how [`latex_it`](../../latex_it) identifies, diagnoses, and provides remediation hints for each issue.
+This catalog documents common LaTeX and TeX compilation errors, their root causes, canonical reference links, and how [`leeni`](../../leeni) identifies, diagnoses, and provides remediation hints for each issue.
 
 ---
 
@@ -14,12 +14,12 @@ Errors during compilation originate in one of three layers:
 
 ---
 
-## 2. `latex_it` Diagnostic Tiers
+## 2. `leeni` Diagnostic Tiers
 
 | Handling Level | Description |
 | :--- | :--- |
-| **`Pre-Flight`** | Detected statically *before* compilation via [`LaTeXBraceChecker`](../../lib/latex_it/brace_checker.rb) (e.g. unclosed braces, inverted labels, and environment mismatches). |
-| **`Catalog Hint`** | Classified via [`LaTeXErrorCatalog`](../../lib/latex_it/error_catalog.rb), which extracts offending tokens (commands, environments, filenames) and prints an inline actionable remediation hint (`▸ Hint:`). Full boxed explanations (`Why:` / `Fix:`) are rendered on demand with `--explain`. |
+| **`Pre-Flight`** | Detected statically *before* compilation via [`LaTeXBraceChecker`](../../lib/leeni/brace_checker.rb) (e.g. unclosed braces, inverted labels, and environment mismatches). |
+| **`Catalog Hint`** | Classified via [`LaTeXErrorCatalog`](../../lib/leeni/error_catalog.rb), which extracts offending tokens (commands, environments, filenames) and prints an inline actionable remediation hint (`▸ Hint:`). Full boxed explanations (`Why:` / `Fix:`) are rendered on demand with `--explain`. |
 | **`Standard`** | Captured via `-file-line-error` logging with source snippet and line attribution. |
 | **`Fatal`** | Critical engine termination (`Emergency stop`); surfaces the primary fault line and points to the raw transcript. |
 

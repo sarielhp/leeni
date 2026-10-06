@@ -5,16 +5,16 @@ require 'tmpdir'
 require 'fileutils'
 require 'open3'
 
-require_relative '../lib/latex_it/utils'
-require_relative '../lib/latex_it/builder'
-require_relative '../lib/latex_it/arxiv'
-require_relative '../lib/latex_it/packager'
+require_relative '../lib/leeni/utils'
+require_relative '../lib/leeni/builder'
+require_relative '../lib/leeni/arxiv'
+require_relative '../lib/leeni/packager'
 
 # Guards every path that deletes files in the user's project directory.
 # The tool writes all of its own scratch output under junk/; anything these
 # sweeps match in the project root can therefore only be a file the user wrote.
 class TestDestructivePaths < Minitest::Test
-  BIN = File.expand_path('../latex_it', __dir__)
+  BIN = File.expand_path('../leeni', __dir__)
   load BIN
 
   def build_options
@@ -22,7 +22,7 @@ class TestDestructivePaths < Minitest::Test
   end
 
   def test_paper_cleanup_preserves_user_log_txt
-    Dir.mktmpdir('latex_it_cleanup_test') do |dir|
+    Dir.mktmpdir('leeni_cleanup_test') do |dir|
       Dir.chdir(dir) do
         File.write('paper.tex', "\\documentclass{article}\n\\begin{document}\nx\n\\end{document}\n")
         File.write('log.txt', "experiment results, not a LaTeX artifact\n")
@@ -36,7 +36,7 @@ class TestDestructivePaths < Minitest::Test
   end
 
   def test_clean_directory_preserves_user_authored_files
-    Dir.mktmpdir('latex_it_clean_test') do |dir|
+    Dir.mktmpdir('leeni_clean_test') do |dir|
       Dir.chdir(dir) do
         FileUtils.mkdir_p('figs/bak')
         File.write('figs/bak/old_figure.pdf', 'user backup')
@@ -61,7 +61,7 @@ class TestDestructivePaths < Minitest::Test
   end
 
   def test_clean_directory_still_removes_real_artifacts
-    Dir.mktmpdir('latex_it_clean_real_test') do |dir|
+    Dir.mktmpdir('leeni_clean_real_test') do |dir|
       Dir.chdir(dir) do
         FileUtils.mkdir_p('junk')
         File.write('junk/paper.aux', 'artifact')
@@ -82,7 +82,7 @@ class TestDestructivePaths < Minitest::Test
   end
 
   def test_directory_argument_rejects_a_path_that_does_not_exist
-    Dir.mktmpdir('latex_it_target_test') do |dir|
+    Dir.mktmpdir('leeni_target_test') do |dir|
       Dir.chdir(dir) do
         FileUtils.mkdir_p('sub')
         File.write('paper.tex', "\\documentclass{article}\n")
@@ -98,7 +98,7 @@ class TestDestructivePaths < Minitest::Test
   end
 
   def test_clean_only_with_a_bad_directory_exits_without_cleaning
-    Dir.mktmpdir('latex_it_badtarget_test') do |dir|
+    Dir.mktmpdir('leeni_badtarget_test') do |dir|
       File.write(File.join(dir, 'paper.tex'), "\\documentclass{article}\n")
       File.write(File.join(dir, 'paper.aux'), 'artifact')
 
@@ -111,7 +111,7 @@ class TestDestructivePaths < Minitest::Test
   end
 
   def test_clean_directory_prints_relative_path_to_pwd
-    Dir.mktmpdir('latex_it_clean_rel_test') do |dir|
+    Dir.mktmpdir('leeni_clean_rel_test') do |dir|
       FileUtils.mkdir_p(File.join(dir, 'notes', '40_vc'))
       out, status = Open3.capture2e(BIN, '-C', 'notes/40_vc', chdir: dir)
       assert status.success?
@@ -132,7 +132,7 @@ class TestDestructivePaths < Minitest::Test
   end
 
   def test_help_wins_over_clean_only
-    Dir.mktmpdir('latex_it_help_test') do |dir|
+    Dir.mktmpdir('leeni_help_test') do |dir|
       File.write(File.join(dir, 'paper.tex'), "\\documentclass{article}\n")
       File.write(File.join(dir, 'paper.aux'), 'artifact')
 
@@ -183,7 +183,7 @@ class TestDestructivePaths < Minitest::Test
   end
 
   def test_unknown_flag_reports_usage_instead_of_a_backtrace
-    Dir.mktmpdir('latex_it_badflag_test') do |dir|
+    Dir.mktmpdir('leeni_badflag_test') do |dir|
       File.write(File.join(dir, 'paper.tex'), "\\documentclass{article}\n")
 
       out, status = Open3.capture2e(BIN, '--typpo', chdir: dir)
@@ -196,8 +196,8 @@ class TestDestructivePaths < Minitest::Test
   end
 
   def test_lock_directory_must_be_private_and_owned
-    Dir.mktmpdir('latex_it_tmpdir_test') do |dir|
-      hostile = File.join(dir, "latex_it_#{Process.uid}")
+    Dir.mktmpdir('leeni_tmpdir_test') do |dir|
+      hostile = File.join(dir, "leeni_#{Process.uid}")
       Dir.mkdir(hostile, 0o777)
       File.chmod(0o777, hostile)
 
@@ -215,7 +215,7 @@ class TestDestructivePaths < Minitest::Test
   end
 
   def test_private_lock_directory_is_accepted
-    Dir.mktmpdir('latex_it_tmpdir_ok_test') do |dir|
+    Dir.mktmpdir('leeni_tmpdir_ok_test') do |dir|
       builder = LatexBuilder.new('paper.tex', build_options)
       original = ENV['TMPDIR']
       begin
@@ -229,7 +229,7 @@ class TestDestructivePaths < Minitest::Test
   end
 
   def test_meta_target_writes_next_to_the_document
-    Dir.mktmpdir('latex_it_meta_test') do |dir|
+    Dir.mktmpdir('leeni_meta_test') do |dir|
       FileUtils.mkdir_p(File.join(dir, 'sub'))
       File.write(File.join(dir, 'sub', 'paper.tex'),
                  "\\documentclass{article}\n\\title{A Title}\n\\author{Ada Lovelace}\n" \
@@ -245,7 +245,7 @@ class TestDestructivePaths < Minitest::Test
   end
 
   def test_arxiv_copy_preserving_path_rejects_out_of_tree_and_symlinks
-    Dir.mktmpdir('latex_it_arxiv_copy_test') do |root|
+    Dir.mktmpdir('leeni_arxiv_copy_test') do |root|
       outside = File.join(root, 'outside.png')
       File.write(outside, 'secret outside')
 
@@ -275,7 +275,7 @@ class TestDestructivePaths < Minitest::Test
   end
 
   def test_packager_copy_preserving_path_rejects_out_of_tree_and_symlinks
-    Dir.mktmpdir('latex_it_packager_copy_test') do |root|
+    Dir.mktmpdir('leeni_packager_copy_test') do |root|
       outside = File.join(root, 'outside.png')
       File.write(outside, 'secret outside')
 

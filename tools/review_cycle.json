@@ -1,5 +1,5 @@
 {
-  "target": "lib latex_it",
+  "target": "lib leeni",
   "gate_cmd": "tools/gate",
   "build_cmd": "tools/install",
   "audit_cmd": "tools/audit",

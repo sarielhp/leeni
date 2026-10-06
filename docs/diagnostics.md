@@ -1,9 +1,9 @@
 # Diagnostics & Error Handling
 
-`latex_it` parses raw compiler logs from `xelatex`, `lualatex`, and `pdflatex` to present clean, categorized diagnostic messages. Instead of wading through hundreds of lines of TeX console output, errors and warnings are categorized into clear tiers with actionable remediation hints.
+`leeni` parses raw compiler logs from `xelatex`, `lualatex`, and `pdflatex` to present clean, categorized diagnostic messages. Instead of wading through hundreds of lines of TeX console output, errors and warnings are categorized into clear tiers with actionable remediation hints.
 
 <p align="center">
-  <a href="gallery.html"><img src="images/error_comparison.svg" alt="Error Diagnostics Comparison: latexmk vs latex_it" width="100%"></a><br>
+  <a href="gallery.html"><img src="images/error_comparison.svg" alt="Error Diagnostics Comparison: latexmk vs leeni" width="100%"></a><br>
   <em>See the <a href="gallery.html">Diagnostic Showcase Gallery</a> for more side-by-side comparisons on real errors.</em>
 </p>
 
@@ -33,7 +33,7 @@ Diagnostics are organized into four severity levels:
 
 Standard LaTeX has an all-or-nothing philosophy: either a run halts on a fatal syntax error, or it succeeds with exit code 0. Everything else is dumped into a single undifferentiated stream of `Warning` lines.
 
-`latex_it` introduced **Alerts** and **Whatevers** to solve the two opposite failure modes of this model: **Silent Corruptions** (False Negatives) and **Warning Fatigue** (False Positives).
+`leeni` introduced **Alerts** and **Whatevers** to solve the two opposite failure modes of this model: **Silent Corruptions** (False Negatives) and **Warning Fatigue** (False Positives).
 
 ### What Are "Alerts" (and Why Do They Matter)?
 
@@ -47,10 +47,10 @@ Standard tools like `latexmk` treat these as clean builds because the compiler d
 - **Multiply-Defined Labels**: Having two different sections or equations share the same `\label{eq:bound}` causes TeX to silently resolve citations to whichever happened to compile last.
 - **Type 3 (Bitmap) Fonts**: Low-resolution raster fonts embedded in the PDF that cause automatic rejection by journal submission portals (IEEE PDF eXpress, ACM TAPS).
 
-**How `latex_it` Handles Alerts:**
+**How `leeni` Handles Alerts:**
 - Displayed in high-visibility bold yellow/orange banners.
 - Always shown, even when minor warnings are suppressed.
-- If run with `-W` / `--werror`, Alerts cause `latex_it` to exit with a non-zero status, preventing broken PDFs from being uploaded to arXiv.
+- If run with `-W` / `--werror`, Alerts cause `leeni` to exit with a non-zero status, preventing broken PDFs from being uploaded to arXiv.
 
 ### What Are "Whatevers" (and Why Are They Not Important)?
 
@@ -65,7 +65,7 @@ Standard tools like `latexmk` treat these as clean builds because the compiler d
 - Spending hours trying to rephrase sentences to eliminate a $0.8\text{pt}$ line overflow is wasted effort that does not improve the paper.
 - Pages of harmless micro-warnings cause authors to ignore the terminal entirely, making them miss broken citations and inverted labels.
 
-**How `latex_it` Handles Whatevers:**
+**How `leeni` Handles Whatevers:**
 1. **Suppressed by default**: Kept out of your terminal so you can focus 100% on genuine text and layout issues.
 2. **Counted in the summary line**: Always visible at the end of compilation (`Whatevers: 3 (suppressed)`).
 3. **Inspectable anytime (`l -a`)**: Running `l -a` (or `--all`) instantly unhides all Whatevers in cyan.
@@ -126,25 +126,25 @@ l -a paper.tex
 
 ## 4. Proactive Semantic Checks
 
-`latex_it` includes proactive checks that catch subtle bugs before or during compilation:
+`leeni` includes proactive checks that catch subtle bugs before or during compilation:
 
 ### Inverted `\label` Before `\caption`
-In LaTeX floats (`figure`, `table`), placing `\label{...}` before `\caption{...}` causes the label to bind to the outer section counter instead of the figure number. `latex_it` flags inverted labels with an Alert.
+In LaTeX floats (`figure`, `table`), placing `\label{...}` before `\caption{...}` causes the label to bind to the outer section counter instead of the figure number. `leeni` flags inverted labels with an Alert.
 
 ### Type 3 (Bitmap) Font Detection
-Journals and indexing services (ACM TAPS, IEEE PDF eXpress, arXiv) often reject PDFs containing Type 3 raster fonts. When `pdffonts` is available, `latex_it` checks the compiled PDF and reports the specific pages where Type 3 fonts appear.
+Journals and indexing services (ACM TAPS, IEEE PDF eXpress, arXiv) often reject PDFs containing Type 3 raster fonts. When `pdffonts` is available, `leeni` checks the compiled PDF and reports the specific pages where Type 3 fonts appear.
 
 ### Pre-Flight Brace Auditing
 The built-in brace checker (`LaTeXBraceChecker`) runs before LaTeX starts, catching unmatched `{`, `}`, and mismatched brackets like `{]` across environments without waiting for a full compiler run.
 
 ### Bibliography Source Pinpointing
-When LaTeX crashes during `\printbibliography` or `\bibliography` due to a syntax error in a `.bib` file (such as an unescaped `_` or `&`), standard TeX engines only report `\printbibliography` in `main.tex`. `latex_it` hooks BibLaTeX's entry processing, intercepts the active citation key, locates the entry and line in your `.bib` databases, and emits a companion error with line number and token hints. See [Troubleshooting Bibliography Errors](troubleshooting_bibliography_errors.md) for details.
+When LaTeX crashes during `\printbibliography` or `\bibliography` due to a syntax error in a `.bib` file (such as an unescaped `_` or `&`), standard TeX engines only report `\printbibliography` in `main.tex`. `leeni` hooks BibLaTeX's entry processing, intercepts the active citation key, locates the entry and line in your `.bib` databases, and emits a companion error with line number and token hints. See [Troubleshooting Bibliography Errors](troubleshooting_bibliography_errors.md) for details.
 
 ---
 
 ## 5. GNU Standard Compiler Mode (`-cc` / `--compile`) & Editor Integration
 
-For standard compiler integration with editors, IDEs, and build runners (e.g. Emacs `M-x compile`, Vim `:make`, VS Code tasks, CI log matchers), `latex_it` provides the `-cc` / `--compile` flag.
+For standard compiler integration with editors, IDEs, and build runners (e.g. Emacs `M-x compile`, Vim `:make`, VS Code tasks, CI log matchers), `leeni` provides the `-cc` / `--compile` flag.
 
 ### Format Specification (GNU §4.4)
 Diagnostics are emitted directly to `$stderr` in standard GNU format:
@@ -187,7 +187,7 @@ l --emacs paper.tex
 
 Autonomous AI coding agents (Claude Code, Antigravity, OpenCode, Cursor, Aider) interact with build systems through terminal execution. Standard TeX output wastes tokens, floods context windows with secondary warnings, and breaks regex log parsers with ANSI escapes.
 
-`latex_it` provides the dedicated `-llm` (or `--agent`) profile tailored for agent interaction:
+`leeni` provides the dedicated `-llm` (or `--agent`) profile tailored for agent interaction:
 
 ```bash
 # Run in token-optimized agent mode
@@ -197,12 +197,12 @@ l -llm paper.tex
 ### Key Behaviors of `--llm` Mode
 
 1. **Plaintext Guarantee**: Zero ANSI color escape sequences (`\e[...]`) and zero OSC 8 terminal hyperlinks (`\e]8;;...`). Plaintext parses cleanly and avoids wasting 15–25 tokens per diagnostic line.
-2. **Silence on Clean Success**: If compilation succeeds with no actionable diagnostics or if targets are already up-to-date, `latex_it` exits `0` with completely empty stdout and stderr, consuming zero agent context tokens.
+2. **Silence on Clean Success**: If compilation succeeds with no actionable diagnostics or if targets are already up-to-date, `leeni` exits `0` with completely empty stdout and stderr, consuming zero agent context tokens.
 3. **Warning Category Folding**: When a document has dozens of identical warnings (such as 50 missing citations from an empty bibliography), `--llm` displays the first **2** occurrences with exact `file:line:col` and folds the remaining occurrences into a single summary note:
    ```text
    paper.tex:12: warning: [alert] undefined citation 'knuth1984'
    paper.tex:15: warning: [alert] undefined citation 'lamport1994'
-   latex_it: note: 48 more undefined citations in paper.tex (pass -a to show all)
+   leeni: note: 48 more undefined citations in paper.tex (pass -a to show all)
    ```
 4. **Suppression of Underfull Boxes**: Low-level micro-notes (`whatevers`) are suppressed by default unless `-a` is explicitly passed.
 5. **Actionable Unparsed Crash Reporting**: When a TeX engine crashes with an unclassified syntax or memory failure, `--llm` mode extracts the last 8 lines of the compiler log into a GNU-compliant error block:

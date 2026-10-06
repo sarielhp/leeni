@@ -1,4 +1,4 @@
-# Using `latex_it` Colors in GNU Emacs
+# Using `leeni` Colors in GNU Emacs
 
 This guide explains how ANSI colors interact with GNU Emacs, why raw terminal escapes confuse AUCTeX's error parser, and how to configure Emacs to display rich, colorized compiler diagnostics and source frames.
 
@@ -6,7 +6,7 @@ This guide explains how ANSI colors interact with GNU Emacs, why raw terminal es
 
 ## 1. Why Raw ANSI Colors Confuse AUCTeX
 
-If `latex_it` emits standard terminal ANSI escape codes (`\e[31m`, `\e[0m`) into an AUCTeX output buffer:
+If `leeni` emits standard terminal ANSI escape codes (`\e[31m`, `\e[0m`) into an AUCTeX output buffer:
 
 1. **Filename Corruption**: AUCTeX parses compiler errors using the regular expression `^(.+?):[0-9]+: `. When ANSI codes surround the file or line number (e.g. `\e[31mmain.tex:15:1:\e[0m`), AUCTeX captures `\e[31mmain.tex` as the filename.
 2. **Failed File Verification**: AUCTeX calls `(file-exists-p "\e[31mmain.tex")`, which returns `nil`.
@@ -14,7 +14,7 @@ If `latex_it` emits standard terminal ANSI escape codes (`\e[31m`, `\e[0m`) into
 4. **Column Number Mismatch**: Standard terminal mode outputs Rust-style column locations (`file:line:col:`, e.g. `main.tex:15:1:`). AUCTeX only recognizes single-colon lines (`main.tex:15: `); the second colon causes AUCTeX to treat `:15` as part of the filename (`main.tex:15`).
 5. **Context Anchors**: AUCTeX relies on standard TeX `l.<line> <token>` lines followed by a space-indented continuation line to locate and place the editing cursor on the offending macro.
 
-This is why `latex_it --emacs` strictly disables ANSI escapes and outputs plain-text diagnostics conforming to TeX's classic error and file-stack convention.
+This is why `leeni --emacs` strictly disables ANSI escapes and outputs plain-text diagnostics conforming to TeX's classic error and file-stack convention.
 
 ---
 
@@ -50,7 +50,7 @@ Run standard `l` (without `--emacs`) inside Emacs's universal `compilation-mode`
 
 ## 3. Approach 2: AUCTeX Native Output Fontification
 
-If your primary editing workflow is built on AUCTeX's command runner (`C-c C-c` -> `latex_it`):
+If your primary editing workflow is built on AUCTeX's command runner (`C-c C-c` -> `leeni`):
 
 ### Native Syntax Highlighting
 

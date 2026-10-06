@@ -10,7 +10,7 @@ require 'stringio'
 require 'tempfile'
 require 'zlib'
 
-load File.expand_path('../latex_it', __dir__)
+load File.expand_path('../leeni', __dir__)
 
 module ArxivMetadataReport
   MAX_BYTES = 100 * 1024 * 1024

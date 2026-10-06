@@ -5,8 +5,8 @@ require 'tmpdir'
 require 'fileutils'
 require 'open3'
 
-require_relative '../lib/latex_it/color'
-require_relative '../lib/latex_it/config'
+require_relative '../lib/leeni/color'
+require_relative '../lib/leeni/config'
 
 class TestColorTheme < Minitest::Test
   def setup
@@ -93,7 +93,7 @@ class TestColorTheme < Minitest::Test
   end
 
   def test_cli_list_themes_flag
-    bin = File.expand_path('../latex_it', __dir__)
+    bin = File.expand_path('../leeni', __dir__)
     out, status = Open3.capture2e(bin, '--theme-list')
     assert status.success?
     assert_match(/Available diagnostic color themes:/, out)
@@ -134,7 +134,7 @@ class TestColorTheme < Minitest::Test
   end
 
   def test_determine_color_enabled
-    load File.expand_path('../latex_it', __dir__)
+    load File.expand_path('../leeni', __dir__)
 
     # Explicit options override environment
     assert LatexCLI.determine_color_enabled(color: true)
@@ -163,15 +163,15 @@ class TestColorTheme < Minitest::Test
   end
 
   def test_show_config_cli
-    bin = File.expand_path('../latex_it', __dir__)
+    bin = File.expand_path('../leeni', __dir__)
     out, status = Open3.capture2e(bin, '--config-show')
     assert status.success?
-    assert_match(/Active latex_it Configuration/, out)
+    assert_match(/Active leeni Configuration/, out)
     assert_match(/"theme":/, out)
   end
 
   def test_help_all_short_flag
-    bin = File.expand_path('../latex_it', __dir__)
+    bin = File.expand_path('../leeni', __dir__)
     out, status = Open3.capture2e(bin, '-H')
     assert status.success?
     assert_match(/Usage: l \[options\]/, out)

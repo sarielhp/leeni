@@ -6,11 +6,11 @@ require 'open3'
 require 'tmpdir'
 require 'fileutils'
 
-require_relative '../lib/latex_it/utils'
+require_relative '../lib/leeni/utils'
 
 class TestCompileMode < Minitest::Test
   def setup
-    @bin_path = File.expand_path('../latex_it', __dir__)
+    @bin_path = File.expand_path('../leeni', __dir__)
   end
 
   def test_clean_build_in_compile_mode_is_silent
@@ -280,7 +280,7 @@ class TestCompileMode < Minitest::Test
 
       env = {
         'KITTY_WINDOW_ID' => '1', 'TERM' => 'xterm-kitty',
-        'LATEX_IT_THEME' => 'blush', 'NO_COLOR' => nil
+        'LEENI_THEME' => 'blush', 'NO_COLOR' => nil
       }
       cmd = "cd #{dir} && #{@bin_path} --compile doc.tex"
       output = String.new

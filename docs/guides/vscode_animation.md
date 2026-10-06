@@ -1,6 +1,6 @@
 # VS Code Headless Automation & Demo Recording Guide
 
-This document captures the complete technical methodology, architecture, configurations, and lessons learned while automating authentic recordings of Visual Studio Code running `latex_it` via the LaTeX Workshop extension in a headless Linux environment.
+This document captures the complete technical methodology, architecture, configurations, and lessons learned while automating authentic recordings of Visual Studio Code running `leeni` via the LaTeX Workshop extension in a headless Linux environment.
 
 ---
 
@@ -130,18 +130,18 @@ Pre-configure `.vscode/settings.json` in the workspace directory:
 {
   "latex-workshop.latex.tools": [
     {
-      "name": "latex_it",
+      "name": "leeni",
       "command": "/home/sariel/bin/l",
       "args": ["-u", "--vscode-lw", "%DOC%"]
     }
   ],
   "latex-workshop.latex.recipes": [
     {
-      "name": "latex_it",
-      "tools": ["latex_it"]
+      "name": "leeni",
+      "tools": ["leeni"]
     }
   ],
-  "latex-workshop.latex.recipe.default": "latex_it",
+  "latex-workshop.latex.recipe.default": "leeni",
   "latex-workshop.latex.autoBuild.run": "never",
   "window.zoomLevel": 1.5,
   "editor.fontSize": 22,
@@ -169,7 +169,7 @@ The canonical recorded walkthrough consists of the following timed sequence:
 ```
 [00:00 - 00:04]  Launch VS Code, maximize window, dismiss dialogs, close secondary sidebar.
 [00:04 - 00:08]  Display initial LaTeX source with deliberate errors & warnings.
-[00:08 - 00:14]  Trigger build (Ctrl+Alt+B) -> latex_it executes via LaTeX Workshop.
+[00:08 - 00:14]  Trigger build (Ctrl+Alt+B) -> leeni executes via LaTeX Workshop.
 [00:14 - 00:20]  Open Problems panel (Ctrl+Shift+M) -> Shows red squiggles and colored emojis:
                  ❓ Why: Undefined control sequence '\badMacroNameHere'
                  🔧 Fix: Check macro spelling or add package
@@ -201,6 +201,6 @@ ffmpeg -y -i docs/vscode_latex_it_demo.mp4 \
 - [ ] Pass isolated `XDG_RUNTIME_DIR` and `--user-data-dir`.
 - [ ] Disable conflicting extensions (`mathematic.vscode-latex`, Copilot).
 - [ ] Ensure quoted heredoc (`<<~'RUBY'`) so `$DISPLAY` evaluates inside `xvfb-run`.
-- [ ] Pre-populate workspace `.vscode/settings.json` with `latex_it` recipe and zoom settings.
+- [ ] Pre-populate workspace `.vscode/settings.json` with `leeni` recipe and zoom settings.
 - [ ] Use `ctrl+k ctrl+i` for deterministic hover rendering.
 - [ ] Verify output frame count and non-zero bitrate before finalizing.

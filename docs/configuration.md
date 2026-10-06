@@ -1,6 +1,6 @@
 # Configuration & Environment
 
-`latex_it` provides flexible configuration options that can be defined globally, set per-project, or overridden via command-line flags.
+`leeni` provides flexible configuration options that can be defined globally, set per-project, or overridden via command-line flags.
 
 ---
 
@@ -9,8 +9,8 @@
 Settings are resolved using the following order of precedence (highest to lowest):
 
 1. **Command-line flags** (e.g. `-e lualatex`, `-f`, `-x`)
-2. **Local project configuration** (`.l.jsonc` or `.latex_it.jsonc` in document root)
-3. **Global user configuration** (`~/.config/latex_it/config.jsonc`)
+2. **Local project configuration** (`.l.jsonc` or `.leeni.jsonc` in document root)
+3. **Global user configuration** (`~/.config/leeni/config.jsonc`)
 4. **Built-in defaults**
 
 ---
@@ -91,10 +91,10 @@ Comments (`//` and `/* ... */`) and trailing commas are supported in `.l.jsonc` 
 
 ## 3. Global Configuration
 
-On first execution, `latex_it` automatically creates a global configuration file at:
+On first execution, `leeni` automatically creates a global configuration file at:
 
 ```
-~/.config/latex_it/config.jsonc
+~/.config/leeni/config.jsonc
 ```
 
 Settings defined here apply to all projects on your machine unless overridden by a project-level `.l.jsonc` or command-line flags.
@@ -130,7 +130,7 @@ LATEXOPTS="-shell-escape -synctex=1" l paper.tex
 
 ## 5. Concurrency Locking
 
-When compiling large documents in editor setups that trigger builds on save, multiple compiler processes can conflict. `latex_it` automatically prevents simultaneous builds in the same directory using file locking (`flock` on `.l.lock`):
+When compiling large documents in editor setups that trigger builds on save, multiple compiler processes can conflict. `leeni` automatically prevents simultaneous builds in the same directory using file locking (`flock` on `.l.lock`):
 
 - **Default**: Enabled. A second process waits for the active build to complete.
 - **Disabling**: Use `--no-lock` if you need to run concurrent builds intentionally.
@@ -139,12 +139,12 @@ When compiling large documents in editor setups that trigger builds on save, mul
 
 ## 6. Diagnostic Color Themes
 
-`latex_it` formats error headers, carets, source line numbers, and tier summaries using 24-bit TrueColor themes.
+`leeni` formats error headers, carets, source line numbers, and tier summaries using 24-bit TrueColor themes.
 
 ### Theme Resolution Hierarchy
 1. **CLI flag**: `l --theme=<theme>`
-2. **Environment variable**: `LATEX_IT_THEME` or `L_THEME` (fallback: `COLOR_THEME`, `BASE16_THEME`)
-3. **Local/Global config**: `"theme": "blush"` in `.l.jsonc` or `~/.config/latex_it/config.jsonc`
+2. **Environment variable**: `LEENI_THEME` or `L_THEME` (fallback: `COLOR_THEME`, `BASE16_THEME`)
+3. **Local/Global config**: `"theme": "blush"` in `.l.jsonc` or `~/.config/leeni/config.jsonc`
 4. **Built-in default**: `"blush"`
 
 ### Built-in Presets

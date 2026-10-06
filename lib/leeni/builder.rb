@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 # ==============================================================================
-# lib/latex_it/builder.rb
+# lib/leeni/builder.rb
 #
 # LaTeX compilation lifecycle manager, pass scheduler, junk/ directory isolation,
 # bibliography handling, lockfile protection, and artifact staging.
@@ -373,7 +373,7 @@ class LatexBuilder
   def report_unconverged(pass, cycling)
     @cacheable_build = false
     why = cycling ? 'the auxiliary files keep cycling between states' : "a rerun is still requested after #{pass} passes"
-    msg = "\nLaTeX Warning: latex_it: build did not converge; #{why}. " \
+    msg = "\nLaTeX Warning: leeni: build did not converge; #{why}. " \
           "References or page numbers may be stale (raise -n/--passes, max #{LaTeXUtils::MAX_PASSES}).\n"
     File.open("#{@pdferr}_#{pass}", 'a') { |f| f.write(msg) }
   end

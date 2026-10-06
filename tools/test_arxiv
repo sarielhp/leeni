@@ -18,7 +18,7 @@ module ArxivPaperTest
   MAX_BYTES = 100 * 1024 * 1024
   ROOT = File.expand_path('..', __dir__)
   FIXUP_DIR = File.join(ROOT, 'test', 'fixups', 'arxiv')
-  RESERVED = %w[.git .bws .bws.jsonc .bws-home .latex_it_bws_bin .sandbox-config junk].freeze
+  RESERVED = %w[.git .bws .bws.jsonc .bws-home .leeni_bws_bin .sandbox-config junk].freeze
   class Error < StandardError; end
 
   def self.fixup_for(metadata)
@@ -131,7 +131,7 @@ module ArxivPaperTest
   end
 
   def self.atomic_write(path, content)
-    Tempfile.create(['latex-it-test-', '.tmp'], File.dirname(path)) do |tmp|
+    Tempfile.create(['leeni-test-', '.tmp'], File.dirname(path)) do |tmp|
       tmp.write(content)
       tmp.close
       File.rename(tmp.path, path)
@@ -139,13 +139,13 @@ module ArxivPaperTest
   end
 
   def self.options(argv)
-    result = { bws: ENV.fetch('BWS_BIN', 'bws'), latex_it: File.join(ROOT, 'latex_it'),
+    result = { bws: ENV.fetch('BWS_BIN', 'bws'), leeni: File.join(ROOT, 'leeni'),
                timeout: 600.0, engine: nil }
     parser = OptionParser.new do |p|
       p.banner = 'Usage: tools/test_arxiv SAMPLE_DIR [options]'
       p.on('--main MEMBER.tex', 'Select the main source inside the archive') { |v| result[:main] = v }
       p.on('--bws PATH', 'bws executable (default: BWS_BIN or bws)') { |v| result[:bws] = v }
-      p.on('--latex-it PATH', 'Test this executable instead of the repository copy') { |v| result[:latex_it] = v }
+      p.on('--leeni PATH', 'Test this executable instead of the repository copy') { |v| result[:leeni] = v }
       p.on('--timeout SECONDS', Float, 'Total sandbox time limit (default: 600)') { |v| result[:timeout] = v }
       p.on('--engine ENGINE', %w[xelatex pdflatex lualatex], 'Engine override (default: automatic)') { |v| result[:engine] = v }
       p.on('-h', '--help', 'Show help') { result[:help] = true }
@@ -155,7 +155,7 @@ module ArxivPaperTest
     raise Error, 'exactly one SAMPLE_DIR is required' unless argv.length == 1
     raise Error, '--timeout must be finite and positive' unless result[:timeout].finite? && result[:timeout].positive?
 
-    result[:latex_it] = File.expand_path(result[:latex_it])
+    result[:leeni] = File.expand_path(result[:leeni])
     result[:bws] = File.expand_path(result[:bws]) if result[:bws].include?('/')
     result[:sample] = File.realpath(argv.first)
     raise Error, 'SAMPLE_DIR must be a directory' unless File.directory?(result[:sample])
@@ -188,7 +188,7 @@ module ArxivPaperTest
       %w[PASS FAIL].each { |name| FileUtils.rm_f(File.join(@sample, name)) }
       started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
       begin
-        Dir.mktmpdir('latex_it_test_stage_', '/tmp') do |stage|
+        Dir.mktmpdir('leeni_test_stage_', '/tmp') do |stage|
           prepare(stage)
           launch(stage)
         end
@@ -229,9 +229,9 @@ module ArxivPaperTest
       %w[arxiv_test_worker.rb check_arxiv_metadata].each do |file|
         FileUtils.cp(File.join(ROOT, 'tools', file), File.join(stage, 'tools', file))
       end
-      FileUtils.cp(@options[:latex_it], File.join(stage, 'latex_it'))
+      FileUtils.cp(@options[:leeni], File.join(stage, 'leeni'))
       stage_compatibility_tree(stage)
-      @report['latex_it_sha256'] = Digest::SHA256.file(File.join(stage, 'latex_it')).hexdigest
+      @report['leeni_sha256'] = Digest::SHA256.file(File.join(stage, 'leeni')).hexdigest
       File.write(File.join(stage, 'metadata.json'), JSON.pretty_generate(metadata))
       config = { main: @report['main'] }
       config[:engine] = @options[:engine] if @options[:engine]
@@ -248,11 +248,11 @@ module ArxivPaperTest
     end
 
     def launch(stage)
-      retained = Dir.mktmpdir('latex_it_test_results_', '/tmp')
+      retained = Dir.mktmpdir('leeni_test_results_', '/tmp')
       workspace = File.join(retained, 'sandbox')
       @report['artifacts'] = { 'sandbox' => workspace, 'log' => File.join(workspace, 'bws-run.log') }
       argv = [RbConfig.ruby, File.join(ROOT, 'tools/bws_run'), stage, '--output', workspace,
-              '--bws', @options[:bws], '--latex-it', @options[:latex_it], '--timeout', @options[:timeout].to_s,
+              '--bws', @options[:bws], '--leeni', @options[:leeni], '--timeout', @options[:timeout].to_s,
               '--', 'ruby', 'tools/arxiv_test_worker.rb']
       output, status = Open3.capture2e(*argv)
       @report['runner'] = { 'exit_status' => status.exitstatus || (128 + status.termsig), 'output' => output }
@@ -275,7 +275,7 @@ module ArxivPaperTest
     end
 
     def markdown
-      lines = ["# latex_it test: #{@report['status']}", '',
+      lines = ["# leeni test: #{@report['status']}", '',
                "Paper: #{@report['arxiv_id'] || @sample}",
                "Engine: `#{@report['engine'] || 'automatic'}`; main: `#{@report['main'] || 'undetermined'}`", '']
       lines << "Error: #{@report['error']}" << '' if @report['error']
@@ -295,7 +295,7 @@ module ArxivPaperTest
         lines << '' << "[Build workspace](#{paths['sandbox']}) · [Sandbox log](#{paths['log']})"
       end
       lines << '' << '[Detailed report](test-report.json)' << ''
-      lines << 'FAIL is a test outcome, not proof of a latex_it bug: input, metadata and environment problems also fail checks.'
+      lines << 'FAIL is a test outcome, not proof of a leeni bug: input, metadata and environment problems also fail checks.'
       lines.join("\n") + "\n"
     end
 

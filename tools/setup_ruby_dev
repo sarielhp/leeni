@@ -225,7 +225,7 @@ module RubyDevSetup
 
     def self.check_pdftotext
       name = 'pdftotext'
-      desc = 'Poppler PDF text extractor for latex_it --update-if-changed mode'
+      desc = 'Poppler PDF text extractor for leeni --update-if-changed mode'
       if RubyDevSetup.command_available?('pdftotext')
         puts "  [#{GREEN}OK#{RESET}] #{BOLD}#{name}#{RESET} (#{desc})"
       else

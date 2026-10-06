@@ -1,4 +1,4 @@
-# `latex_it` Technical Reference for LLMs & AI Agents
+# `leeni` Technical Reference for LLMs & AI Agents
 
 > **Audience**: Autonomous coding agents (Claude Code, Antigravity, Cursor, OpenCode, Aider) and programmatic pipelines.  
 > **Purpose**: Dense, token-optimized technical reference covering CLI flags, configuration schemas, exit codes, and diagnostic contracts. Zero prose filler.
@@ -7,7 +7,7 @@
 
 ## 1. Quick Execution Contract
 
-When compiling LaTeX documents in a repository where `latex_it` (or `l`) is available:
+When compiling LaTeX documents in a repository where `leeni` (or `l`) is available:
 
 ```bash
 # Recommended compile invocation for all AI agents:
@@ -82,8 +82,8 @@ l --json paper.tex
 
 ## 4. Configuration Schema (`.l.jsonc`)
 
-Local file: `./.l.jsonc` (or `./.latex_it.jsonc`).  
-Global file: `~/.config/latex_it/config.jsonc`.
+Local file: `./.l.jsonc` (or `./.leeni.jsonc`).
+Global file: `~/.config/leeni/config.jsonc`.
 
 ```jsonc
 {
@@ -134,7 +134,7 @@ Global file: `~/.config/latex_it/config.jsonc`.
    ```text
    paper.tex:12: warning: [alert] undefined citation 'knuth1984'
    paper.tex:15: warning: [alert] undefined citation 'lamport1994'
-   latex_it: note: 48 more undefined citations in paper.tex (pass -a to show all)
+   leeni: note: 48 more undefined citations in paper.tex (pass -a to show all)
    ```
 4. **Log-Tail Fallback on Crash**: If engine exits non-zero without a standard regex match:
    ```text

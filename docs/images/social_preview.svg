@@ -44,7 +44,7 @@
   <rect x="0" y="0" width="225" height="28" rx="14" fill="#1e2238" stroke="#3b4261" stroke-width="1" />
   <text x="14" y="18" fill="#7dcfff" font-size="11.5" font-weight="700" letter-spacing="1.2">STANDALONE BUILD TOOL</text>
 
-  <text x="0" y="86" fill="url(#title-grad)" font-size="58" font-weight="900" letter-spacing="-1">latex_it</text>
+  <text x="0" y="86" fill="url(#title-grad)" font-size="58" font-weight="900" letter-spacing="-1">leeni</text>
   <text x="212" y="86" fill="#7aa2f7" font-size="34" font-weight="700"> (l)</text>
 
   <text x="0" y="126" fill="#ffffff" font-size="21" font-weight="700">Modern, Pinpointed LaTeX Diagnostics</text>
@@ -77,7 +77,7 @@
 
   <g transform="translate(0, 442)">
     <text x="0" y="0" fill="#565f89" font-size="13">GitHub Repository:</text>
-    <text x="126" y="0" fill="#7dcfff" font-size="13" font-weight="600">github.com/sarielhp/latex_it</text>
+    <text x="126" y="0" fill="#7dcfff" font-size="13" font-weight="600">github.com/sarielhp/leeni</text>
   </g>
 </g>
 
@@ -92,7 +92,7 @@
   <circle cx="42" cy="20" r="6" fill="#ffbd2e" />
   <circle cx="62" cy="20" r="6" fill="#27c93f" />
 
-  <text x="347" y="25" fill="#787c99" font-size="12.5" font-weight="600" text-anchor="middle" class="font-ui">terminal — latex_it</text>
+  <text x="347" y="25" fill="#787c99" font-size="12.5" font-weight="600" text-anchor="middle" class="font-ui">terminal — leeni</text>
 
   <g transform="translate(24, 70)" class="font-mono" font-size="13.2" xml:space="preserve">
     <text x="0" y="0"><tspan fill="#7dcfff" font-weight="bold">❯ </tspan><tspan fill="#c0caf5">l example.tex</tspan></text>

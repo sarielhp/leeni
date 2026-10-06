@@ -7,17 +7,17 @@ require 'tmpdir'
 require 'fileutils'
 
 class TestPathologicalLatex < Minitest::Test
-  BIN = File.expand_path('../latex_it', __dir__)
+  BIN = File.expand_path('../leeni', __dir__)
 
   def test_missing_package_reports_nested_preamble_location
     with_project('missing_package') do |dir|
       write(dir, 'main.tex', "\\documentclass{article}\n\\input{config}\n\\begin{document}Text.\\end{document}\n")
-      write(dir, 'config.tex', "\\usepackage{latex-it-definitely-missing-package}\n")
+      write(dir, 'config.tex', "\\usepackage{leeni-definitely-missing-package}\n")
 
       out, status = compile(dir, 'main.tex')
 
       assert_equal 1, status.exitstatus, out
-      assert_match(/^config\.tex:1(?::\d+)?: error: .*latex-it-definitely-missing-package\.sty.*not found/i, out)
+      assert_match(/^config\.tex:1(?::\d+)?: error: .*leeni-definitely-missing-package\.sty.*not found/i, out)
       assert_match(/check file path or spelling/i, out)
     end
   end

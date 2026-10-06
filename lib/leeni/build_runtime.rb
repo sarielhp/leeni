@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 # ==============================================================================
-# lib/latex_it/build_runtime.rb
+# lib/leeni/build_runtime.rb
 #
 # Runtime services for LatexBuilder: locking, workspace preparation, compiler
 # process execution, timeouts, and individual LaTeX passes.
@@ -23,7 +23,7 @@ module LatexBuildRuntime
 
   def project_tmp_dir
     @project_tmp_dir ||= begin
-      dir = File.join(Dir.tmpdir, "latex_it_#{Process.uid}")
+      dir = File.join(Dir.tmpdir, "leeni_#{Process.uid}")
       Dir.mkdir(dir, 0o700) unless File.directory?(dir)
       verify_private_dir!(dir)
       dir
@@ -37,7 +37,7 @@ module LatexBuildRuntime
     stat = File.lstat(dir)
     return if stat.directory? && !stat.symlink? && stat.uid == Process.uid && (stat.mode & 0o077).zero?
 
-    abort "latex_it: refusing to use #{dir}: not a private directory owned by uid #{Process.uid}"
+    abort "leeni: refusing to use #{dir}: not a private directory owned by uid #{Process.uid}"
   end
 
   def project_tmp_file(suffix)
@@ -62,7 +62,7 @@ module LatexBuildRuntime
     return if file.flock(File::LOCK_EX | File::LOCK_NB)
 
     unless @options[:score]
-      puts "      #{Rainbow("Another latex_it process is running for #{@bfilename}. Waiting for it to finish...").yellow}"
+      puts "      #{Rainbow("Another leeni process is running for #{@bfilename}. Waiting for it to finish...").yellow}"
     end
     file.flock(File::LOCK_EX)
   end
@@ -211,7 +211,7 @@ module LatexBuildRuntime
   def trace_status(status) = LaTeXUtils.trace_status(status)
 
   def capture_pass_output(cmd_args)
-    timeout = (@options[:timeout] || ENV['LATEX_IT_TIMEOUT'] || self.class::DEFAULT_PASS_TIMEOUT).to_i
+    timeout = (@options[:timeout] || ENV['LEENI_TIMEOUT'] || ENV['LATEX_IT_TIMEOUT'] || self.class::DEFAULT_PASS_TIMEOUT).to_i
     env = pass_environment
     trace_command(env, cmd_args) if @options[:trace]
     out, status = capture_command(env, cmd_args, timeout)

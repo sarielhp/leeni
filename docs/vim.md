@@ -1,12 +1,12 @@
-# Vim & Neovim Integration with latex_it
+# Vim & Neovim Integration with leeni
 
-`latex_it` provides first-class support for Vi, Vim, and Neovim through the standard `--compile` flag and the bundled Vim compiler plugin.
+`leeni` provides first-class support for Vi, Vim, and Neovim through the standard `--compile` flag and the bundled Vim compiler plugin.
 
 ---
 
 ## Quick Start (Zero-Plugin)
 
-You can use `latex_it` directly with Vim's built-in `:make` command without installing any plugins.
+You can use `leeni` directly with Vim's built-in `:make` command without installing any plugins.
 
 In your `~/.vim/after/ftplugin/tex.vim` (or `~/.config/nvim/after/ftplugin/tex.lua`):
 
@@ -29,26 +29,26 @@ Whenever you run `:make` inside a `.tex` file:
 
 ---
 
-## Compiler Plugin (`docs/vim/compiler/latex_it.vim`)
+## Compiler Plugin (`docs/vim/compiler/leeni.vim`)
 
-The repository includes a standard Vim compiler script at [`docs/vim/compiler/latex_it.vim`](vim/compiler/latex_it.vim).
+The repository includes a standard Vim compiler script at [`docs/vim/compiler/leeni.vim`](vim/compiler/leeni.vim).
 
 ### Installation:
-Copy or symlink `docs/vim/compiler/latex_it.vim` into your Vim/Neovim compiler directory:
+Copy or symlink `docs/vim/compiler/leeni.vim` into your Vim/Neovim compiler directory:
 ```bash
 # Classic Vim
 mkdir -p ~/.vim/compiler
-cp docs/vim/compiler/latex_it.vim ~/.vim/compiler/
+cp docs/vim/compiler/leeni.vim ~/.vim/compiler/
 
 # Neovim
 mkdir -p ~/.config/nvim/compiler
-cp docs/vim/compiler/latex_it.vim ~/.config/nvim/compiler/
+cp docs/vim/compiler/leeni.vim ~/.config/nvim/compiler/
 ```
 
 ### Usage:
 In any LaTeX buffer:
 ```vim
-:compiler latex_it
+:compiler leeni
 :make
 ```
 
@@ -58,7 +58,7 @@ In any LaTeX buffer:
 
 ### With `tpope/vim-dispatch`:
 ```vim
-:compiler latex_it
+:compiler leeni
 :Make
 ```
 Compiles in the background without freezing your editor and loads errors into Quickfix when finished.
@@ -92,5 +92,5 @@ In traditional `vi` or `nvi` where Quickfix lists are not present, simply run:
 :!l
 ```
 
-`latex_it` executes directly in a subshell, outputting its clean diagnostic summary before returning to the editor buffer.
+`leeni` executes directly in a subshell, outputting its clean diagnostic summary before returning to the editor buffer.
 

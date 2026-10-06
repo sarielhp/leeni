@@ -5,11 +5,11 @@ require 'tmpdir'
 require 'open3'
 require 'fileutils'
 
-require_relative '../lib/latex_it/utils'
-require_relative '../lib/latex_it/error_catalog'
-require_relative '../lib/latex_it/bib_locator'
-require_relative '../lib/latex_it/diagnostics'
-require_relative '../lib/latex_it/builder'
+require_relative '../lib/leeni/utils'
+require_relative '../lib/leeni/error_catalog'
+require_relative '../lib/leeni/bib_locator'
+require_relative '../lib/leeni/diagnostics'
+require_relative '../lib/leeni/builder'
 
 class TestBibIntegration < Minitest::Test
   def test_standard_bibtex_compilation_not_broken
@@ -33,7 +33,7 @@ class TestBibIntegration < Minitest::Test
       File.write(File.join(dir, 'main.tex'), tex_content)
       File.write(File.join(dir, 'refs.bib'), bib_content)
 
-      bin_path = File.expand_path('../latex_it', __dir__)
+      bin_path = File.expand_path('../leeni', __dir__)
       out, status = Open3.capture2e(bin_path, 'main.tex', chdir: dir)
       assert_equal 0, status.exitstatus, "Compilation failed with output:\n#{out}"
       assert File.file?(File.join(dir, 'main.pdf')), 'Expected main.pdf to be generated'
@@ -166,13 +166,13 @@ class TestBibIntegration < Minitest::Test
         assert_equal './01_intro/intro.tex', primary[:file]
         assert_equal bib_file, companion[:file]
         assert_equal 3, companion[:line]
-        assert_equal :latex_it, companion[:source]
+        assert_equal :leeni, companion[:source]
         assert_equal true, companion[:synthetic]
         assert_equal '01_intro/intro.tex', companion[:companion_to]
 
         # Verify companion error line formatting
-        assert_equal "refs.bib:3: [latex_it] Bibliography error in entry 'Key1:2020'", companion[:err_block].first
-        assert_includes companion[:formatted], '[latex_it]'
+        assert_equal "refs.bib:3: [leeni] Bibliography error in entry 'Key1:2020'", companion[:err_block].first
+        assert_includes companion[:formatted], '[leeni]'
         refute_match(/^\s*3:\s*:/, companion[:formatted])
 
         # Verify sorting: primary file is first, companion is second
@@ -243,7 +243,7 @@ class TestBibIntegration < Minitest::Test
       File.write(File.join(dir, 'main.tex'), tex)
       File.write(File.join(dir, 'refs.bib'), '')
 
-      bin_path = File.expand_path('../latex_it', __dir__)
+      bin_path = File.expand_path('../leeni', __dir__)
       out, status = Open3.capture2e(bin_path, 'main.tex', chdir: dir)
       assert_equal 0, status.exitstatus, "Compilation failed on clean dir: #{out}"
       pdf_path = File.join(dir, 'main.pdf')
@@ -281,7 +281,7 @@ class TestBibIntegration < Minitest::Test
       File.write(File.join(dir, 'main.tex'), tex)
       File.write(File.join(dir, 'refs.bib'), '@article{broken, author = {Incomplete')
 
-      bin_path = File.expand_path('../latex_it', __dir__)
+      bin_path = File.expand_path('../leeni', __dir__)
       _out, status = Open3.capture2e(bin_path, 'main.tex', chdir: dir)
       assert_equal 1, status.exitstatus, 'Expected compilation to halt on bib syntax error'
     end
@@ -309,7 +309,7 @@ class TestBibIntegration < Minitest::Test
       File.write(File.join(dir, 'main.tex'), tex1)
       File.write(File.join(dir, 'refs.bib'), bib)
 
-      bin_path = File.expand_path('../latex_it', __dir__)
+      bin_path = File.expand_path('../leeni', __dir__)
       # Pass 1: compiles with missingKey
       out1, _ = Open3.capture2e(bin_path, 'main.tex', chdir: dir)
       assert File.exist?(File.join(dir, 'main.bbl')), 'Expected main.bbl to be created'
@@ -358,7 +358,7 @@ class TestBibIntegration < Minitest::Test
       File.write(File.join(dir, 'main.tex'), tex)
       File.write(File.join(dir, 'refs.bib'), bib1)
 
-      bin_path = File.expand_path('../latex_it', __dir__)
+      bin_path = File.expand_path('../leeni', __dir__)
       _out1, status1 = Open3.capture2e(bin_path, 'main.tex', chdir: dir)
       assert_equal 0, status1.exitstatus
       pdf_path = File.join(dir, 'main.pdf')
@@ -401,7 +401,7 @@ class TestBibIntegration < Minitest::Test
       File.write(File.join(dir, 'main.tex'), tex1)
       File.write(File.join(dir, 'refs.bib'), bib)
 
-      bin_path = File.expand_path('../latex_it', __dir__)
+      bin_path = File.expand_path('../leeni', __dir__)
       out1, status1 = Open3.capture2e(bin_path, 'main.tex', chdir: dir)
       assert_equal 0, status1.exitstatus, "Pass 1 setup failed:\n#{out1}"
       assert File.exist?(File.join(dir, 'main.bbl')), 'Expected main.bbl to be created'
@@ -439,7 +439,7 @@ class TestBibIntegration < Minitest::Test
       File.write(File.join(dir, 'main.tex'), tex1)
       File.write(File.join(dir, 'refs.bib'), bib)
 
-      bin_path = File.expand_path('../latex_it', __dir__)
+      bin_path = File.expand_path('../leeni', __dir__)
       out1, status1 = Open3.capture2e(bin_path, 'main.tex', chdir: dir)
       assert_equal 0, status1.exitstatus, "Pass 1 setup failed:\n#{out1}"
 

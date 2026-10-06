@@ -5,16 +5,16 @@ require 'minitest/autorun'
 require 'tmpdir'
 require 'fileutils'
 
-require_relative '../lib/latex_it/utils'
-require_relative '../lib/latex_it/builder'
-load File.expand_path('../latex_it', __dir__)
+require_relative '../lib/leeni/utils'
+require_relative '../lib/leeni/builder'
+load File.expand_path('../leeni', __dir__)
 
 # Drives run_convergence_loop with a scripted engine: each LaTeX pass "writes"
 # the next aux state and the calls made are recorded, so pass accounting can be
 # asserted without running TeX.
 class TestConvergenceLoop < Minitest::Test
   def in_project(opts = {})
-    Dir.mktmpdir('latex_it_loop_test') do |dir|
+    Dir.mktmpdir('leeni_loop_test') do |dir|
       Dir.chdir(dir) do
         FileUtils.mkdir_p('junk')
         File.write('paper.tex', "\\documentclass{article}\n\\begin{document}\nx\n\\end{document}\n")
@@ -167,7 +167,7 @@ class TestConvergenceLoop < Minitest::Test
       builder.send(:run_convergence_loop)
       assert_equal 3, calls.count(:latex)
       refute builder.instance_variable_get(:@cacheable_build)
-      assert_match(/LaTeX Warning: latex_it: build did not converge; a rerun is still requested after 3 passes/, last_pass_log(builder, 3))
+      assert_match(/LaTeX Warning: leeni: build did not converge; a rerun is still requested after 3 passes/, last_pass_log(builder, 3))
     end
   end
 
@@ -297,7 +297,7 @@ class TestConvergenceLoop < Minitest::Test
   end
 
   def test_junk_dir_name_with_glob_characters_does_not_touch_a_lookalike_directory
-    Dir.mktmpdir('latex_it_glob_test') do |dir|
+    Dir.mktmpdir('leeni_glob_test') do |dir|
       Dir.chdir(dir) do
         FileUtils.mkdir_p(%w[build1 build[1]])
         File.write('paper.tex', "\\begin{document}x\\end{document}\n")

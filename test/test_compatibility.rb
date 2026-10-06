@@ -3,7 +3,7 @@
 
 require 'minitest/autorun'
 require 'tmpdir'
-load File.expand_path('../latex_it', __dir__)
+load File.expand_path('../leeni', __dir__)
 
 class TestCompatibility < Minitest::Test
   def test_revtex4_tree_is_available_to_compiler_subprocesses
@@ -50,7 +50,7 @@ class TestCompatibility < Minitest::Test
   end
 
   def test_fls_identifies_used_compatibility_files
-    Dir.mktmpdir('latex-it-compat-') do |dir|
+    Dir.mktmpdir('leeni-compat-') do |dir|
       path = File.join(LaTeXCompatibility::REPO_TEXMF, 'tex/latex/revtex4/revtex4.cls')
       fls = File.join(dir, 'paper.fls')
       File.write(fls, "INPUT #{path}\nINPUT /usr/share/texlive/texmf-dist/tex/latex/base/article.cls\n")
@@ -59,7 +59,7 @@ class TestCompatibility < Minitest::Test
   end
 
   def test_portable_packager_treats_revtex_rtx_files_as_styles
-    Dir.mktmpdir('latex-it-compat-') do |dir|
+    Dir.mktmpdir('leeni-compat-') do |dir|
       Dir.chdir(dir) do
         FileUtils.mkdir_p('junk')
         File.write('paper.tex', '\\documentclass{revtex4}')

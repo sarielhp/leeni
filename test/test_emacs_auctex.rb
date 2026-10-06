@@ -6,7 +6,7 @@ require 'open3'
 require 'stringio'
 require 'tmpdir'
 
-load File.expand_path('../latex_it', __dir__)
+load File.expand_path('../leeni', __dir__)
 
 class TestEmacsAuctex < Minitest::Test
   def test_error_block_continuation_line_in_emacs_mode

@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 # ==============================================================================
-# lib/latex_it/compile_format.rb
+# lib/leeni/compile_format.rb
 #
 # GNU Coding Standards compliant diagnostic formatter for compiler runners
 # (Emacs compilation-mode, Vim/Neovim, VS Code, CI log matchers).

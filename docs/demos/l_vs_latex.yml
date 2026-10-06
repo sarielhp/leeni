@@ -1,7 +1,7 @@
 # ==============================================================================
-# Demo Scenario: Standard LaTeX vs latex_it (l) - Sequential Comparison
+# Demo Scenario: Standard LaTeX vs leeni (l) - Sequential Comparison
 # ==============================================================================
-output: "../docs/images/l_vs_latex_demo.gif"
+output: "../images/leeni_demo.gif"
 
 settings:
   width: 1200
@@ -28,11 +28,11 @@ files:
     \end{document}
 
 steps:
-  # 1. Intro title card: Large letters "latex_it" and GitHub URL
+  # 1. Intro title card: Large letters "leeni" and GitHub URL
   - banner:
-      title: "latex_it"
-      subtitle: "Fast, friendly, pinpointed LaTeX diagnostics"
-      url: "https://github.com/sarielhp/latex_it"
+      title: "Leeni"
+      subtitle: "Your LaTeX genie"
+      url: "https://github.com/sarielhp/leeni"
       delay_after: 1.8s
 
   # 2. Clear screen and inspect source code with syntax highlighting
@@ -50,13 +50,13 @@ steps:
   - type: "clear"
     delay_after: 0.5s
 
-  # 5. Compile with latex_it (l): instant pinpointed diagnosis & hint
-  - type: "l example.tex"
+  # 5. Compile with leeni (l): instant pinpointed diagnosis & hint
+  - type: "leeni example.tex"
     delay_after: 3.2s
 
   # 6. Fix with vim like a human developer!
   # Open vim directly on line 8 where the error occurred
-  - type: "vim +8 example.tex"
+  - type: "vim -u NONE +8 example.tex"
     delay_after: 1.0s
 
   # Jump to '=' on the line
@@ -81,9 +81,9 @@ steps:
   - type: "l -cc example.tex"
     delay_after: 2.5s
 
-  # 8. Outro card: Large letters "latex_it" and GitHub URL
+  # 8. Outro card: Large letters "leeni" and GitHub URL
   - banner:
-      title: "latex_it"
-      subtitle: "Fast, friendly, pinpointed LaTeX diagnostics"
-      url: "https://github.com/sarielhp/latex_it"
+      title: "Leeni"
+      subtitle: "Your LaTeX genie"
+      url: "https://github.com/sarielhp/leeni"
       delay_after: 3.2s

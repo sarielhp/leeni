@@ -5,14 +5,14 @@ require 'tmpdir'
 require 'open3'
 require 'fileutils'
 
-require_relative '../lib/latex_it/utils'
-require_relative '../lib/latex_it/builder'
-require_relative '../lib/latex_it/bib_extractor'
-load File.expand_path('../latex_it', __dir__) unless defined?(LatexCLI)
+require_relative '../lib/leeni/utils'
+require_relative '../lib/leeni/builder'
+require_relative '../lib/leeni/bib_extractor'
+load File.expand_path('../leeni', __dir__) unless defined?(LatexCLI)
 
 class TestBibExtractor < Minitest::Test
   def setup
-    @bin_path = File.expand_path('../latex_it', __dir__)
+    @bin_path = File.expand_path('../leeni', __dir__)
   end
 
   def test_count_bib_stats

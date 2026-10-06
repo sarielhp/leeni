@@ -1,12 +1,12 @@
-# Emacs & AUCTeX Integration with latex_it
+# Emacs & AUCTeX Integration with leeni
 
-`latex_it` has dedicated support for GNU Emacs and the AUCTeX package via the `--emacs` flag.
+`leeni` has dedicated support for GNU Emacs and the AUCTeX package via the `--emacs` flag.
 
 ---
 
 ## Why `--emacs`?
 
-Standard `latex_it` formats diagnostics with colored borders, box frames, and source snippets designed for human terminal reading. However, Emacs and AUCTeX parse compilation buffers using regular expressions expecting standard TeX file tracking (`(filename.tex ... )`) and line anchors (`l.<line>`).
+Standard `leeni` formats diagnostics with colored borders, box frames, and source snippets designed for human terminal reading. However, Emacs and AUCTeX parse compilation buffers using regular expressions expecting standard TeX file tracking (`(filename.tex ... )`) and line anchors (`l.<line>`).
 
 Passing `--emacs` automatically:
 * Emits parenthesized file stack markers (`(chapters/intro.tex ... )`) that AUCTeX tracks.
@@ -18,24 +18,24 @@ Passing `--emacs` automatically:
 
 ## AUCTeX Setup (`init.el` or `~/.emacs`)
 
-To add `latex_it` as a build command in AUCTeX, add the following to your Emacs configuration:
+To add `leeni` as a build command in AUCTeX, add the following to your Emacs configuration:
 
 ```elisp
 (eval-after-load "tex"
   '(add-to-list 'TeX-command-list
-                '("latex_it" "l --emacs %t" TeX-run-TeX nil (latex-mode)
-                  :help "Build with latex_it and jump to errors") t))
+                '("leeni" "l --emacs %t" TeX-run-TeX nil (latex-mode)
+                  :help "Build with leeni and jump to errors") t))
 ```
 
-### Setting `latex_it` as the Default Command
-If you want AUCTeX to default to `latex_it` instead of `LaTeX`:
+### Setting `leeni` as the Default Command
+If you want AUCTeX to default to `leeni` instead of `LaTeX`:
 
 ```elisp
-(setq-default TeX-command-default "latex_it")
+(setq-default TeX-command-default "leeni")
 ```
 
 ### Everyday AUCTeX Workflow:
-* `C-c C-c`: Choose `latex_it` and press `Enter` to compile.
+* `C-c C-c`: Choose `leeni` and press `Enter` to compile.
 * `C-c \`` (`TeX-next-error`): Jump directly to the offending line for each error or warning.
 * `C-c C-l` (`TeX-recenter-output-buffer`): View the full compilation log buffer.
 
@@ -53,7 +53,7 @@ For Emacs's built-in `compilation-mode` (`M-x compile`, `next-error` `C-x \``), 
 ```
 
 ### Colored Compilation Output
-By default, `latex_it` disables ANSI escape sequences under `INSIDE_EMACS=...compile` so line numbers match standard GNU compilation regexes cleanly. To enable color in `compilation-mode`:
+By default, `leeni` disables ANSI escape sequences under `INSIDE_EMACS=...compile` so line numbers match standard GNU compilation regexes cleanly. To enable color in `compilation-mode`:
 
 ```elisp
 ;; Enable ANSI colors in compilation buffers

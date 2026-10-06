@@ -1,8 +1,8 @@
-# latex_it
+# leeni
 
 > Standalone Ruby tool for compiling LaTeX documents with automated multi-pass convergence, junk file isolation, and token-optimized diagnostics for humans and AI agents.
 
-`latex_it` (often invoked via symlink `l`) compiles LaTeX documents using `xelatex`, `lualatex`, or `pdflatex`. It eliminates directory clutter by isolating temporary build files into `junk/` and provides token-optimized, 4-tier diagnostics.
+`leeni` (often invoked via symlink `l`) compiles LaTeX documents using `xelatex`, `lualatex`, or `pdflatex`. It eliminates directory clutter by isolating temporary build files into `junk/` and provides token-optimized, 4-tier diagnostics.
 
 ## Quick Start for LLMs & AI Agents
 
@@ -41,8 +41,8 @@ Key features of `-llm` mode:
 ## Key Links
 
 - [Complete Technical Reference for LLMs](docs/llm_reference.md): Dense, token-optimized specification of all CLI flags, configuration schemas, exit codes, and diagnostic contracts.
-- [Documentation](https://sarielhp.github.io/latex_it/): Full online documentation.
-- [Diagnostics Guide](https://sarielhp.github.io/latex_it/docs/diagnostics.html): Detailed explanation of 4-tier diagnostics, Alerts, Whatevers, and `-llm` mode.
-- [Error Reference Catalog](https://sarielhp.github.io/latex_it/docs/errors/): Catalog of 55 TeX/LaTeX errors with root causes and fixes.
-- [Configuration](https://sarielhp.github.io/latex_it/docs/configuration.html): Unified `.l.jsonc` project configuration.
-- [GitHub Repository](https://github.com/sarielhp/latex_it): Source code and issues.
+- [Documentation](https://sarielhp.github.io/leeni/): Full online documentation.
+- [Diagnostics Guide](https://sarielhp.github.io/leeni/docs/diagnostics.html): Detailed explanation of 4-tier diagnostics, Alerts, Whatevers, and `-llm` mode.
+- [Error Reference Catalog](https://sarielhp.github.io/leeni/docs/errors/): Catalog of 55 TeX/LaTeX errors with root causes and fixes.
+- [Configuration](https://sarielhp.github.io/leeni/docs/configuration.html): Unified `.l.jsonc` project configuration.
+- [GitHub Repository](https://github.com/sarielhp/leeni): Source code and issues.

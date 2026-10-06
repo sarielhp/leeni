@@ -2,8 +2,8 @@
 # frozen_string_literal: true
 
 require 'minitest/autorun'
-require_relative '../lib/latex_it/color'
-require_relative '../lib/latex_it/compile_format'
+require_relative '../lib/leeni/color'
+require_relative '../lib/leeni/compile_format'
 
 class TestCompileFormat < Minitest::Test
   def test_clean_message_stripping_headers

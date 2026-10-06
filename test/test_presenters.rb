@@ -2,11 +2,11 @@
 
 require 'minitest/autorun'
 require 'stringio'
-require_relative '../lib/latex_it/presenters'
+require_relative '../lib/leeni/presenters'
 
 class TestPresenters < Minitest::Test
   def test_compiler_presenter_gnu_format
-    presenter = LatexIt::CompilerPresenter.new(color: false, link: false)
+    presenter = Leeni::CompilerPresenter.new(color: false, link: false)
     rec = { file: 'main.tex', line: 12, col: 3, tier: 'errors', message: 'syntax error' }
     io = StringIO.new
     presenter.render_record(rec, io: io)
@@ -14,7 +14,7 @@ class TestPresenters < Minitest::Test
   end
 
   def test_agent_presenter_plain_text_and_folding
-    presenter = LatexIt::AgentPresenter.new(color: false, link: false, fold_threshold: 2)
+    presenter = Leeni::AgentPresenter.new(color: false, link: false, fold_threshold: 2)
     warnings = (1..6).map do |i|
       { file: 'main.tex', line: i * 10, tier: 'warnings', category: :undefined_citation, message: "undefined citation 'cite#{i}'" }
     end
@@ -26,14 +26,14 @@ class TestPresenters < Minitest::Test
     assert_includes lines[0], "undefined citation 'cite1'"
     assert_includes lines[1], "undefined citation 'cite2'"
     # Fold note for remaining 4
-    assert_equal "latex_it: note: 4 more undefined citations in main.tex (pass -a to show all)", lines[2]
+    assert_equal "leeni: note: 4 more undefined citations in main.tex (pass -a to show all)", lines[2]
     assert_equal 3, lines.size
     # No ANSI escapes
     refute_match(/\e\[/, io.string)
   end
 
   def test_agent_presenter_unparsed_failure
-    presenter = LatexIt::AgentPresenter.new
+    presenter = Leeni::AgentPresenter.new
     io = StringIO.new
     presenter.render_diagnostics(errors: [], log_tail: "! Emergency stop.\nFatal error\n", file: 'paper.tex', io: io)
     out = io.string
@@ -44,7 +44,7 @@ class TestPresenters < Minitest::Test
   end
 
   def test_agent_presenter_suppresses_warnings_when_errors_exist
-    presenter = LatexIt::AgentPresenter.new
+    presenter = Leeni::AgentPresenter.new
     errs = [{ file: 'main.tex', line: 5, tier: 'errors', message: 'fatal syntax crash' }]
     warns = [{ file: 'main.tex', line: 10, tier: 'warnings', message: 'minor warning' }]
     io = StringIO.new
@@ -54,8 +54,8 @@ class TestPresenters < Minitest::Test
   end
 
   def test_json_presenter
-    presenter = LatexIt::JsonPresenter.new
-    result = LatexIt::DiagnosticResult.new(
+    presenter = Leeni::JsonPresenter.new
+    result = Leeni::DiagnosticResult.new(
       success: true,
       exit_code: 0,
       pdf_path: 'doc.pdf',

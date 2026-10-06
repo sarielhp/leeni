@@ -8,7 +8,7 @@ require "fileutils"
 require "open3"
 
 class TestArxivSupport < Minitest::Test
-  BIN = File.expand_path("../latex_it", __dir__)
+  BIN = File.expand_path("../leeni", __dir__)
   load BIN
 
   def test_meta_extraction_title_and_math

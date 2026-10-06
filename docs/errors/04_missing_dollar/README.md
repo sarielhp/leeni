@@ -24,4 +24,4 @@ TeX encountered a character or macro that is only valid inside math mode while o
   ```
 
 > [!NOTE]
-> If this error occurs during `\printbibliography` or `\bibliography`, the unescaped underscore or missing dollar sign is inside a `.bib` database field. See [Troubleshooting Bibliography Errors](../../troubleshooting_bibliography_errors.md) for automated diagnosis with `latex_it`.
+> If this error occurs during `\printbibliography` or `\bibliography`, the unescaped underscore or missing dollar sign is inside a `.bib` database field. See [Troubleshooting Bibliography Errors](../../troubleshooting_bibliography_errors.md) for automated diagnosis with `leeni`.

@@ -1,6 +1,6 @@
 # Command-Line Interface (CLI) Options Reference
 
-This document provides a complete reference for all command-line flags and options supported by `latex_it` (`l`).
+This document provides a complete reference for all command-line flags and options supported by `leeni` (`l`).
 
 ---
 
@@ -67,13 +67,13 @@ l -u paper.tex
 ```
 
 ### `-n`, `--passes NUM`
-Sets the maximum number of compilation passes allowed (1-10, default: 5). If cross-references or bibliographies do not stabilize within this limit, or the auxiliary state starts cycling between values, `latex_it` stops, reports a warning (which `--werror` treats as an error), and does not cache the build.
+Sets the maximum number of compilation passes allowed (1-10, default: 5). If cross-references or bibliographies do not stabilize within this limit, or the auxiliary state starts cycling between values, `leeni` stops, reports a warning (which `--werror` treats as an error), and does not cache the build.
 ```bash
 l -n 2 paper.tex
 ```
 
 ### `-b`, `--[no-]bib`
-Explicitly enables or disables the bibliography pass. By default, `latex_it` automatically detects whether BibTeX or Biber is required based on auxiliary files (`.aux` / `.bcf`).
+Explicitly enables or disables the bibliography pass. By default, `leeni` automatically detects whether BibTeX or Biber is required based on auxiliary files (`.aux` / `.bcf`).
 ```bash
 l --no-bib paper.tex
 ```
@@ -144,7 +144,7 @@ l -a paper.tex
 ```
 
 ### `-W`, `--werror`
-Treats compilation warnings and Alerts as fatal errors, causing `latex_it` to exit with a non-zero status.
+Treats compilation warnings and Alerts as fatal errors, causing `leeni` to exit with a non-zero status.
 ```bash
 l -W paper.tex
 ```
@@ -156,7 +156,7 @@ l -v paper.tex
 ```
 
 ### `-r`, `--raw`
-Bypasses `latex_it`'s diagnostic interception engine entirely and streams raw, unfiltered compiler stdout/stderr directly to the terminal.
+Bypasses `leeni`'s diagnostic interception engine entirely and streams raw, unfiltered compiler stdout/stderr directly to the terminal.
 ```bash
 l -r paper.tex
 ```
@@ -211,7 +211,7 @@ l -Z paper.tex
 ```
 
 ### `-t`, `--verify`
-Tests the generated `.zip` package by unpacking it into an isolated `/tmp/latex_it_verify_XXXX` sandbox and compiling it with `--no-env` to ensure 100% self-contained portability.
+Tests the generated `.zip` package by unpacking it into an isolated `/tmp/leeni_verify_XXXX` sandbox and compiling it with `--no-env` to ensure 100% self-contained portability.
 ```bash
 l -z -t paper.tex
 ```
@@ -281,13 +281,13 @@ l -e lualatex --update-if-changed --config-save
 ```
 
 ### `--vscode-init`
-Generates `.vscode/tasks.json` and `settings.json` configured for `latex_it` problem matching and build tasks.
+Generates `.vscode/tasks.json` and `settings.json` configured for `leeni` problem matching and build tasks.
 ```bash
 l --vscode-init
 ```
 
 ### `--gitignore-init`
-Appends standard `latex_it` and LaTeX ignore rules to `.gitignore`.
+Appends standard `leeni` and LaTeX ignore rules to `.gitignore`.
 ```bash
 l --gitignore-init
 ```
@@ -318,11 +318,11 @@ l -H
 
 ## 8. Symlink Shortcuts & Personalities
 
-When installed via `tools/install` (or manually symlinked), `latex_it` inspects `$PROGRAM_NAME` to automatically adapt its default behavior based on the command invoked:
+When installed via `tools/install` (or manually symlinked), `leeni` inspects `$PROGRAM_NAME` to automatically adapt its default behavior based on the command invoked:
 
 | Command | Behavior |
 | :--- | :--- |
-| `l`, `latex_it` | Default compilation (`xelatex`, up to 5 passes, automatic bibliography). |
+| `l`, `leeni` | Default compilation (`xelatex`, up to 5 passes, automatic bibliography). |
 | `lw` | Incremental rebuild (identical to `l`; preserved for compatibility with legacy shortcuts). |
 | `ll`, `llua` | Compile using LuaLaTeX (`--engine=lualatex`). |
 | `lp`, `pdflatex` | Compile using pdfLaTeX (`--engine=pdflatex`). |

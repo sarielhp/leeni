@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 # ==============================================================================
-# lib/latex_it/macro_harvester.rb
+# lib/leeni/macro_harvester.rb
 #
 # Scans local project source files (.tex, .sty, .cls) to harvest custom macro
 # declarations for fuzzy suggestions during diagnostic error reporting.

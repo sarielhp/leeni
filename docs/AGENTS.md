@@ -1,19 +1,19 @@
-# Agent Instructions for Maintaining `latex_it`
+# Agent Instructions for Maintaining `leeni`
 
-This document provides architectural guidelines, core invariants, development workflows, and acceleration instructions for AI agents and maintainers working in the [`latex_it`](latex_it) repository.
+This document provides architectural guidelines, core invariants, development workflows, and acceleration instructions for AI agents and maintainers working in the [`leeni`](leeni) repository.
 
 ---
 
 ## 1. Core Architecture & Repository Layout
 
-- **Primary Executable**: [`latex_it`](latex_it)
-  - Modular Ruby executable (`#!/usr/bin/env ruby`) with zero-build development workflow (`require_relative 'lib/latex_it/...'`).
+- **Primary Executable**: [`leeni`](leeni)
+  - Modular Ruby executable (`#!/usr/bin/env ruby`) with zero-build development workflow (`require_relative 'lib/leeni/...'`).
   - Supports symlink personalities (`l`, `lw`, `ll`, `llua`, `latex_clean`, `latex_file_in_dir`, `latex_env_free`).
-- **Modular Core Library (`lib/latex_it/`)**:
+- **Modular Core Library (`lib/leeni/`)**:
   - `version.rb`: Canonical version string, executable path, and constants.
   - `color.rb`: ANSI color rendering via `Rainbow` with graceful plain-text `NullString` fallback.
   - `compatibility.rb`: Environment adjustments for vendor styles (e.g. `revtex4`).
-  - `config.rb`: Unified JSONC configuration loader (`.l.jsonc`, `~/.config/latex_it/config.jsonc`) and quote-aware parser.
+  - `config.rb`: Unified JSONC configuration loader (`.l.jsonc`, `~/.config/leeni/config.jsonc`) and quote-aware parser.
   - `utils.rb`: Engine detection, main file discovery heuristics, noise filtering, and directory cleanup.
   - `brace_checker.rb`: Lexical environment-scoped brace validator and AUCTeX formatter.
   - `flattener.rb`: TeX input tree resolution, comment stripping, and flattening.
@@ -29,7 +29,7 @@ This document provides architectural guidelines, core invariants, development wo
   - [`tools/bundle`](tools/bundle): Compiles modular `lib/` components into a single standalone executable.
   - [`tools/gate`](tools/gate): Tiered quality gate (`--fast`, `--medium`, `--full`) verifying syntax, code metrics, and tests.
   - [`tools/setup_ruby_dev`](tools/setup_ruby_dev): Automated environment auditor and installer for Ruby gems, LSPs, and CLI tools.
-  - [`tools/install`](tools/install): Bundles `latex_it` into a standalone binary at `~/bin/latex_it` with `~/bin/l` symlink.
+  - [`tools/install`](tools/install): Bundles `leeni` into a standalone binary at `~/bin/leeni` with `~/bin/l` symlink.
   - [`tools/bump`](tools/bump): Validates clean git tree, runs `tools/gate --full`, increments version, commits, tags, and pushes.
   - [`tools/test_error_corpus`](tools/test_error_corpus): Standalone on-demand test runner verifying real-world error fixtures in `docs/errors/`.
 - **Automated Test Suite** (`test/`):
@@ -70,7 +70,7 @@ This document provides architectural guidelines, core invariants, development wo
 
 ---
 
-## 3. The `latex_it` Execution Contract
+## 3. The `leeni` Execution Contract
 
 Any modifications to compilation logic must honor the following invariants:
 
@@ -92,8 +92,8 @@ Any modifications to compilation logic must honor the following invariants:
    - Supports supplementary assets via trailing `-- <files...>`.
    - Default `inject_styles: false` places styles in root for universal journal compatibility without modifying `.tex` source code.
 5. **Sandbox Portability Verification (`-t` / `--verify`)**:
-   - Unpacks bundle into `/tmp/latex_it_verify_XXXX` sandbox.
-   - Compiles with `latex_it --no-env` (wiping ambient `TEXINPUTS`, `BIBINPUTS`, `TEXMFHOME`).
+   - Unpacks bundle into `/tmp/leeni_verify_XXXX` sandbox.
+   - Compiles with `leeni --no-env` (wiping ambient `TEXINPUTS`, `BIBINPUTS`, `TEXMFHOME`).
    - Compares PDF text layout against bundled PDF with `pdftotext -layout`.
 6. **Agent & LLM Compilation Profile (`-llm` / `--agent`)**:
    - Autonomous coding agents must invoke `l -llm [file.tex]`.
@@ -124,7 +124,7 @@ Always execute quality workflows through the provided scripts:
 - `--fast` (default) checks Ruby syntax and deterministic unit tests. Run it after every edit.
 - `--medium` adds practical real-LaTeX integration tests. Run it after roughly ten fast checks and before committing or changing build logic.
 - `--full` adds long-running integration, BWS, archive/visual verification, and ArXiv corpus tests. Run it before bumping or pushing, and in CI.
-- Every tier checks Ruby syntax across `latex_it`, `tools/`, and `test/`.
+- Every tier checks Ruby syntax across `leeni`, `tools/`, and `test/`.
 - **Trigger**: Run the appropriate tier continuously during development.
   ```bash
   rtk ./tools/gate --fast
@@ -146,16 +146,16 @@ Always execute quality workflows through the provided scripts:
 ### 3. Static Analysis & Linting
 - Verify code style and syntax offenses:
   ```bash
-  rtk rubocop latex_it tools/ test/
+  rtk rubocop leeni tools/ test/
   ```
 - Automatically correct safe offenses:
   ```bash
-  rtk rubocop -A latex_it tools/ test/
+  rtk rubocop -A leeni tools/ test/
   ```
 
 ### 4. `tools/install` (Local Binary Installation)
-- Copies `latex_it` to `~/bin/latex_it` (setting permissions to `0755`).
-- Creates symbolic link `~/bin/l -> latex_it`.
+- Copies `leeni` to `~/bin/leeni` (setting permissions to `0755`).
+- Creates symbolic link `~/bin/l -> leeni`.
 - **Trigger**:
   ```bash
   ./tools/install
@@ -164,7 +164,7 @@ Always execute quality workflows through the provided scripts:
 ### 5. `tools/bump` (Version Bump, Tag & Push Workflow)
 - Ensures working tree is completely clean (aborts if uncommitted changes exist).
 - Runs [`tools/gate --full`](tools/gate) automatically. (Do not run `--full` manually before bumping to avoid duplicate gate runs).
-- Increments version by +0.0.1 (patch by default, or `--major` / `--minor`) in [`lib/latex_it/version.rb`](lib/latex_it/version.rb) and bundled `latex_it`.
+- Increments version by +0.0.1 (patch by default, or `--major` / `--minor`) in [`lib/leeni/version.rb`](lib/leeni/version.rb) and bundled `leeni`.
 - Commits changes, creates a release git tag, and pushes to remote with `--follow-tags`.
 - **Trigger**:
   ```bash
@@ -184,7 +184,7 @@ The following developer tools are pre-configured in the environment:
 | **`rubocop`** | `rubocop` (Ruby gem) | **Static analysis & formatting.** Lint and auto-correct Ruby code. |
 | **`ruby-lsp`** | `ruby-lsp` (Ruby gem) | **Shopify Language Server.** Fast symbol navigation, definitions, and code intelligence. |
 | **`repomix`** | `repomix` (in `PATH`) | **Repository context packer.** Generates token-optimized codebase snapshots for LLM prompts. |
-| **`pdftotext`** | `pdftotext` (in `PATH`) | **Poppler PDF text extractor.** Enables text diff verification in `latex_it -d`. |
+| **`pdftotext`** | `pdftotext` (in `PATH`) | **Poppler PDF text extractor.** Enables text diff verification in `leeni -d`. |
 | **`minitest`** | Ruby gem | **Unit test runner.** Powers `tools/gate` and `test/test_*.rb`. |
 | **`rainbow`** | Ruby gem | **Colorized diagnostics.** ANSI color rendering in terminal output. |
 
@@ -192,7 +192,7 @@ The following developer tools are pre-configured in the environment:
 
 ## 6. Adversarial Audit Lenses
 
-When reviewing, refactoring, or evaluating changes to `latex_it`, evaluate across these 5 domain lenses:
+When reviewing, refactoring, or evaluating changes to `leeni`, evaluate across these 5 domain lenses:
 
 1. **Systems & Concurrency**:
    - File locking (`--lock` with `flock`) must prevent race conditions without deadlocking.
@@ -223,7 +223,7 @@ When reviewing, refactoring, or evaluating changes to `latex_it`, evaluate acros
 - **AST Pattern Refactoring**:
   Use `ast-grep` (`sg`) to inspect or transform method signatures and patterns:
   ```bash
-  rtk sg -p 'def $NAME($$$ARGS) $$$BODY end' -l ruby latex_it
+  rtk sg -p 'def $NAME($$$ARGS) $$$BODY end' -l ruby leeni
   ```
 - **Async Background Tasks & Reactive Wait**:
   `run_command` has a 10s synchronous timeout (`WaitMsBeforeAsync: 10000`). When a task runs in the background:

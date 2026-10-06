@@ -9,7 +9,7 @@ require 'json'
 
 class TestJsonMode < Minitest::Test
   def setup
-    @bin_path = File.expand_path('../latex_it', __dir__)
+    @bin_path = File.expand_path('../leeni', __dir__)
   end
 
   def test_clean_build_in_json_mode

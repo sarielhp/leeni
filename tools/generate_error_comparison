@@ -5,7 +5,7 @@
 # tools/generate_error_comparison
 #
 # Generates side-by-side terminal comparison cards (SVG, PNG, and animated GIF)
-# contrasting latexmk vs latex_it error diagnostics on an unclosed curly brace.
+# contrasting latexmk vs leeni error diagnostics on an unclosed curly brace.
 # ==============================================================================
 
 require 'fileutils'
@@ -23,6 +23,14 @@ HEIGHT = 580
 
 def escape_xml(str)
   str.gsub('&', '&amp;').gsub('<', '&lt;').gsub('>', '&gt;').gsub('"', '&quot;')
+end
+
+def render_png(svg_path, png_path)
+  if system('which', 'rsvg-convert', out: File::NULL, err: File::NULL)
+    return system('rsvg-convert', '-o', png_path, svg_path)
+  end
+
+  system('convert', '-density', '150', svg_path, png_path)
 end
 
 # Left panel lines (latexmk)
@@ -48,7 +56,7 @@ LEFT_LINES = [
   { text: "Collected error summary: 'xelatex' return code 1", color: "#ff6b6b" }
 ].freeze
 
-# Right panel lines (latex_it)
+# Right panel lines (leeni)
 RIGHT_LINES = [
   { text: "$ l paper.tex", color: "#7dcfff", bold: true },
   { text: "      xelatex (1): Latex compilation failed! (Status: 1)", color: "#ff6b6b", bold: true },
@@ -106,14 +114,14 @@ def render_svg(left_subset, right_subset, show_left_pill: true, show_right_pill:
         end}
     </g>
 
-    <!-- Right Panel: latex_it -->
+    <!-- Right Panel: leeni -->
     <g transform="translate(588, 24)" filter="url(#shadow)">
       <rect width="528" height="530" rx="10" fill="#1a1b26" stroke="#384a68" stroke-width="1.5"/>
       <path d="M 0,10 A 10,10 0 0,1 10,0 L 518,0 A 10,10 0 0,1 528,10 L 528,40 L 0,40 Z" fill="#16161e"/>
       <circle cx="20" cy="20" r="6" fill="#ff6b6b"/>
       <circle cx="38" cy="20" r="6" fill="#e0af68"/>
       <circle cx="56" cy="20" r="6" fill="#9ece6a"/>
-      <text x="264" y="25" fill="#c0caf5" text-anchor="middle" class="title">latex_it (l)</text>
+      <text x="264" y="25" fill="#c0caf5" text-anchor="middle" class="title">leeni (l)</text>
 
       <g transform="translate(20, 66)" class="code">
         #{right_subset.map.with_index { |l, i|
@@ -140,7 +148,7 @@ puts "Wrote #{SVG_FILE}"
 
 # 2. Generate high-res PNG using ImageMagick
 if system('which', 'convert', out: File::NULL, err: File::NULL)
-  system('convert', '-density', '150', SVG_FILE, PNG_FILE)
+  render_png(SVG_FILE, PNG_FILE)
   puts "Wrote #{PNG_FILE}" if File.exist?(PNG_FILE)
 
   # 3. Generate animated GIF of simulated build session
@@ -149,19 +157,19 @@ if system('which', 'convert', out: File::NULL, err: File::NULL)
     f1_svg = File.join(tmpdir, 'f1.svg')
     f1_png = File.join(tmpdir, 'f1.png')
     File.write(f1_svg, render_svg(LEFT_LINES.first(1), RIGHT_LINES.first(1), show_left_pill: false, show_right_pill: false))
-    system('convert', '-density', '150', f1_svg, f1_png)
+    render_png(f1_svg, f1_png)
 
     # Frame 2: Compiler running
     f2_svg = File.join(tmpdir, 'f2.svg')
     f2_png = File.join(tmpdir, 'f2.png')
     File.write(f2_svg, render_svg(LEFT_LINES.first(6), RIGHT_LINES.first(5), show_left_pill: false, show_right_pill: false))
-    system('convert', '-density', '150', f2_svg, f2_png)
+    render_png(f2_svg, f2_png)
 
     # Frame 3: Error detected
     f3_svg = File.join(tmpdir, 'f3.svg')
     f3_png = File.join(tmpdir, 'f3.png')
     File.write(f3_svg, render_svg(LEFT_LINES.first(13), RIGHT_LINES.first(10), show_left_pill: false, show_right_pill: true))
-    system('convert', '-density', '150', f3_svg, f3_png)
+    render_png(f3_svg, f3_png)
 
     # Frame 4: Final full state
     f4_png = PNG_FILE

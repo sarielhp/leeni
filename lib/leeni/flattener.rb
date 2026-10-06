@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 # ==============================================================================
-# lib/latex_it/flattener.rb
+# lib/leeni/flattener.rb
 #
 # Recursive LaTeX document flattener. Inlines \\input and \\include directives,
 # strips comments, and cleans machine-specific styles.

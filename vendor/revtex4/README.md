@@ -2,7 +2,7 @@
 
 These files are the generated runtime files from the REVTeX 4.0 distribution
 (`revtex4.cls`, `revsymb.sty`, and the APS/RMP/font-size `.rtx` files). They
-are installed under `~/.local/share/latex_it/texmf/tex/latex/revtex4` so old
+are installed under `~/.local/share/leeni/texmf/tex/latex/revtex4` so old
 papers can be compiled without modifying their sources.
 
 Source: https://ctan.org/pkg/revtex (REVTeX 4.0 distribution, retrieved 2026-09-09)

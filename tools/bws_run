@@ -9,7 +9,7 @@ require 'find'
 require 'open3'
 
 PROFILE = File.expand_path('profiles/bws-latex-write.json', __dir__)
-DEFAULT_LATEX_IT = File.expand_path('../latex_it', __dir__)
+DEFAULT_LEENI = File.expand_path('../leeni', __dir__)
 DEFAULT_BWS = ENV.fetch('BWS_BIN', 'bws')
 
 def usage_error(message)
@@ -19,7 +19,7 @@ def usage_error(message)
 end
 
 def ignored_path?(path)
-  ignored = %w[.git junk .bws .bws.jsonc .bws-home .latex_it_bws_bin .sandbox-config]
+  ignored = %w[.git junk .bws .bws.jsonc .bws-home .leeni_bws_bin .sandbox-config]
   path.split(File::SEPARATOR).any? { |part| ignored.include?(part) }
 end
 
@@ -69,7 +69,7 @@ def write_config(workspace, real_home, sandbox_home)
     'system' => { 'share_net' => false, 'clearenv' => true, 'unshare_uts' => true },
     'profiles' => ['bws-latex-write'],
     'env' => { 'HOME' => sandbox_home, 'XDG_CONFIG_HOME' => config_home },
-    'path' => [File.join(workspace, '.latex_it_bws_bin'), '/usr/bin', '/bin'],
+    'path' => [File.join(workspace, '.leeni_bws_bin'), '/usr/bin', '/bin'],
     'binds_rw' => binds.map { |host, target| [host, target] },
     'binds_ro' => []
   }
@@ -77,13 +77,13 @@ def write_config(workspace, real_home, sandbox_home)
 end
 
 def parse_options
-  options = { output: nil, bws: DEFAULT_BWS, latex_it: DEFAULT_LATEX_IT,
+  options = { output: nil, bws: DEFAULT_BWS, leeni: DEFAULT_LEENI,
               prepare_only: false, timeout: 300.0, help: false }
   parser = OptionParser.new do |opts|
     opts.banner = 'Usage: tools/bws_run SOURCE [options] -- COMMAND [ARGS...]'
     opts.on('--output DIR', 'Retain the staged workspace at DIR') { |v| options[:output] = File.expand_path(v) }
     opts.on('--bws PATH', "bws executable (default: #{DEFAULT_BWS})") { |v| options[:bws] = v }
-    opts.on('--latex-it PATH', 'latex_it executable to stage') { |v| options[:latex_it] = v }
+    opts.on('--leeni PATH', 'leeni executable to stage') { |v| options[:leeni] = v }
     opts.on('--prepare-only', 'stage and print the workspace without launching bws') { options[:prepare_only] = true }
     opts.on('--timeout SECONDS', Float, 'stop the sandbox after SECONDS (default: 300)') { |v| options[:timeout] = v }
     opts.on('-h', '--help', 'show this help') { options[:help] = true }
@@ -116,7 +116,7 @@ def validate_options(source, options)
     raise ArgumentError, '--output must be outside the source directory'
   end
 
-  options[:latex_it] = File.realpath(options[:latex_it])
+  options[:leeni] = File.realpath(options[:leeni])
   options[:bws] = File.expand_path(options[:bws]) if options[:bws].include?(File::SEPARATOR)
   return unless options[:output]
 
@@ -132,7 +132,7 @@ def validate_options(source, options)
 end
 
 def stage_workspace(source, options, real_home)
-  workspace = options[:output] || Dir.mktmpdir('latex_it_bws_', '/tmp')
+  workspace = options[:output] || Dir.mktmpdir('leeni_bws_', '/tmp')
   if options[:output]
     FileUtils.mkdir_p(File.dirname(workspace))
     Dir.mkdir(workspace)
@@ -141,9 +141,9 @@ def stage_workspace(source, options, real_home)
   sandbox_home = File.join(workspace, '.bws-home')
   FileUtils.mkdir_p(sandbox_home)
   write_config(workspace, real_home, sandbox_home)
-  staged_latex = File.join(workspace, '.latex_it_bws_bin', 'latex_it')
+  staged_latex = File.join(workspace, '.leeni_bws_bin', 'leeni')
   FileUtils.mkdir_p(File.dirname(staged_latex))
-  FileUtils.cp(options[:latex_it], staged_latex)
+  FileUtils.cp(options[:leeni], staged_latex)
   FileUtils.chmod(0o755, staged_latex)
   vendor = File.expand_path('../vendor/revtex4', __dir__)
   staged_vendor = File.join(File.dirname(staged_latex), 'vendor', 'revtex4')
@@ -156,7 +156,7 @@ end
 
 def launch(workspace, sandbox_home, staged_latex, options, command)
   command = [staged_latex] if command.empty?
-  command[0] = staged_latex if command[0] == 'latex_it'
+  command[0] = staged_latex if command[0] == 'leeni'
   args = ['--no-init', '--no-ssh', '--offline', '--no-proxy', '--no-dbus', '--'] + command
   env = {
     'HOME' => sandbox_home,

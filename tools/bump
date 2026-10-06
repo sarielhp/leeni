@@ -4,12 +4,12 @@
 # ==============================================================================
 # tools/bump
 #
-# Automated version bump and release workflow for latex_it:
+# Automated version bump and release workflow for leeni:
 # 1. Checks if running inside a Bubblewrap environment (aborts immediately if detected).
 # 2. Validates working tree is 100% clean (aborts if uncommitted changes exist).
 # 3. Runs the full quality gate (tools/gate --full).
 # 4. Increments version by +0.0.1 (patch by default, or --major / --minor).
-# 5. Updates lib/latex_it/version.rb and latex_it files.
+# 5. Updates lib/leeni/version.rb and leeni files.
 # 6. Commits the updated version, tags the release, and pushes to remote.
 # 7. Publishes GitHub release and installs updated binary to ~/bin via tools/install.
 # ==============================================================================
@@ -27,13 +27,13 @@ module VersionBumper
   RESET  = "\e[0m"
 
   REPO_ROOT = File.expand_path('..', __dir__)
-  VERSION_FILE = File.join(REPO_ROOT, 'lib', 'latex_it', 'version.rb')
-  LATEX_IT_FILE = File.join(REPO_ROOT, 'latex_it')
+  VERSION_FILE = File.join(REPO_ROOT, 'lib', 'leeni', 'version.rb')
+  LEENI_FILE = File.join(REPO_ROOT, 'leeni')
 
   def self.run!(dry_run: false, bump_type: :patch)
     check_bubblewrap!
 
-    puts "#{BOLD}==> Version Bump Workflow (latex_it)#{RESET}"
+    puts "#{BOLD}==> Version Bump Workflow (leeni)#{RESET}"
 
     Dir.chdir(REPO_ROOT) do
       check_git_repo!
@@ -45,7 +45,7 @@ module VersionBumper
       puts "--> Bumping version (#{bump_type}): #{YELLOW}#{current_v}#{RESET} -> #{GREEN}#{BOLD}#{new_v}#{RESET}"
 
       if dry_run
-        puts "#{CYAN}[Dry Run] Would update lib/latex_it/version.rb, commit, tag v#{new_v}, push, and install.#{RESET}"
+        puts "#{CYAN}[Dry Run] Would update lib/leeni/version.rb, commit, tag v#{new_v}, push, and install.#{RESET}"
         return
       end
 
@@ -169,8 +169,8 @@ module VersionBumper
       return Regexp.last_match(1) if content =~ /VERSION\s*=\s*['"]([^'"]+)['"]/
     end
 
-    if File.file?(LATEX_IT_FILE)
-      content = File.read(LATEX_IT_FILE)
+    if File.file?(LEENI_FILE)
+      content = File.read(LEENI_FILE)
       return Regexp.last_match(1) if content =~ /VERSION\s*=\s*['"]([^'"]+)['"]/
     end
 
@@ -191,7 +191,7 @@ module VersionBumper
   end
 
   def self.apply_version_update(new_v)
-    # 1. Update lib/latex_it/version.rb
+    # 1. Update lib/leeni/version.rb
     if File.file?(VERSION_FILE)
       content = File.read(VERSION_FILE)
       updated = content.sub(/VERSION\s*=\s*['"][^'"]+['"](?:\.freeze)?/, "VERSION = '#{new_v}'.freeze")
@@ -199,18 +199,18 @@ module VersionBumper
       puts "  [#{GREEN}OK#{RESET}] Updated #{VERSION_FILE}"
     end
 
-    # 2. Update latex_it fallback string if present
-    if File.file?(LATEX_IT_FILE)
-      content = File.read(LATEX_IT_FILE)
+    # 2. Update leeni fallback string if present
+    if File.file?(LEENI_FILE)
+      content = File.read(LEENI_FILE)
       updated = content.sub(/(: '\d+\.\d+\.\d+')/, ": '#{new_v}'")
-      File.write(LATEX_IT_FILE, updated) if updated != content
-      puts "  [#{GREEN}OK#{RESET}] Updated #{LATEX_IT_FILE}"
+      File.write(LEENI_FILE, updated) if updated != content
+      puts "  [#{GREEN}OK#{RESET}] Updated #{LEENI_FILE}"
     end
   end
 
   def self.git_commit_and_push!(new_v)
     puts "--> Committing version bump to git..."
-    files_to_add = ['lib/latex_it/version.rb', 'latex_it']
+    files_to_add = ['lib/leeni/version.rb', 'leeni']
     Open3.capture2('git', 'add', *files_to_add)
     commit_msg = "Bump version to #{new_v}"
     out, status = Open3.capture2e('git', 'commit', '-m', commit_msg)
@@ -242,8 +242,8 @@ module VersionBumper
 
     tag_name = "v#{new_v}"
     puts "--> Publishing GitHub release #{CYAN}#{tag_name}#{RESET} with standalone binary..."
-    Dir.mktmpdir('latex_it_release') do |tmpdir|
-      bundle_path = File.join(tmpdir, 'latex_it')
+    Dir.mktmpdir('leeni_release') do |tmpdir|
+      bundle_path = File.join(tmpdir, 'leeni')
       bundle_script = File.join(REPO_ROOT, 'tools/bundle')
       _out, status = Open3.capture2e(bundle_script, '-o', bundle_path)
       unless status.success? && File.file?(bundle_path)

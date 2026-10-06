@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 # ==============================================================================
-# lib/latex_it/brace_checker.rb
+# lib/leeni/brace_checker.rb
 #
 # Lexical brace, bracket, and environment validator for LaTeX documents.
 # Identifies mismatched braces/brackets and unclosed environments.
@@ -305,7 +305,7 @@ class LaTeXBraceChecker
   end
 
   def build_error(line_no, col_no, message, snippet, alert_msg: nil)
-    err_block = ["! [latex_it] #{message}"]
+    err_block = ["! [leeni] #{message}"]
     err_block << "  Alert: #{alert_msg}" if alert_msg
     err_block << "l.#{line_no} #{snippet}"
 
@@ -321,7 +321,7 @@ class LaTeXBraceChecker
       base_color: :red,
       has_alert: !alert_msg.nil?,
       index: -1000,
-      source: :latex_it,
+      source: :leeni,
       synthetic: true
     }
   end

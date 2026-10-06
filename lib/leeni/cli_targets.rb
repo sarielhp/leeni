@@ -1,9 +1,9 @@
 # frozen_string_literal: true
 
 # ==============================================================================
-# lib/latex_it/cli_targets.rb
+# lib/leeni/cli_targets.rb
 #
-# Target dispatch and target-specific workflows for the latex_it CLI.
+# Target dispatch and target-specific workflows for the leeni CLI.
 # ==============================================================================
 
 module LatexCLITargets

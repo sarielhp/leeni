@@ -6,7 +6,7 @@ require 'tmpdir'
 require 'fileutils'
 require 'open3'
 
-class TestLatexItCLI < Minitest::Test
+class TestLeeniCLI < Minitest::Test
   # Several tests flip the process-global Rainbow.enabled; without this the value
   # leaks into whichever test file runs next and makes results order-dependent.
   def setup
@@ -17,7 +17,7 @@ class TestLatexItCLI < Minitest::Test
     Rainbow.enabled = @saved_rainbow_enabled
   end
 
-  BIN = File.expand_path('../latex_it', __dir__)
+  BIN = File.expand_path('../leeni', __dir__)
   load BIN
 
   def strip_ansi(str)
@@ -27,7 +27,7 @@ class TestLatexItCLI < Minitest::Test
   def test_version_flag
     stdout, status = Open3.capture2(BIN, '-V')
     assert status.success?, "Expected exit code 0, got: #{status.exitstatus}"
-    assert_match(/^l \d+\.\d+\.\d+/, stdout)
+    assert_match(/^leeni \d+\.\d+\.\d+/, stdout)
   end
 
   def test_help_flag
@@ -135,7 +135,7 @@ class TestLatexItCLI < Minitest::Test
   end
 
   def test_canonical_cli_flags_and_anti_alias
-    Dir.mktmpdir('latex_it_canon_flags') do |dir|
+    Dir.mktmpdir('leeni_canon_flags') do |dir|
       Dir.chdir(dir) do
         canonical_flags = [
           %w[-u], %w[--single-pass], %w[-f], %w[--force], %w[-m], %w[--main],
@@ -863,7 +863,7 @@ class TestLatexItCLI < Minitest::Test
       target = File.join(dir, '.l.jsonc')
       assert File.file?(target)
       content = File.read(target)
-      assert_includes content, 'latex_it Global Configuration File'
+      assert_includes content, 'leeni Global Configuration File'
       assert_includes content, '"engine": "xelatex"'
     end
   end
@@ -1320,7 +1320,7 @@ class TestLatexItCLI < Minitest::Test
       assert_includes plain, 'Diagnostic Explanation: Note: Underfull \hbox (Loose Line)'
       assert_includes plain, 'TeX stretched inter-word spacing excessively'
       assert_includes plain, 'Might fix: Remove trailing \\\\ before blank lines'
-      assert_includes plain, 'See: https://sarielhp.github.io/latex_it/docs/guides/underfull_boxes/'
+      assert_includes plain, 'See: https://sarielhp.github.io/leeni/docs/guides/underfull_boxes/'
     end
   end
 
@@ -1347,7 +1347,7 @@ class TestLatexItCLI < Minitest::Test
       assert_includes plain, 'Diagnostic Explanation: Warning: Underfull \vbox (Vertical Stretch)'
       assert_includes plain, 'TeX could not stretch vertical whitespace'
       assert_includes plain, 'Might fix: Add \\raggedbottom to preamble'
-      assert_includes plain, 'See: https://sarielhp.github.io/latex_it/docs/guides/underfull_boxes/'
+      assert_includes plain, 'See: https://sarielhp.github.io/leeni/docs/guides/underfull_boxes/'
     end
   end
 
@@ -1380,7 +1380,7 @@ class TestLatexItCLI < Minitest::Test
           builder_link.send(:analyze_output)
         end
       end
-      expected_osc8 = "\e]8;;https://sarielhp.github.io/latex_it/docs/guides/underfull_boxes/\e\\underfull \\hbox\e]8;;\e\\"
+      expected_osc8 = "\e]8;;https://sarielhp.github.io/leeni/docs/guides/underfull_boxes/\e\\underfull \\hbox\e]8;;\e\\"
       assert_includes out_link, expected_osc8
     end
   end
@@ -1470,7 +1470,7 @@ class TestLatexItCLI < Minitest::Test
         refute_equal lock1, lock2
         user = ENV['USER'] || 'user'
         refute_includes lock1, "/tmp/#{user}"
-        assert_equal File.join(Dir.tmpdir, "latex_it_#{Process.uid}"), File.dirname(lock1)
+        assert_equal File.join(Dir.tmpdir, "leeni_#{Process.uid}"), File.dirname(lock1)
         assert_includes lock1, 'main_build.lock'
       end
     end
@@ -1596,7 +1596,7 @@ class TestLatexItCLI < Minitest::Test
         assert_equal 4, err[:line]
         assert_equal 14, err[:col]
         assert_includes err[:text], "inside environment 'theorem'"
-        assert_includes err[:text], '! [latex_it] Unclosed open brace'
+        assert_includes err[:text], '! [leeni] Unclosed open brace'
         assert_includes err[:text], 'l.4   Let $X$ be { unclosed.'
       end
     end
@@ -1900,7 +1900,7 @@ class TestLatexItCLI < Minitest::Test
   def test_primary_error_file_prefers_compiler_errors_over_synthetic_checks
     diag = TestDiagnosticsHelper.new('main.tex', {})
     groups = {
-      'synthetic_ch.tex' => [{ file: 'synthetic_ch.tex', line: 10, source: :latex_it, synthetic: true }],
+      'synthetic_ch.tex' => [{ file: 'synthetic_ch.tex', line: 10, source: :leeni, synthetic: true }],
       'compiler_ch.tex' => [{ file: 'compiler_ch.tex', line: 20, source: :compiler, synthetic: false }]
     }
 
@@ -1919,7 +1919,7 @@ class TestLatexItCLI < Minitest::Test
   def test_error_items_have_source_and_synthetic_flags
     brace_errs = LaTeXBraceChecker.new('test.tex', "x}y\n").scan
     assert_equal 1, brace_errs.size
-    assert_equal :latex_it, brace_errs.first[:source]
+    assert_equal :leeni, brace_errs.first[:source]
     assert_equal true, brace_errs.first[:synthetic]
 
     diag = TestDiagnosticsHelper.new('main.tex', {})
@@ -2013,7 +2013,7 @@ class TestLatexItCLI < Minitest::Test
   end
 
   def test_subcommand_interrupt_signal_exits_130
-    Dir.mktmpdir('latex_it_sigint') do |dir|
+    Dir.mktmpdir('leeni_sigint') do |dir|
       tex = File.join(dir, 'slow.tex')
       File.write(tex, "\\documentclass{article}\n\\begin{document}\n\\loop\\iftrue\\repeat\n\\end{document}\n")
       cmd = [BIN, '-f', 'slow.tex']

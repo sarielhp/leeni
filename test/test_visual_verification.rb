@@ -7,7 +7,7 @@ require 'tmpdir'
 require 'fileutils'
 
 class TestVisualVerification < Minitest::Test
-  load File.expand_path('../latex_it', __dir__)
+  load File.expand_path('../leeni', __dir__)
   Status = Struct.new(:exitstatus) do
     def success?
       exitstatus == 0
@@ -15,7 +15,7 @@ class TestVisualVerification < Minitest::Test
   end
 
   def with_packager
-    Dir.mktmpdir('latex_it_visual_test_') do |dir|
+    Dir.mktmpdir('leeni_visual_test_') do |dir|
       Dir.chdir(dir) do
         FileUtils.mkdir_p('junk')
         File.write('paper.tex', 'Source')

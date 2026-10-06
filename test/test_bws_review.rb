@@ -47,7 +47,7 @@ class TestBwsReview < Minitest::Test
     with_source do |_root, source, output|
       text, status = prepare(source, output)
       assert status.success?, text
-      assert File.file?(File.join(output, '.latex_it_bws_bin/vendor/revtex4/tex/latex/revtex4/revtex4.cls'))
+      assert File.file?(File.join(output, '.leeni_bws_bin/vendor/revtex4/tex/latex/revtex4/revtex4.cls'))
     end
   end
 

@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 # ==============================================================================
-# lib/latex_it/presenters.rb
+# lib/leeni/presenters.rb
 #
 # Audience-specific diagnostic presenters:
 # - LaTeXCompilerPresenter: GNU compile-mode standard (file:line:col: severity: msg)
@@ -12,7 +12,7 @@
 require_relative 'compile_format'
 require_relative 'diagnostic_record'
 
-module LatexIt
+module Leeni
   module Presenters
     # Base helper for category normalization
     def self.classify_category(record)
@@ -107,7 +107,7 @@ module LatexIt
       remaining = errors.size - primary_errors.size
       if remaining > 0
         primary_file = primary_errors.first[:file] || file || 'document'
-        io.puts "latex_it: note: #{remaining} more errors in #{primary_file} truncated (resolve initial errors first)"
+        io.puts "leeni: note: #{remaining} more errors in #{primary_file} truncated (resolve initial errors first)"
       end
     end
 
@@ -134,7 +134,7 @@ module LatexIt
           if remainder > 0
             file_name = items.first[:file] || 'document.tex'
             name = Presenters.category_name(cat)
-            io.puts "latex_it: note: #{remainder} more #{name} in #{file_name} (pass -a to show all)"
+            io.puts "leeni: note: #{remainder} more #{name} in #{file_name} (pass -a to show all)"
             folds[cat] = remainder
           end
         else
@@ -168,6 +168,6 @@ module LatexIt
   end
 end
 
-LaTeXCompilerPresenter = LatexIt::CompilerPresenter
-LaTeXAgentPresenter = LatexIt::AgentPresenter
-LaTeXJsonPresenter = LatexIt::JsonPresenter
+LaTeXCompilerPresenter = Leeni::CompilerPresenter
+LaTeXAgentPresenter = Leeni::AgentPresenter
+LaTeXJsonPresenter = Leeni::JsonPresenter

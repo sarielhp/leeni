@@ -5,11 +5,11 @@ require 'fileutils'
 require 'open3'
 
 class TestReviewIntegration < Minitest::Test
-  BIN = File.expand_path("../latex_it", __dir__)
+  BIN = File.expand_path("../leeni", __dir__)
   load BIN
 
   def fixture
-    Dir.mktmpdir('latex_it_independent_') do |dir|
+    Dir.mktmpdir('leeni_independent_') do |dir|
       File.write(File.join(dir, '.l.jsonc'), '{"engine":"xelatex"}')
       yield dir
     end

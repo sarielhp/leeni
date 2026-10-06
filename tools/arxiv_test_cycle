@@ -29,7 +29,7 @@ module ArxivTestCycle
         options[:engine] = v
       end
       opts.on('--bws PATH', 'bws executable used by the tester') { |v| options[:bws] = v }
-      opts.on('--latex-it PATH', 'latex_it executable used by the tester') { |v| options[:latex_it] = v }
+      opts.on('--leeni PATH', 'leeni executable used by the tester') { |v| options[:leeni] = v }
       opts.on('--timeout SECONDS', Float, 'tester timeout (default: 600)') { |v| options[:timeout] = v }
       opts.on('--downloader PATH', 'downloader executable (for testing or alternate samplers)') { |v| options[:downloader] = v }
       opts.on('--tester PATH', 'tester executable (for testing or alternate runners)') { |v| options[:tester] = v }
@@ -76,7 +76,7 @@ module ArxivTestCycle
     args += ['--main', options[:main]] if options[:main]
     args += ['--engine', options[:engine]] if options[:engine]
     args += ['--bws', options[:bws]] if options[:bws]
-    args += ['--latex-it', options[:latex_it]] if options[:latex_it]
+    args += ['--leeni', options[:leeni]] if options[:leeni]
     args += ['--timeout', options[:timeout].to_s] if options[:timeout]
     output, status = Open3.capture2e(*args, chdir: ROOT)
     puts output unless output.empty?

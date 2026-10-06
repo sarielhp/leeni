@@ -5,7 +5,7 @@ require 'minitest/autorun'
 require 'tmpdir'
 require 'fileutils'
 
-load File.expand_path('../latex_it', __dir__)
+load File.expand_path('../leeni', __dir__)
 
 # The engine's terminal log is the only evidence the tool has about a build.
 # These tests pin the three recognisers that read it: the gate that decides a
@@ -25,7 +25,7 @@ class TestLogRecognisers < Minitest::Test
   end
 
   def with_log(content)
-    Dir.mktmpdir('latex_it_log_test') do |dir|
+    Dir.mktmpdir('leeni_log_test') do |dir|
       Dir.chdir(dir) do
         FileUtils.mkdir_p('junk')
         File.write('junk/err_xelatex_1', content)
@@ -148,7 +148,7 @@ class TestLogRecognisers < Minitest::Test
   end
 
   def bib_builder(content)
-    Dir.mktmpdir('latex_it_bib_test') do |dir|
+    Dir.mktmpdir('leeni_bib_test') do |dir|
       path = File.join(dir, 'err_bib')
       File.write(path, content)
       yield builder(path)

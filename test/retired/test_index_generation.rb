@@ -6,7 +6,7 @@ require 'fileutils'
 require 'open3'
 
 class TestIndexGeneration < Minitest::Test
-  BIN = File.expand_path('../latex_it', __dir__)
+  BIN = File.expand_path('../leeni', __dir__)
 
   INDEX_DOC_TEX = <<~LATEX
     \\documentclass{article}
@@ -23,7 +23,7 @@ class TestIndexGeneration < Minitest::Test
   end
 
   def test_index_generation_with_flag
-    Dir.mktmpdir('latex_it_index_test') do |dir|
+    Dir.mktmpdir('leeni_index_test') do |dir|
       doc_path = File.join(dir, 'paper.tex')
       File.write(doc_path, INDEX_DOC_TEX)
 
@@ -46,7 +46,7 @@ class TestIndexGeneration < Minitest::Test
   end
 
   def test_index_skipped_by_default
-    Dir.mktmpdir('latex_it_no_index_test') do |dir|
+    Dir.mktmpdir('leeni_no_index_test') do |dir|
       doc_path = File.join(dir, 'paper.tex')
       File.write(doc_path, INDEX_DOC_TEX)
 
@@ -60,7 +60,7 @@ class TestIndexGeneration < Minitest::Test
   end
 
   def test_index_enabled_via_local_config
-    Dir.mktmpdir('latex_it_config_index_test') do |dir|
+    Dir.mktmpdir('leeni_config_index_test') do |dir|
       # Persist index choice first
       out_save, _, status_save = Open3.capture3(BIN, '-I', '--config-save', chdir: dir)
       assert status_save.success?
@@ -80,7 +80,7 @@ class TestIndexGeneration < Minitest::Test
   end
 
   def test_index_rebuild_on_updated_entry
-    Dir.mktmpdir('latex_it_index_update') do |dir|
+    Dir.mktmpdir('leeni_index_update') do |dir|
       doc_path = File.join(dir, 'paper.tex')
       File.write(doc_path, INDEX_DOC_TEX)
 

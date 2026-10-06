@@ -7,11 +7,11 @@ require 'tmpdir'
 require 'open3'
 require 'stringio'
 
-load File.expand_path('../latex_it', __dir__)
+load File.expand_path('../leeni', __dir__)
 
 class TestDeepDiagnostics < Minitest::Test
   def test_inverted_label_detected_when_before_caption
-    Dir.mktmpdir('latex_it_test_label_') do |dir|
+    Dir.mktmpdir('leeni_test_label_') do |dir|
       path = File.join(dir, 'test.tex')
       File.write(path, <<~TEX)
         \\documentclass{article}
@@ -33,7 +33,7 @@ class TestDeepDiagnostics < Minitest::Test
   end
 
   def test_inverted_label_not_flagged_when_after_or_inside_caption
-    Dir.mktmpdir('latex_it_test_label_') do |dir|
+    Dir.mktmpdir('leeni_test_label_') do |dir|
       path = File.join(dir, 'test.tex')
       File.write(path, <<~TEX)
         \\documentclass{article}
@@ -56,7 +56,7 @@ class TestDeepDiagnostics < Minitest::Test
   end
 
   def test_label_in_unnumbered_math_detected
-    Dir.mktmpdir('latex_it_test_label_') do |dir|
+    Dir.mktmpdir('leeni_test_label_') do |dir|
       path = File.join(dir, 'test.tex')
       File.write(path, <<~TEX)
         \\documentclass{article}
@@ -76,7 +76,7 @@ class TestDeepDiagnostics < Minitest::Test
   end
 
   def test_inverted_label_ignored_inside_verbatim_or_lstlisting
-    Dir.mktmpdir('latex_it_test_verbatim_label_') do |dir|
+    Dir.mktmpdir('leeni_test_verbatim_label_') do |dir|
       path = File.join(dir, 'test.tex')
       File.write(path, <<~TEX)
         \\documentclass{article}
@@ -124,7 +124,7 @@ class TestDeepDiagnostics < Minitest::Test
 
     fake_stat = Struct.new(:success?).new(true)
 
-    Dir.mktmpdir('latex_it_test_font_') do |dir|
+    Dir.mktmpdir('leeni_test_font_') do |dir|
       pdf_path = File.join(dir, 'paper.pdf')
       File.write(pdf_path, '%PDF-1.4 dummy')
 
@@ -160,7 +160,7 @@ class TestDeepDiagnostics < Minitest::Test
   end
 
   def test_report_errors_routes_to_stderr_stream
-    Dir.mktmpdir('latex_it_test_stderr_') do |dir|
+    Dir.mktmpdir('leeni_test_stderr_') do |dir|
       log_file = File.join(dir, 'err_xelatex_1')
       File.write(log_file, <<~LOG)
         This is XeTeX, Version 3.141592653
@@ -183,7 +183,7 @@ class TestDeepDiagnostics < Minitest::Test
   end
 
   def test_report_errors_accepts_custom_io
-    Dir.mktmpdir('latex_it_test_custom_io_') do |dir|
+    Dir.mktmpdir('leeni_test_custom_io_') do |dir|
       log_file = File.join(dir, 'err_xelatex_1')
       File.write(log_file, <<~LOG)
         This is XeTeX, Version 3.141592653

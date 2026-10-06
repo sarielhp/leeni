@@ -26,7 +26,7 @@ module QualityGate
     test_sample_arxiv_review.rb test_arxiv_cycle.rb test_emacs_auctex.rb
   ].freeze
   FULL_TESTS = %w[
-    test_latex_it.rb
+    test_leeni.rb
   ].freeze
   TIERS = { fast: FAST_TESTS, medium: MEDIUM_TESTS + FAST_TESTS,
             full: FULL_TESTS + MEDIUM_TESTS + FAST_TESTS }.freeze
@@ -46,12 +46,12 @@ module QualityGate
   end
 
   def self.announce(tier)
-    puts color(:bold, "==> Running #{tier.capitalize} Quality Gate (latex_it)...")
+    puts color(:bold, "==> Running #{tier.capitalize} Quality Gate (leeni)...")
   end
 
   def self.check_syntax!
     puts "--> #{color(:cyan, '[1/3]')} Ruby syntax and warnings (ruby -cw)..."
-    files = ['latex_it'] + Dir.glob('lib/**/*.rb') + Dir.glob('tools/*').select { |path| ruby_script?(path) } + Dir.glob('test/**/*.rb')
+    files = ['leeni'] + Dir.glob('lib/**/*.rb') + Dir.glob('tools/*').select { |path| ruby_script?(path) } + Dir.glob('test/**/*.rb')
     output, status = Open3.capture2e('ruby', '-cw', *files.uniq)
     abort_failure('Syntax check or compiler warning failed', output) unless status.success? && !output.include?('warning:')
 

@@ -1,6 +1,6 @@
 # Troubleshooting Bibliography Errors in LaTeX (`\printbibliography` & `\bibliography`)
 
-A comprehensive guide to diagnosing, understanding, and fixing cryptic compilation errors in BibLaTeX and BibTeX using [`latex_it`](../README.md).
+A comprehensive guide to diagnosing, understanding, and fixing cryptic compilation errors in BibLaTeX and BibTeX using [`leeni`](../README.md).
 
 ---
 
@@ -59,7 +59,7 @@ The table below lists the most common error signatures produced by bibliography 
 
 ## 3. The Traditional Troubleshooting Agony
 
-Before `latex_it`, authors faced two painful, time-consuming manual options:
+Before `leeni`, authors faced two painful, time-consuming manual options:
 
 ### Method A: The Binary Search (20–45 minutes)
 1. Comment out half the `\cite{...}` commands or entries in your `.bib` file.
@@ -76,27 +76,27 @@ Before `latex_it`, authors faced two painful, time-consuming manual options:
 
 ---
 
-## 4. How `latex_it` Solves It Automatically
+## 4. How `leeni` Solves It Automatically
 
-`latex_it` eliminates this entire manual debugging cycle through automated AST-level entry tracking and multi-database resolution.
+`leeni` eliminates this entire manual debugging cycle through automated AST-level entry tracking and multi-database resolution.
 
 ### 1. Transparent AST Tracking
-When `biblatex` is used, `latex_it` automatically injects a non-destructive logging hook:
+When `biblatex` is used, `leeni` automatically injects a non-destructive logging hook:
 ```latex
 \AtBeginDocument{\@ifpackageloaded{biblatex}{\AtEveryBibitem{\typeout{BIB_ENTRY: \thefield{entrykey}}}}{}}
 ```
 During compilation, each bibliography item reports its unique citation key to the log stream as it begins typesetting.
 
 ### 2. Failure Interception & Provenance
-When the TeX engine crashes inside `\printbibliography`, `latex_it` immediately intercepts the failure and extracts:
+When the TeX engine crashes inside `\printbibliography`, `leeni` immediately intercepts the failure and extracts:
 - The **active citation key** typeset right before the crash.
 - The **offending token** from TeX's `<argument>` or error context.
 
 ### 3. Automated Source Resolution
-`latex_it` queries the `.bcf` datasource list, `\bibliography{}` declarations, and `BIBINPUTS` paths across the workspace. It scans the candidate `.bib` files, matches the entry key, and locates the exact line containing the offending token.
+`leeni` queries the `.bcf` datasource list, `\bibliography{}` declarations, and `BIBINPUTS` paths across the workspace. It scans the candidate `.bib` files, matches the entry key, and locates the exact line containing the offending token.
 
 ### 4. Direct Companion Diagnostic Output
-Instead of leaving the author staring at an anonymous error in `main.tex`, `latex_it` surfaces both the primary engine error and a **companion error** pointing directly into the `.bib` source:
+Instead of leaving the author staring at an anonymous error in `main.tex`, `leeni` surfaces both the primary engine error and a **companion error** pointing directly into the `.bib` source:
 
 ```text
 ── main.tex (2 errors) ─────────────────────────────────────────────────────────
@@ -111,7 +111,7 @@ Instead of leaving the author staring at an anonymous error in `main.tex`, `late
        ▸ Hint: Consecutive '_' subscripts; wrap in braces like 'x_{a_b}'
 
 ── refs/geometry.bib (1 error) ─────────────────────────────────────────────────
-refs/geometry.bib:13148: [latex_it] Bibliography error in entry 'grss-sracp-95'
+refs/geometry.bib:13148: [leeni] Bibliography error in entry 'grss-sracp-95'
        l.13148 journal      = {NORDIC_J_COMP},
        ▸ Hint: Offending token 'NORDIC_J_COMP' found on this line.
 ```

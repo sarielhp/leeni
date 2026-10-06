@@ -5,18 +5,18 @@ require 'tmpdir'
 require 'open3'
 require 'fileutils'
 
-require_relative '../lib/latex_it/utils'
+require_relative '../lib/leeni/utils'
 
 class TestVimIntegration < Minitest::Test
   def setup
-    @bin_path = File.expand_path('../latex_it', __dir__)
-    @compiler_vim = File.expand_path('../docs/vim/compiler/latex_it.vim', __dir__)
+    @bin_path = File.expand_path('../leeni', __dir__)
+    @compiler_vim = File.expand_path('../docs/vim/compiler/leeni.vim', __dir__)
   end
 
   def test_compiler_vim_file_exists
     assert File.file?(@compiler_vim), "Expected #{@compiler_vim} to exist"
     content = File.read(@compiler_vim)
-    assert_includes content, 'let current_compiler = "latex_it"'
+    assert_includes content, 'let current_compiler = "leeni"'
     assert_includes content, 'CompilerSet makeprg=l\ --compile'
     assert_includes content, 'CompilerSet errorformat='
   end

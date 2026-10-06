@@ -3,7 +3,7 @@
 
 require 'minitest/autorun'
 
-require_relative '../lib/latex_it/config'
+require_relative '../lib/leeni/config'
 
 # parse_jsonc reads the user's whole configuration. A parse failure is not
 # localised: it returns {} and every setting silently reverts to the template

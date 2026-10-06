@@ -7,7 +7,7 @@ require 'tmpdir'
 require 'fileutils'
 
 class TestRepairFailures < Minitest::Test
-  load File.expand_path('../latex_it', __dir__)
+  load File.expand_path('../leeni', __dir__)
   Status = Struct.new(:exitstatus) do
     def success?
       exitstatus == 0
@@ -15,7 +15,7 @@ class TestRepairFailures < Minitest::Test
   end
 
   def with_project
-    Dir.mktmpdir('latex_it_failure_test_') do |dir|
+    Dir.mktmpdir('leeni_failure_test_') do |dir|
       Dir.chdir(dir) do
         FileUtils.mkdir_p('junk')
         File.write('paper.tex', 'Source')

@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 # ==============================================================================
-# lib/latex_it/utils.rb
+# lib/leeni/utils.rb
 #
 # Core utility functions for LaTeX engine detection, main document resolution,
 # noise filtering, environment sanitization, and cleanup.

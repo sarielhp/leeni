@@ -1,7 +1,7 @@
 # ArXiv test fixups
 
 This directory records source repairs discovered while testing downloaded
-ArXiv papers. A fixup is evidence about the input corpus; `latex_it` and
+ArXiv papers. A fixup is evidence about the input corpus; `leeni` and
 `tools/test_arxiv` never apply one automatically. The original source remains
 the test result, and a matching catalog entry is shown in its report.
 

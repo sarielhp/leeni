@@ -3,8 +3,8 @@
 
 require 'minitest/autorun'
 
-require_relative '../lib/latex_it/utils'
-require_relative '../lib/latex_it/meta_extractor'
+require_relative '../lib/leeni/utils'
+require_relative '../lib/leeni/meta_extractor'
 
 # verify_arxiv_authors_match refuses any extracted name still containing a
 # backslash, so every accent macro the cleaner does not understand blocks

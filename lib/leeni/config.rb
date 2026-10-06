@@ -1,27 +1,28 @@
 # frozen_string_literal: true
 
 # ==============================================================================
-# lib/latex_it/config.rb
+# lib/leeni/config.rb
 #
-# JSONC configuration loader and template generator for latex_it.
-# Supports ~/.config/latex_it/config.jsonc and project-level .l.jsonc overrides.
+# JSONC configuration loader and template generator for leeni.
+# Supports ~/.config/leeni/config.jsonc and project-level .l.jsonc overrides.
 # ==============================================================================
 
 require 'fileutils'
 require 'json'
 
 module LaTeXConfig
-  CONFIG_DIR = File.expand_path('~/.config/latex_it')
+  CONFIG_DIR = File.expand_path('~/.config/leeni')
   GLOBAL_CONFIG_FILE = File.join(CONFIG_DIR, 'config.jsonc')
-  LOCAL_CONFIG_CANDIDATES = ['.l.jsonc', '.latex_it.jsonc'].freeze
+  LEGACY_GLOBAL_CONFIG_FILE = File.expand_path('~/.config/latex_it/config.jsonc')
+  LOCAL_CONFIG_CANDIDATES = ['.l.jsonc', '.leeni.jsonc', '.latex_it.jsonc'].freeze
 
   DEFAULT_CONFIG_TEMPLATE = <<~JSONC
     {
       // =========================================================================
-      // latex_it Global Configuration File
-      // Location: ~/.config/latex_it/config.jsonc
+      // leeni Global Configuration File
+      // Location: ~/.config/leeni/config.jsonc
       //
-      // Project-level overrides can be placed in .l.jsonc (or .latex_it.jsonc).
+      // Project-level overrides can be placed in .l.jsonc (or .leeni.jsonc).
       // CLI flags always override settings defined here.
       // =========================================================================
 
@@ -169,9 +170,17 @@ module LaTeXConfig
     return if File.exist?(GLOBAL_CONFIG_FILE)
 
     FileUtils.mkdir_p(CONFIG_DIR)
-    File.write(GLOBAL_CONFIG_FILE, DEFAULT_CONFIG_TEMPLATE)
+    content = File.file?(LEGACY_GLOBAL_CONFIG_FILE) ? File.read(LEGACY_GLOBAL_CONFIG_FILE) : DEFAULT_CONFIG_TEMPLATE
+    File.write(GLOBAL_CONFIG_FILE, content)
   rescue StandardError
     # Silently ignore if unable to create in restricted environments
+  end
+
+  def self.global_config_file
+    return GLOBAL_CONFIG_FILE if File.file?(GLOBAL_CONFIG_FILE)
+    return LEGACY_GLOBAL_CONFIG_FILE if File.file?(LEGACY_GLOBAL_CONFIG_FILE)
+
+    GLOBAL_CONFIG_FILE
   end
 
   def self.create_local_template!(dir = '.')
@@ -185,8 +194,8 @@ module LaTeXConfig
     puts "Created local configuration file: #{local_path}"
   end
 
-  VSCODE_TASK_LABEL = 'Build LaTeX (latex_it)'
-  VSCODE_TOOL_NAME = 'latex_it'
+  VSCODE_TASK_LABEL = 'Build LaTeX (leeni)'
+  VSCODE_TOOL_NAME = 'leeni'
 
   def self.default_vscode_task
     {
@@ -224,7 +233,7 @@ module LaTeXConfig
     data = {} unless data.is_a?(Hash)
     data['version'] ||= '2.0.0'
     raw_tasks = data['tasks'].is_a?(Array) ? data['tasks'] : []
-    tasks = raw_tasks.reject { |t| t.is_a?(Hash) && t['label'] == VSCODE_TASK_LABEL }
+    tasks = raw_tasks.reject { |t| t.is_a?(Hash) && [VSCODE_TASK_LABEL, 'Build LaTeX (latex_it)'].include?(t['label']) }
     tasks << default_vscode_task
     data['tasks'] = tasks
     File.write(tasks_file, "#{JSON.pretty_generate(data)}\n")
@@ -232,12 +241,12 @@ module LaTeXConfig
   end
 
   def self.merge_vscode_tool(tools)
-    filtered = tools.reject { |t| t.is_a?(Hash) && t['name'] == VSCODE_TOOL_NAME }
+    filtered = tools.reject { |t| t.is_a?(Hash) && [VSCODE_TOOL_NAME, 'latex_it'].include?(t['name']) }
     filtered << { 'name' => VSCODE_TOOL_NAME, 'command' => 'l', 'args' => ['--vscode-lw', '%DOC%'], 'env' => {} }
   end
 
   def self.merge_vscode_recipe(recipes)
-    filtered = recipes.reject { |r| r.is_a?(Hash) && r['name'] == VSCODE_TOOL_NAME }
+    filtered = recipes.reject { |r| r.is_a?(Hash) && [VSCODE_TOOL_NAME, 'latex_it'].include?(r['name']) }
     filtered << { 'name' => VSCODE_TOOL_NAME, 'tools' => [VSCODE_TOOL_NAME] }
   end
 
@@ -300,7 +309,7 @@ module LaTeXConfig
 
   DEFAULT_GITIGNORE_TEMPLATE = <<~GITIGNORE
     # ==============================================================================
-    # latex_it build isolation
+    # leeni build isolation
     # ==============================================================================
     junk/
     .junk/
@@ -343,7 +352,7 @@ module LaTeXConfig
     target = File.join(dir, '.gitignore')
     if !File.exist?(target)
       File.write(target, DEFAULT_GITIGNORE_TEMPLATE)
-      puts "      Created #{target} with standard latex_it and LaTeX ignore rules."
+      puts "      Created #{target} with standard leeni and LaTeX ignore rules."
       return [target, :created]
     end
 
@@ -360,7 +369,7 @@ module LaTeXConfig
       return [target, :unchanged]
     end
 
-    addition = "\n# Added by latex_it --gitignore-init\n" + missing.join("\n") + "\n"
+    addition = "\n# Added by leeni --gitignore-init\n" + missing.join("\n") + "\n"
     File.open(target, 'a') { |f| f.write(addition) }
     puts "      Updated #{target} (+#{missing.size} #{missing.size == 1 ? 'entry' : 'entries'} added)."
     [target, :updated]
@@ -557,7 +566,7 @@ module LaTeXConfig
     ensure_global_config_exists!
 
     base_cfg = parse_jsonc(DEFAULT_CONFIG_TEMPLATE)
-    global_cfg = File.exist?(GLOBAL_CONFIG_FILE) ? parse_jsonc(File.read(GLOBAL_CONFIG_FILE)) : {}
+    global_cfg = File.file?(global_config_file) ? parse_jsonc(File.read(global_config_file)) : {}
     merged_global = deep_merge(base_cfg, global_cfg)
 
     local_cfg = {}
@@ -589,8 +598,8 @@ module LaTeXConfig
     local_path = local_found ? File.join(dir, local_found) : nil
 
     {
-      global_file: GLOBAL_CONFIG_FILE,
-      global_exists: File.file?(GLOBAL_CONFIG_FILE),
+      global_file: global_config_file,
+      global_exists: File.file?(global_config_file),
       local_file: local_path,
       merged_config: load_merged_config(dir)
     }
@@ -601,7 +610,7 @@ module LaTeXConfig
     if scope == :global
       return [
         '# =========================================================================',
-        '# Global latex_it Configuration',
+        '# Global leeni Configuration',
         '# =========================================================================',
         format('# Global file: %s (%s)', info[:global_file], info[:global_exists] ? 'loaded' : 'not found'),
         '',
@@ -610,7 +619,7 @@ module LaTeXConfig
     elsif scope == :local
       return [
         '# =========================================================================',
-        '# Local latex_it Configuration',
+        '# Local leeni Configuration',
         '# =========================================================================',
         format('# Local file: %s', info[:local_file] ? "#{info[:local_file]} (loaded)" : 'none (no .l.jsonc found)'),
         '',
@@ -620,7 +629,7 @@ module LaTeXConfig
 
     lines = [
       '# =========================================================================',
-      '# Active latex_it Configuration',
+      '# Active leeni Configuration',
       '# =========================================================================',
       format('# Global file: %s (%s)', info[:global_file], info[:global_exists] ? 'loaded' : 'not found'),
       format('#  Local file: %s', info[:local_file] ? "#{info[:local_file]} (loaded)" : 'none'),

@@ -2,7 +2,7 @@
 # frozen_string_literal: true
 
 # ==============================================================================
-# Unified LaTeX Builder (latex_it / l)
+# Unified LaTeX Builder (leeni / l)
 #
 # Robust, high-performance LaTeX compilation manager with:
 # - Automatic main file detection (.mainfile or directory scan)
@@ -26,27 +26,27 @@ require 'shellwords'
 require 'tmpdir'
 require 'uri'
 
-require_relative 'lib/latex_it/version'
-require_relative 'lib/latex_it/color'
-require_relative 'lib/latex_it/compatibility'
-require_relative 'lib/latex_it/config'
-require_relative 'lib/latex_it/utils'
-require_relative 'lib/latex_it/help_manual'
-require_relative 'lib/latex_it/brace_checker'
-require_relative 'lib/latex_it/flattener'
-require_relative 'lib/latex_it/meta_extractor'
-require_relative 'lib/latex_it/bib_locator'
-require_relative 'lib/latex_it/macro_harvester'
-require_relative 'lib/latex_it/diagnostic_record'
-require_relative 'lib/latex_it/error_catalog'
-require_relative 'lib/latex_it/compile_format'
-require_relative 'lib/latex_it/presenters'
-require_relative 'lib/latex_it/diagnostics'
-require_relative 'lib/latex_it/builder'
-require_relative 'lib/latex_it/packager'
-require_relative 'lib/latex_it/arxiv'
-require_relative 'lib/latex_it/bib_extractor'
-require_relative 'lib/latex_it/cli_targets'
+require_relative 'lib/leeni/version'
+require_relative 'lib/leeni/color'
+require_relative 'lib/leeni/compatibility'
+require_relative 'lib/leeni/config'
+require_relative 'lib/leeni/utils'
+require_relative 'lib/leeni/help_manual'
+require_relative 'lib/leeni/brace_checker'
+require_relative 'lib/leeni/flattener'
+require_relative 'lib/leeni/meta_extractor'
+require_relative 'lib/leeni/bib_locator'
+require_relative 'lib/leeni/macro_harvester'
+require_relative 'lib/leeni/diagnostic_record'
+require_relative 'lib/leeni/error_catalog'
+require_relative 'lib/leeni/compile_format'
+require_relative 'lib/leeni/presenters'
+require_relative 'lib/leeni/diagnostics'
+require_relative 'lib/leeni/builder'
+require_relative 'lib/leeni/packager'
+require_relative 'lib/leeni/arxiv'
+require_relative 'lib/leeni/bib_extractor'
+require_relative 'lib/leeni/cli_targets'
 
 module LatexCLI
   extend LatexCLITargets
@@ -473,7 +473,7 @@ module LatexCLI
     opts.on('--config-save', 'Save specified CLI option choices to configuration file (default: local .l.jsonc)') do
       options[:config_save] = true
     end
-    opts.on('--global', 'Target global configuration (~/.config/latex_it/config.jsonc) for config operations') do
+    opts.on('--global', 'Target global configuration (~/.config/leeni/config.jsonc) for config operations') do
       options[:config_scope] = :global
     end
     opts.on('--local', 'Target local configuration (./.l.jsonc) for config operations (default)') do
@@ -509,7 +509,7 @@ module LatexCLI
     opts.on('-m', '--main', 'Print the detected main LaTeX root file and exit without compiling') { options[:show_main] = true }
     opts.on('-M', '--deps', 'Print Makefile dependency rule for the document and exit') { options[:deps] = true }
     opts.on('-V', '--version', 'Show version and exit') do
-      puts "l #{LatexIt::VERSION}"
+        puts "leeni #{Leeni::VERSION}"
       exit 0
     end
     opts.on('-E', '--examples', 'Show detailed usage examples and common workflows') { options[:show_examples] = true }
@@ -663,7 +663,7 @@ module LatexCLI
     Rainbow.enabled = options[:color]
 
     if options[:list_themes]
-      base_theme = ENV['LATEX_IT_THEME'] || ENV['L_THEME'] || ENV['COLOR_THEME'] ||
+      base_theme = ENV['LEENI_THEME'] || ENV['L_THEME'] || ENV['COLOR_THEME'] ||
                    ENV['BASE16_THEME'] || options[:theme] || LatexColor.default_theme
       LatexColor.active_theme = base_theme
       puts LatexColor.format_theme_list
@@ -749,7 +749,7 @@ module LatexCLI
   end
 
   def self.apply_theme_configuration(options)
-    base_theme = ENV['LATEX_IT_THEME'] || ENV['L_THEME'] || ENV['COLOR_THEME'] ||
+    base_theme = ENV['LEENI_THEME'] || ENV['LATEX_IT_THEME'] || ENV['L_THEME'] || ENV['COLOR_THEME'] ||
                  ENV['BASE16_THEME'] || options[:theme] || LatexColor.default_theme
 
     if options[:theme_arg] =~ /^[+-]\d+$/

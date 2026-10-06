@@ -1,6 +1,6 @@
 # arXiv Submission Preparation & Verification
 
-`latex_it` provides automated packaging and verification for uploading papers to [arXiv.org](https://arxiv.org). A single command produces a clean, self-contained submission archive while stripping private comments and verifying that the output compiles identically.
+`leeni` provides automated packaging and verification for uploading papers to [arXiv.org](https://arxiv.org). A single command produces a clean, self-contained submission archive while stripping private comments and verifying that the output compiles identically.
 
 ---
 
@@ -30,7 +30,7 @@ This creates:
 
 ## 2. Packaging Pipeline (`--arxiv`)
 
-When `--arxiv` is invoked, `latex_it` performs the following steps:
+When `--arxiv` is invoked, `leeni` performs the following steps:
 
 ### Monolithic TeX Flattening
 arXiv prefers a single `.tex` file or a shallow hierarchy. The flattener (`LaTeXFlattener`):
@@ -50,7 +50,7 @@ arXiv prefers a single `.tex` file or a shallow hierarchy. The flattener (`LaTeX
 - Strictly excludes raw figure sources (`.fig`, `.ipe`, `.svg`, `.asy`, `.gp`, `.gnuplot`, `.py`, `.R`) and backup copies (`*.bak`, `figs/bak/`).
 
 ### BibLaTeX Version Shielding
-arXiv's TeX Live environment may run a different version of `biblatex` than your local machine, leading to `wrong format version` errors. When `biblatex` is detected, `latex_it`:
+arXiv's TeX Live environment may run a different version of `biblatex` than your local machine, leading to `wrong format version` errors. When `biblatex` is detected, `leeni`:
 - Bundles local distribution files (`biblatex.sty`, `biblatex.cfg`, `*.bbx`, `*.cbx`, `*.lbx`) directly into the archive.
 - Can be disabled with `--no-biblatex-shield` if a standard system build is preferred.
 
@@ -58,9 +58,9 @@ arXiv's TeX Live environment may run a different version of `biblatex` than your
 
 ## 3. Automated Verification
 
-Before finalizing the package, `latex_it` tests the generated zip inside an isolated `/tmp` sandbox:
+Before finalizing the package, `leeni` tests the generated zip inside an isolated `/tmp` sandbox:
 
-1. **Sandbox Compilation**: Unpacks the archive and compiles it using `latex_it --no-env` to ensure no ambient environment variables (`TEXINPUTS`, `BIBINPUTS`) are required.
+1. **Sandbox Compilation**: Unpacks the archive and compiles it using `leeni --no-env` to ensure no ambient environment variables (`TEXINPUTS`, `BIBINPUTS`) are required.
 2. **Text Layout Verification**: Uses `pdftotext -layout` to compare the rebuilt PDF against the original local PDF. Any text divergence triggers a verification failure.
 3. **Visual Page Rendering (pdftoppm)**: Renders every page at 150 DPI and compares pixel output between builds.
    - Requires `pdftoppm` (from `poppler-utils`).
@@ -99,7 +99,7 @@ tools/sample_arxiv --output examples/arxiv --attempts 10
 
 - Chooses completed calendar months uniformly from April 2007 onward.
 - Downloads source archives (`source.tar.gz`, `source.tex`) and records API metadata in `metadata.json`.
-- Caches monthly query counts in `~/.cache/latex_it/arxiv`.
+- Caches monthly query counts in `~/.cache/leeni/arxiv`.
 
 ### Inspecting Metadata (`tools/check_arxiv_metadata`)
 Verifies that the metadata extractor accurately matches arXiv's API records:

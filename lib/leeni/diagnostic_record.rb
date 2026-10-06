@@ -1,14 +1,14 @@
 # frozen_string_literal: true
 
 # ==============================================================================
-# lib/latex_it/diagnostic_record.rb
+# lib/leeni/diagnostic_record.rb
 #
 # Canonical structured diagnostic data models.
 # ==============================================================================
 
 require 'json'
 
-module LatexIt
+module Leeni
   DiagnosticRecord = Struct.new(
     :file,
     :line,
@@ -87,5 +87,5 @@ module LatexIt
   end
 end
 
-LaTeXDiagnosticRecord = LatexIt::DiagnosticRecord
-LaTeXDiagnosticResult = LatexIt::DiagnosticResult
+LaTeXDiagnosticRecord = Leeni::DiagnosticRecord
+LaTeXDiagnosticResult = Leeni::DiagnosticResult

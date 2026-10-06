@@ -9,13 +9,13 @@ class TestCodeMetrics < Minitest::Test
 
   def test_ast_code_metrics_zero_violations
     audit_bin = File.join(ROOT, 'tools', 'gate_audit_code')
-    latex_it_bin = File.join(ROOT, 'latex_it')
+    leeni_bin = File.join(ROOT, 'leeni')
     lib_files = Dir.glob(File.join(ROOT, 'lib', '**', '*.rb'))
     tool_files = Dir.glob(File.join(ROOT, 'tools', '*')).select do |p|
       File.file?(p) && (File.extname(p) == '.rb' || File.open(p, &:gets).to_s.start_with?('#!/usr/bin/env ruby'))
     end
     test_files = Dir.glob(File.join(ROOT, 'test', '**', '*.rb'))
-    targets = [latex_it_bin] + lib_files + tool_files + test_files
+    targets = [leeni_bin] + lib_files + tool_files + test_files
     cmd = ['ruby', audit_bin] + targets
     output, status = Open3.capture2e(*cmd)
 
@@ -41,7 +41,7 @@ class TestCodeMetrics < Minitest::Test
     assert status.success?, 'Failed to generate standalone bundle'
 
     Dir.mktmpdir('bundle_exec_test') do |dir|
-      bundle_script = File.join(dir, 'latex_it')
+      bundle_script = File.join(dir, 'leeni')
       File.write(bundle_script, bundle_code)
       FileUtils.chmod(0755, bundle_script)
 

@@ -123,7 +123,7 @@ module ArxivSampler
       end
 
       request = Net::HTTP::Get.new(parsed)
-      request['User-Agent'] = 'latex_it/sample_arxiv'
+      request['User-Agent'] = 'leeni/sample_arxiv'
       request['Accept-Encoding'] = 'identity'
       connection = @http.new(parsed.host, parsed.port)
       connection.use_ssl = true
@@ -211,7 +211,7 @@ module ArxivSampler
 
   class Sampler
     def initialize(client: Client.new, random: Random.new, clock: Date,
-                   cache_dir: File.expand_path('~/.cache/latex_it/arxiv'))
+                   cache_dir: File.expand_path('~/.cache/leeni/arxiv'))
       @client = client
       @random = random
       @clock = clock
@@ -309,12 +309,12 @@ end
 if __FILE__ == $PROGRAM_NAME
   begin
     options = { output: 'examples/arxiv', attempts: 10,
-                cache_dir: File.expand_path('~/.cache/latex_it/arxiv') }
+                cache_dir: File.expand_path('~/.cache/leeni/arxiv') }
     OptionParser.new do |opts|
       opts.banner = 'Usage: tools/sample_arxiv [options]'
       opts.on('-o', '--output DIR', 'destination directory (default: examples/arxiv)') { |v| options[:output] = v }
       opts.on('-n', '--attempts N', Integer, 'maximum candidates (default: 10)') { |v| options[:attempts] = v }
-      opts.on('--cache-dir DIR', 'monthly count cache (default: ~/.cache/latex_it/arxiv)') do |v|
+      opts.on('--cache-dir DIR', 'monthly count cache (default: ~/.cache/leeni/arxiv)') do |v|
         options[:cache_dir] = v
       end
       opts.on('--seed N', Integer, 'seed random selection') { |v| options[:seed] = v }

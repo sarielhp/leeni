@@ -5,8 +5,8 @@ require 'minitest/autorun'
 require 'tmpdir'
 require 'fileutils'
 
-require_relative '../lib/latex_it/utils'
-require_relative '../lib/latex_it/flattener'
+require_relative '../lib/leeni/utils'
+require_relative '../lib/leeni/flattener'
 
 # The flattener's output is the .tex that ships inside arxiv_<base>.zip, so
 # anything it gets wrong is published. Brace balance is the invariant that
@@ -74,7 +74,7 @@ class TestFlattener < Minitest::Test
   end
 
   def test_strip_comments_is_configurable
-    Dir.mktmpdir('latex_it_flatten_test') do |dir|
+    Dir.mktmpdir('leeni_flatten_test') do |dir|
       main = File.join(dir, 'main.tex')
       File.write(main, "TEXT % a private note\nMORE\n")
 
@@ -88,7 +88,7 @@ class TestFlattener < Minitest::Test
   end
 
   def test_macros_beginning_with_verb_are_not_inline_verbatim
-    Dir.mktmpdir('latex_it_verb_test') do |dir|
+    Dir.mktmpdir('leeni_verb_test') do |dir|
       File.write(File.join(dir, 'a.tex'), "INCLUDED\n")
       main = File.join(dir, 'main.tex')
       File.write(main, "\\verbatiminput{v.txt}\nsome text\n\\input{a}\nmore a text\n")
@@ -101,7 +101,7 @@ class TestFlattener < Minitest::Test
   end
 
   def test_real_inline_verbatim_is_still_protected
-    Dir.mktmpdir('latex_it_verb_test') do |dir|
+    Dir.mktmpdir('leeni_verb_test') do |dir|
       File.write(File.join(dir, 'a.tex'), "INCLUDED\n")
       main = File.join(dir, 'main.tex')
       File.write(main, "\\verb|\\input{a}| stays literal\n")
@@ -121,7 +121,7 @@ class TestFlattener < Minitest::Test
   end
 
   def test_out_of_tree_input_is_not_inlined
-    Dir.mktmpdir('latex_it_containment_test') do |root|
+    Dir.mktmpdir('leeni_containment_test') do |root|
       outside = File.join(root, 'outside.tex')
       File.write(outside, "SECRET_OUTSIDE_DATA\n")
 
@@ -137,7 +137,7 @@ class TestFlattener < Minitest::Test
   end
 
   def test_symlink_pointing_out_of_tree_is_not_inlined
-    Dir.mktmpdir('latex_it_symlink_test') do |root|
+    Dir.mktmpdir('leeni_symlink_test') do |root|
       outside = File.join(root, 'outside.tex')
       File.write(outside, "SECRET_SYMLINK_TARGET\n")
 
@@ -156,7 +156,7 @@ class TestFlattener < Minitest::Test
   end
 
   def test_in_tree_nested_subfolder_input_is_inlined
-    Dir.mktmpdir('latex_it_nested_test') do |proj|
+    Dir.mktmpdir('leeni_nested_test') do |proj|
       FileUtils.mkdir_p(File.join(proj, 'chapters'))
       File.write(File.join(proj, 'chapters', 'ch1.tex'), "CHAPTER_ONE_DATA\n")
 
@@ -170,7 +170,7 @@ class TestFlattener < Minitest::Test
   end
 
   def test_multiple_inputs_on_single_line_are_all_inlined
-    Dir.mktmpdir('latex_it_multi_input_test') do |proj|
+    Dir.mktmpdir('leeni_multi_input_test') do |proj|
       File.write(File.join(proj, 'macros.tex'), "\\def\\foo{bar}\n")
       File.write(File.join(proj, 'content.tex'), "SECTION_BODY\n")
       File.write(File.join(proj, 'ignored.tex'), "SHOULD_BE_IGNORED\n")

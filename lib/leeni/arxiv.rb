@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 # ==============================================================================
-# lib/latex_it/arxiv.rb
+# lib/leeni/arxiv.rb
 #
 # arXiv submission preparation manager: inlines inputs, bundles active assets,
 # shields biblatex versions, and validates compilation and visual layout.
@@ -43,7 +43,7 @@ class LatexArxivPackager
     zip_filename = @options[:arxiv_name] || "arxiv_#{@bfilename}.zip"
     meta_filename = "arxiv_#{@bfilename}_meta.txt"
 
-    Dir.mktmpdir('latex_it_arxiv_stage_') do |stage_dir|
+    Dir.mktmpdir('leeni_arxiv_stage_') do |stage_dir|
       return false unless stage_arxiv_files(stage_dir)
       candidate = build_arxiv_zip(stage_dir, zip_filename)
       return false unless candidate
@@ -301,7 +301,7 @@ class LatexArxivPackager
       return false
     end
 
-    Dir.mktmpdir('latex_it_arxiv_verify_') do |tmpdir|
+    Dir.mktmpdir('leeni_arxiv_verify_') do |tmpdir|
       unzip_out, unzip_stat = Open3.capture2e('unzip', '-q', zip_abs, '-d', tmpdir)
       unless unzip_stat.success?
         warn Rainbow("[FAIL] Failed to extract #{zip_filename}: #{unzip_out}").red.bright
@@ -314,7 +314,7 @@ class LatexArxivPackager
 
   def run_sandbox_verify(tmpdir, reference_pdf)
     ruby_bin = RbConfig.ruby
-    script_bin = LATEX_IT_EXECUTABLE
+    script_bin = LEENI_EXECUTABLE
     cmd = [ruby_bin, script_bin, '--no-env', '--engine', @builder.engine_name]
     cmd += ['--timeout', @options[:timeout].to_s] if @options[:timeout]
     cmd << @filename
@@ -490,7 +490,7 @@ class LatexArxivPackager
     end
     paths.map! { |path| File.expand_path(path) }
 
-    Dir.mktmpdir('latex_it_arxiv_visual_') do |tmpdir|
+    Dir.mktmpdir('leeni_arxiv_visual_') do |tmpdir|
       rendered = paths.each_with_index.map { |pdf, idx| render_arxiv_pdf_pages(pdf, File.join(tmpdir, idx.to_s)) }
       return false unless rendered.all?
 
@@ -567,7 +567,7 @@ class LatexArxivPackager
       'TEXMFCACHE' => texmf_cache,
       'XDG_CONFIG_HOME' => xdg_config,
       'XDG_CACHE_HOME' => xdg_cache,
-      'LATEX_IT_DISABLE_BUNDLED_REVTeX' => '1'
+      'LEENI_DISABLE_BUNDLED_REVTeX' => '1'
     )
   end
 

@@ -1,6 +1,6 @@
 # Architecture & Internal Design
 
-`latex_it` is designed as a modular, dependency-minimal Ruby application that manages the end-to-end lifecycle of LaTeX document compilation.
+`leeni` is designed as a modular, dependency-minimal Ruby application that manages the end-to-end lifecycle of LaTeX document compilation.
 
 ---
 
@@ -10,7 +10,7 @@
 - **Minimal Redundant Builds**: File modification times and content checksums eliminate unnecessary compiler passes when the document is already up to date.
 - **Actionable Diagnostics**: TeX logs are filtered and classified into four tiers, suppressing low-level engine noise so authors can fix errors quickly.
 - **Zero-Dependency Runtime**: Relies almost entirely on the Ruby standard library (`fileutils`, `open3`, `optparse`, `tmpdir`, `shellwords`), requiring only the optional `rainbow` gem for colored terminal output.
-- **Single-File Distribution**: While organized into clean modular components under `lib/latex_it/` for development, `tools/bundle` compiles everything into a standalone executable.
+- **Single-File Distribution**: While organized into clean modular components under `lib/leeni/` for development, `tools/bundle` compiles everything into a standalone executable.
 
 ---
 
@@ -31,7 +31,7 @@ The build pipeline follows an orderly sequence of phases:
 ```
 
 ### Phase 1: Main File & Engine Discovery
-- If no file is specified on the command line, `latex_it` scans the current directory using heuristics: checks `.mainfile`, `<dirname>.tex`, filters preamble snippets (`prefix*.tex`, `prelim*.tex`), and searches for `\begin{document}`.
+- If no file is specified on the command line, `leeni` scans the current directory using heuristics: checks `.mainfile`, `<dirname>.tex`, filters preamble snippets (`prefix*.tex`, `prelim*.tex`), and searches for `\begin{document}`.
 - Engine auto-detection reads `% !TEX TS-program` or `% !TEX program` magic comments, AUCTeX file variables, or package requirements (`luacode`, `luamplib`).
 
 ### Phase 2: Pre-Flight Auditing
@@ -56,7 +56,7 @@ The build pipeline follows an orderly sequence of phases:
 
 ## 3. Modular Library Structure
 
-The codebase is organized into modular files under `lib/latex_it/`:
+The codebase is organized into modular files under `lib/leeni/`:
 
 | Module | Responsibility |
 | :--- | :--- |
@@ -80,7 +80,7 @@ The codebase is organized into modular files under `lib/latex_it/`:
 
 ## 4. Development & Quality Tooling
 
-- **Standalone Bundler (`tools/bundle`)**: Bundles `lib/` modules into the single standalone executable `latex_it`.
+- **Standalone Bundler (`tools/bundle`)**: Bundles `lib/` modules into the single standalone executable `leeni`.
 - **Code Metrics Auditor (`tools/gate_audit_code`)**: Enforces method complexity invariants: Cognitive Complexity $\le 15$, indentation depth $\le 4$, method length $\le 80$ lines.
 - **Tiered Quality Gate (`tools/gate`)**:
   - `--fast`: Syntax check + unit tests in $\sim 2$ seconds.

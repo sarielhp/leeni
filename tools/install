@@ -4,7 +4,7 @@
 # ==============================================================================
 # tools/install
 #
-# Copies latex_it to ~/bin/ and creates symbolic link ~/bin/l -> latex_it.
+# Copies leeni to ~/bin/ and creates symbolic link ~/bin/l -> leeni.
 # Usage: ./tools/install
 # ==============================================================================
 
@@ -15,19 +15,19 @@ load File.expand_path('bundle', __dir__)
 
 module Installer
   REPO_ROOT   = File.expand_path('..', __dir__)
-  SRC_BIN     = File.join(REPO_ROOT, 'latex_it')
+  SRC_BIN     = File.join(REPO_ROOT, 'leeni')
   TARGET_DIR  = File.expand_path('~/bin')
-  TARGET_BIN  = File.join(TARGET_DIR, 'latex_it')
+  TARGET_BIN  = File.join(TARGET_DIR, 'leeni')
   SHORTCUTS   = %w[l lw ll lp clean_latex latex_file_in_dir].freeze
   TARGET_LINK = File.join(TARGET_DIR, 'l')
   TEXMF_SOURCE = File.join(REPO_ROOT, 'vendor', 'revtex4')
-  TEXMF_TARGET = File.expand_path('~/.local/share/latex_it/texmf')
+  TEXMF_TARGET = File.expand_path('~/.local/share/leeni/texmf')
 
   def self.run!(verbose: false)
     verify_source!
     FileUtils.mkdir_p(TARGET_DIR)
 
-    puts "==> Installing standalone latex_it bundle to #{TARGET_DIR}..." if verbose
+    puts "==> Installing standalone leeni bundle to #{TARGET_DIR}..." if verbose
     LatexBundler.write_bundle(TARGET_BIN, verbose: verbose)
 
     create_symlinks!
@@ -36,7 +36,7 @@ module Installer
     if verbose
       verify_verbose!
     else
-      puts "Program installed: ~/bin/latex_it, ~/bin/l (shortcuts: #{SHORTCUTS[1..].join(', ')})."
+      puts "Program installed: ~/bin/leeni, ~/bin/l (shortcuts: #{SHORTCUTS[1..].join(', ')})."
     end
   end
 
@@ -44,7 +44,7 @@ module Installer
     Dir.chdir(TARGET_DIR) do
       SHORTCUTS.each do |name|
         FileUtils.rm_f(name) if File.exist?(name) || File.symlink?(name)
-        FileUtils.ln_s('latex_it', name)
+        FileUtils.ln_s('leeni', name)
       end
     end
   end
@@ -82,7 +82,7 @@ module Installer
     else
       warn "  [FAIL] Failed to execute #{TARGET_LINK}"
     end
-    puts 'Program installed: ~/bin/latex_it, ~/bin/l.'
+    puts 'Program installed: ~/bin/leeni, ~/bin/l.'
   end
 end
 

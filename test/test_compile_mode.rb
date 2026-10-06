@@ -77,10 +77,12 @@ class TestCompileMode < Minitest::Test
         \\end{document}
       TEX
 
-      out, status = Open3.capture2e(@bin_path, '--compile', '--no-color', '-u', 'warn.tex', chdir: dir)
+      out, status = Open3.capture2e(
+        @bin_path, '--compile', '--no-color', '--link', '-u', 'warn.tex', chdir: dir
+      )
       assert_equal 0, status.exitstatus, "Expected exit 0. Output: #{out}"
 
-      lines = out.lines.map(&:strip).reject(&:empty?)
+      lines = LaTeXUtils.strip_ansi(out).lines.map(&:strip).reject(&:empty?)
       alert_line = lines.find { |l| l.include?('warning: [alert]') }
       refute_nil alert_line, "Expected alert warning in output: #{out}"
       assert_match(/\Awarn\.tex:3: warning: \[alert\] 80\.00pt too wide/, alert_line)
@@ -90,6 +92,8 @@ class TestCompileMode < Minitest::Test
       refute_nil warn_line, "Expected regular warning in output: #{out}"
       assert_match(/\Awarn\.tex:4: warning: undefined reference 'nonexistent_ref'/, warn_line)
       refute_match(/\.\z/, warn_line)
+      assert_match(%r{\e\]8;;file://[^\e]*warn\.tex#3\e\\}, out)
+      assert_match(%r{\e\]8;;file://[^\e]*warn\.tex#4\e\\}, out)
     end
   end
 
@@ -324,6 +328,140 @@ class TestCompileMode < Minitest::Test
       refute_includes out, 'from /'
       refute_includes out, 'Traceback'
       assert_includes out, 'No LaTeX (.tex) files found'
+    end
+  end
+
+  def test_compile_mode_reports_errors_from_four_levels_of_nested_inputs
+    Dir.mktmpdir('compile_nested_inputs') do |dir|
+      FileUtils.mkdir_p(File.join(dir, 'chapters'))
+      File.write(File.join(dir, 'main.tex'), <<~TEX)
+        \\documentclass{article}
+        \\begin{document}
+        \\input{chapters/level1}
+        \\end{document}
+      TEX
+      (1..3).each do |level|
+        File.write(
+          File.join(dir, "chapters/level#{level}.tex"),
+          "Level #{level}.\n\\input{chapters/level#{level + 1}}\n"
+        )
+      end
+      File.write(File.join(dir, 'chapters/level4.tex'), <<~TEX)
+        Deepest level.
+        \\typodCommand
+        \\input{chapters/does-not-exist}
+      TEX
+
+      out, status = Open3.capture2e(
+        @bin_path, '--compile', '--all', '--no-color', '--link', 'main.tex', chdir: dir
+      )
+      plain = LaTeXUtils.strip_ansi(out)
+
+      assert_equal 1, status.exitstatus, "Expected exit 1. Output: #{out}"
+      assert_match(
+        %r{^chapters/level4\.tex:2:1: error: undefined control sequence \\typodCommand .*check spelling}i,
+        plain
+      )
+      assert_match(
+        %r{^chapters/level4\.tex:3(?::\d+)?: error: .*chapters/does-not-exist\.tex.*not found .*check file path or spelling}i,
+        plain
+      )
+      assert_match(%r{\e\]8;;file://[^\e]*chapters/level4\.tex#2:1\e\\}, out)
+      assert_match(%r{\e\]8;;file://[^\e]*chapters/level4\.tex#3\e\\}, out)
+      refute_match(%r{^(?:main|chapters/level[1-3])\.tex:.*error:}i, plain)
+      refute_match(/error: emergency stop/i, plain)
+    end
+  end
+
+  def test_error_after_nested_input_returns_to_parent_file
+    Dir.mktmpdir('compile_return_to_parent') do |dir|
+      File.write(File.join(dir, 'main.tex'), <<~TEX)
+        \\documentclass{article}
+        \\begin{document}
+        \\input{parent}
+        \\end{document}
+      TEX
+      File.write(File.join(dir, 'parent.tex'), "\\input{grandchild}\n\\parentTypodCommand\n")
+      File.write(File.join(dir, 'grandchild.tex'), "Valid grandchild text.\n")
+
+      out, status = Open3.capture2e(
+        @bin_path, '--compile', '--all', '--no-color', 'main.tex', chdir: dir
+      )
+
+      assert_equal 1, status.exitstatus, "Expected exit 1. Output: #{out}"
+      assert_match(/^parent\.tex:2:1: error: undefined control sequence \\parentTypodCommand/, out)
+      refute_match(/^(?:main|grandchild)\.tex:.*error:/, out)
+    end
+  end
+
+  def test_errors_in_sibling_inputs_keep_their_own_locations
+    Dir.mktmpdir('compile_sibling_inputs') do |dir|
+      File.write(File.join(dir, 'main.tex'), <<~TEX)
+        \\documentclass{article}
+        \\begin{document}
+        \\input{first}
+        \\input{second}
+        \\end{document}
+      TEX
+      File.write(File.join(dir, 'first.tex'), "First sibling.\n\\firstTypodCommand\n")
+      File.write(File.join(dir, 'second.tex'), "Second sibling.\n\\secondTypodCommand\n")
+
+      out, status = Open3.capture2e(
+        @bin_path, '--compile', '--all', '--no-color', 'main.tex', chdir: dir
+      )
+
+      assert_equal 1, status.exitstatus, "Expected exit 1. Output: #{out}"
+      assert_match(/^first\.tex:2:1: error: undefined control sequence \\firstTypodCommand/, out)
+      assert_match(/^second\.tex:2:1: error: undefined control sequence \\secondTypodCommand/, out)
+      refute_match(/^main\.tex:.*error:/, out)
+    end
+  end
+
+  def test_nested_error_with_long_unicode_spaced_parenthesized_path
+    Dir.mktmpdir('compile_hostile_path') do |dir|
+      nested_dir = 'chapters with spaces'
+      nested_file = "café(odd)'#{'long' * 14}.tex"
+      relative_path = File.join(nested_dir, nested_file)
+      FileUtils.mkdir_p(File.join(dir, nested_dir))
+      File.write(File.join(dir, relative_path), "Hostile path.\n\\hostilePathTypodCommand\n")
+      File.write(File.join(dir, 'main.tex'), <<~TEX)
+        \\documentclass{article}
+        \\begin{document}
+        \\input{"#{relative_path}"}
+        \\end{document}
+      TEX
+
+      out, status = Open3.capture2e(
+        @bin_path, '--compile', '--all', '--no-color', 'main.tex', chdir: dir
+      )
+
+      assert_equal 1, status.exitstatus, "Expected exit 1. Output: #{out}"
+      assert_includes out, "#{relative_path}:2:1: error: undefined control sequence \\hostilePathTypodCommand"
+      refute_match(/^main\.tex:.*error:/, out)
+    end
+  end
+
+  def test_runaway_argument_at_nested_file_boundary_reports_child
+    Dir.mktmpdir('compile_runaway_child') do |dir|
+      File.write(File.join(dir, 'main.tex'), <<~TEX)
+        \\documentclass{article}
+        \\newcommand{\\takesone}[1]{#1}
+        \\begin{document}
+        \\input{child}
+        \\end{document}
+      TEX
+      File.write(File.join(dir, 'child.tex'), "\\takesone{unterminated argument\n")
+
+      out, status = Open3.capture2e(
+        @bin_path, '--compile', '--all', '--no-color', 'main.tex', chdir: dir
+      )
+
+      assert_equal 1, status.exitstatus, "Expected exit 1. Output: #{out}"
+      assert_match(
+        /^child\.tex:1:10: error: unclosed open brace .*reached end of file/i, out
+      )
+      refute_match(/^main\.tex:.*error:/, out)
+      refute_match(/error: (?:runaway argument|file ended while scanning)/i, out)
     end
   end
 

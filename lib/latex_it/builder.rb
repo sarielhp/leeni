@@ -20,9 +20,11 @@ require_relative 'compatibility'
 require_relative 'diagnostics'
 require_relative 'brace_checker'
 require_relative 'bib_manager'
+require_relative 'build_runtime'
 
 class LatexBuilder
   include LaTeXDiagnostics
+  include LatexBuildRuntime
 
   attr_reader :options, :filename, :bfilename, :bdir, :engine_name, :biberr, :input_snapshots, :build_start_time
 
@@ -52,8 +54,6 @@ class LatexBuilder
   SIDE_STATE_EXTS = %w[toc lof lot out nav snm].freeze
 
   ProcessResultStatus = LaTeXUtils::ProcessResultStatus
-  NOFOLLOW = defined?(File::NOFOLLOW) ? File::NOFOLLOW : 0
-
   LABEL_HOOK = '\let\lit@orig@pw\protected@write' \
                '\long\def\protected@write#1#2#3{\ifx#1\@auxout\typeout{LIT_LBL:\the\inputlineno:\detokenize{#3}}\fi\lit@orig@pw{#1}{#2}{#3}}'
 
@@ -627,292 +627,6 @@ class LatexBuilder
     puts "#{@bfilename}.pdf: #{deps.join(' ')}"
   end
 
-  def canonical_build_dir
-    target_dir = @bdir ? File.expand_path(@bdir) : Dir.pwd
-    File.realpath(target_dir) rescue target_dir
-  end
-
-  def path_hash
-    @path_hash ||= Digest::SHA256.hexdigest(canonical_build_dir)[0..15]
-  end
-
-  def project_tmp_dir
-    @project_tmp_dir ||= begin
-      dir = File.join(Dir.tmpdir, "latex_it_#{Process.uid}")
-      (Dir.mkdir(dir, 0o700) rescue nil)
-      verify_private_dir!(dir)
-      dir
-    end
-  end
-
-  # FileUtils.mkdir_p does not repair the mode or ownership of a path that
-  # already exists, and the name here is predictable. On a shared /tmp another
-  # user could pre-create this directory world-writable and replace the lock
-  # file with a symlink; with_lock opens that path and truncates it, which
-  # would destroy whatever it pointed at. Linux's protected_symlinks does not
-  # help, because it only covers directories that are both world-writable and
-  # sticky. Refuse anything that is not a private directory we own.
-  def verify_private_dir!(dir)
-    stat = File.lstat(dir)
-    return if stat.directory? && !stat.symlink? && stat.uid == Process.uid && (stat.mode & 0o077).zero?
-
-    abort "latex_it: refusing to use #{dir}: not a private directory owned by uid #{Process.uid}"
-  end
-
-  def project_tmp_file(suffix)
-    File.join(project_tmp_dir, "#{path_hash}_#{@bfilename}_#{suffix}")
-  end
-
-  def with_lock
-    return yield unless @options[:lock]
-
-    lock_file = project_tmp_file('build.lock')
-    File.open(lock_file, File::RDWR | File::CREAT | NOFOLLOW, 0o600) do |f|
-      unless f.flock(File::LOCK_EX | File::LOCK_NB)
-        puts "      #{Rainbow("Another latex_it process is running for #{@bfilename}. Waiting for it to finish...").yellow}" unless @options[:score]
-        f.flock(File::LOCK_EX)
-      end
-
-      f.truncate(0) rescue nil
-      f.puts "pid: #{Process.pid}\nstarted: #{Time.now.iso8601}\ntarget: #{File.expand_path(@filename)}" rescue nil
-      f.flush rescue nil
-
-      yield
-    ensure
-      f.flock(File::LOCK_UN) rescue nil
-    end
-  end
-
-  def setup_environment
-    junk_dir_create
-
-    LaTeXUtils.reset_latex_environment! if @options[:no_env]
-
-    @engine_name = resolve_engine
-    LaTeXUtils.check_program(@engine_name)
-
-    @latex_flags = %w[-interaction=nonstopmode -synctex=1 -no-mktex=tfm -recorder] +
-                   ["-output-directory=#{@junk_dir}", '-file-line-error']
-    @pdferr = "#{@junk_dir}/err_#{@engine_name}"
-    @biberr = "#{@junk_dir}/err_bib"
-    @log, @loga = "#{@junk_dir}/log.txt", "#{@junk_dir}/log.txt.1"
-  end
-
-  def resolve_engine
-    file_engine = LaTeXUtils.detect_engine_from_file(@filename)
-    candidate_engine = @options[:engine] || ENV['PDFBINONLY'] || file_engine ||
-                       @options[:config_engine] || ENV['PDFBIN'] || ENV['LATEX_ENGINE'] || 'xelatex'
-    requested_engine = LaTeXUtils.normalize_engine(candidate_engine)
-    pdflatex_reasons = LaTeXUtils.source_pdflatex_reasons(@filename)
-    incompatible = %w[xelatex lualatex].include?(requested_engine) && !pdflatex_reasons.empty?
-    reason = pdflatex_reasons.join(' and ')
-
-    if incompatible && @options[:engine_explicit]
-      puts Rainbow(" -- Source uses #{reason}; #{requested_engine} may fail. Recommended: -e pdflatex").yellow
-      requested_engine
-    elsif incompatible
-      puts Rainbow(" -- Source uses #{reason}; selecting pdflatex automatically.").cyan
-      LaTeXUtils.compatible_engine(requested_engine, @filename)
-    else
-      requested_engine
-    end
-  end
-
-  def junk_dir_create
-    dir = junk_dir
-    FileUtils.mkdir_p(File.join(dir, dir))
-    target_subdirs = (@options && @options[:junk_subdirs]) || LaTeXUtils::DEFAULT_JUNK_SUBDIRS
-    target_subdirs.each { |d| FileUtils.mkdir_p(File.join(dir, d)) }
-    mirror_project_subdirs_to_junk if @options.nil? || @options[:auto_mirror_subdirs] != false
-  end
-
-  def mirror_project_subdirs_to_junk
-    dir = junk_dir
-    Dir.glob('*/').each do |d|
-      clean_dir = d.chomp('/')
-      next if clean_dir == dir || clean_dir.start_with?('junk', '.', 'backup')
-
-      FileUtils.mkdir_p(File.join(dir, clean_dir))
-    end
-  end
-
-  def deep_clean
-    LaTeXUtils.clean_directory('.', true)
-  end
-
-  def paper_cleanup
-    aux_path = File.join(@junk_dir, "#{@bfilename}.aux")
-    if File.exist?("#{@bfilename}.aux") && !File.exist?(aux_path)
-      FileUtils.mkdir_p(@junk_dir)
-      FileUtils.cp("#{@bfilename}.aux", aux_path, preserve: true)
-    end
-
-    sync_bbl_before_compile
-
-    # Every entry must be anchored to the document stem or be a name TeX itself
-    # reserves. A bare 'log.txt' was removed: this tool writes its transcript to
-    # junk/log.txt, so a root log.txt can only be a file the user wrote, and
-    # paper_cleanup runs on every build with no flag guarding it.
-    exts = %w[.ps .blg .dvi .thm .aux .idx .ind .ilg .log .out .vtc .bcf .run.xml]
-    (exts.map { |e| "#{@bfilename}#{e}" } + %w[texput.log missfont.log mfput.log]).each { |f| FileUtils.rm_f(f) }
-
-    root_bbl = "#{@bfilename}.bbl"
-    FileUtils.rm_f(root_bbl) if File.exist?(root_bbl) && !LaTeXUtils.bbl_has_entries?(root_bbl)
-  end
-
-  def sync_bbl_before_compile
-    root_bbl = "#{@bfilename}.bbl"
-    junk_bbl = File.join(@junk_dir, root_bbl)
-    if File.exist?(root_bbl) && LaTeXUtils.bbl_has_entries?(root_bbl)
-      FileUtils.mkdir_p(@junk_dir)
-      FileUtils.cp(root_bbl, junk_bbl, preserve: true) if !File.exist?(junk_bbl) || File.mtime(root_bbl) > File.mtime(junk_bbl)
-    elsif @options[:trace] && File.exist?(junk_bbl) && !File.exist?(root_bbl) && LaTeXUtils.bbl_has_entries?(junk_bbl)
-      FileUtils.cp(junk_bbl, root_bbl, preserve: true)
-    end
-  end
-
-  def sync_bbl_to_root
-    junk_bbl = File.join(@junk_dir, "#{@bfilename}.bbl")
-    root_bbl = "#{@bfilename}.bbl"
-    return unless File.exist?(junk_bbl) && LaTeXUtils.bbl_has_entries?(junk_bbl)
-
-    update_target_file(junk_bbl, root_bbl)
-  end
-
-  def pass_environment
-    env = LaTeXCompatibility.compiler_environment(@options, ENV.to_h, @filename).dup
-    env['max_print_line'] ||= '2048'
-    env
-  end
-
-  def kill_process_group(pid)
-    pgid = Process.getpgid(pid) rescue nil
-    Process.kill('-KILL', pgid) if pgid rescue nil
-    Process.kill('KILL', pid) rescue nil
-    Process.waitpid(pid, Process::WNOHANG) rescue nil
-  end
-
-  def shell_quote(str) = LaTeXUtils.shell_quote(str)
-  def format_trace_command(env, cmd, cwd = Dir.pwd) = LaTeXUtils.format_trace_command(env, cmd, cwd)
-  def trace_command(env, cmd, cwd = Dir.pwd) = LaTeXUtils.trace_command(env, cmd, cwd)
-  def trace_status(status) = LaTeXUtils.trace_status(status)
-
-  def capture_pass_output(cmd_args)
-    timeout = (@options[:timeout] || ENV['LATEX_IT_TIMEOUT'] || DEFAULT_PASS_TIMEOUT).to_i
-    env = pass_environment
-    trace_command(env, cmd_args) if @options[:trace]
-    out, status = if timeout <= 0
-                    Open3.capture2e(env, *cmd_args)
-                  else
-                    capture_with_timeout(env, cmd_args, timeout)
-                  end
-    trace_status(status) if @options[:trace]
-    $stdout.puts out if @options[:raw]
-    [out, status]
-  rescue Errno::ENOENT
-    raise
-  rescue StandardError => e
-    err_status = ProcessResultStatus.new(1, false, nil, false)
-    trace_status(err_status) if @options[:trace]
-    ["\n! Process Error: #{e.message}\n", err_status]
-  end
-
-  def capture_with_timeout(env, cmd_args, timeout)
-    Open3.popen2e(env, *cmd_args, pgroup: true) do |stdin, stdout_err, wait_thr|
-      stdin.close rescue nil
-      output = +''
-      reader = Thread.new { output = stdout_err.read }
-      begin
-        unless wait_thr.join(timeout)
-          kill_process_group(wait_thr.pid)
-          reader.kill rescue nil
-          msg = "\n! LaTeX Error: Compilation timed out after #{timeout}s (suspected runaway loop).\n"
-          return [msg, ProcessResultStatus.new(124, false, nil, false)]
-        end
-        reader.join(2.0) || reader.kill rescue nil
-        [output, wait_thr.value]
-      ensure
-        kill_process_group(wait_thr.pid) if wait_thr&.alive?
-        reader.kill rescue nil
-      end
-    end
-  end
-
-  def run_latex_pass(suffix)
-    puts '' if @options[:trace] || @options[:raw]
-    t0 = Process.clock_gettime(Process::CLOCK_MONOTONIC) if @options[:time]
-    lgx = "#{@pdferr}#{suffix}"
-    FileUtils.rm_f(lgx)
-
-    cmd_args = build_latex_pass_cmd
-    write_pass_header(lgx, cmd_args)
-
-    stdout_stderr, status = capture_pass_output(cmd_args)
-    st = status.exitstatus || (status.respond_to?(:termsig) && status.termsig ? 128 + status.termsig : 1)
-    File.open(lgx, 'a') { |f| f.write(stdout_stderr) }
-    if status.respond_to?(:signaled?) && status.signaled?
-      LaTeXIndicator.stop(clear: true, enabled: interactive_tty?)
-      warn "\nLaTeX engine terminated by signal #{status.termsig} (fatal crash).\n"
-    elsif st > 0
-      LaTeXIndicator.stop(clear: true, enabled: interactive_tty?)
-      unless interactive_tty? || @options[:compile]
-        puts ": #{format_compilation_failure(st)}"
-        $stdout.flush
-      end
-    end
-
-    handle_pass_errors(st, lgx)
-    File.open(@log, 'a') { |f| f.write(stdout_stderr) }
-
-    if @options[:time]
-      t1 = Process.clock_gettime(Process::CLOCK_MONOTONIC)
-      printf(" [%s]", Rainbow(format('%.2fs', t1 - t0)).green)
-    end
-    status.success?
-  end
-
-  def build_latex_pass_cmd
-    latexopts = ENV['LATEXOPTS'] || ''
-    latexoptions = ENV['LATEXOPTIONS'] || ''
-
-    prefix = !latexoptions.empty? ? "#{latexoptions} " : latexopts
-    cfilename = "#{prefix}#{RUNTIME_HOOK}\\input{#{@filename}}"
-
-    [@engine_name] + @latex_flags + [cfilename]
-  end
-
-  def write_pass_header(lgx, cmd_args)
-    File.open(lgx, 'a') do |f|
-      f.puts '========================================'
-      f.puts format_trace_command(pass_environment, cmd_args)
-      f.puts '========================================'
-      f.puts Time.now.strftime('%a %b %d %H:%M:%S %Z %Y')
-      f.puts '========================================'
-    end
-  end
-
-  def handle_pass_errors(st, lgx)
-    errcnt = count_errors_in_log(st, lgx)
-    return unless errcnt > 0
-
-    if @options[:score]
-      output_score(lgx, st)
-      exit 1
-    else
-      report_errors(lgx)
-    end
-  end
-
-  def format_compilation_failure(status)
-    msg = (@options && @options[:color] == false) ? 'Latex compilation failed!' : Rainbow('Latex compilation failed!').red.bright
-    "#{msg} (Status: #{status})"
-  end
-
-  def format_engine_crash(signal)
-    msg = (@options && @options[:color] == false) ? 'Latex engine terminated by signal' : Rainbow('Latex engine terminated by signal').red.bright
-    "#{msg} #{signal} (fatal crash)"
-  end
-
   def bib_manager
     @bib_manager ||= LaTeXBibManager.new(self)
   end
@@ -1023,8 +737,6 @@ class LatexBuilder
     tmp = "#{dst}.tmp.#{Process.pid}"
     FileUtils.cp(src, tmp, preserve: true)
     File.rename(tmp, dst)
-  rescue StandardError
-    FileUtils.cp(src, dst, preserve: true)
   ensure
     FileUtils.rm_f(tmp) if tmp && File.exist?(tmp)
   end

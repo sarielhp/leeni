@@ -74,6 +74,23 @@ class TestBibIntegration < Minitest::Test
     end
   end
 
+  def test_bib_locator_prefers_configured_junk_directory
+    Dir.mktmpdir('bib_locator_junk_test') do |dir|
+      FileUtils.mkdir_p(File.join(dir, '.build'))
+      FileUtils.mkdir_p(File.join(dir, 'external'))
+      bib_file = File.join(dir, 'external', 'references.bib')
+      File.write(bib_file, "@article{Configured:2026,\n  title = {Configured Path}\n}\n")
+      File.write(File.join(dir, '.build', 'paper.blg'), "Database file #1: #{bib_file}\n")
+
+      location = LaTeXBibLocator.locate(
+        'Configured:2026', nil, 'paper', dir, junk_dir: '.build'
+      )
+
+      refute_nil location
+      assert_equal bib_file, location[:file]
+    end
+  end
+
   def test_decluster_errors
     diag_class = Class.new do
       include LaTeXDiagnostics
@@ -436,4 +453,3 @@ class TestBibIntegration < Minitest::Test
     end
   end
 end
-

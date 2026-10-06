@@ -236,13 +236,19 @@ class TestArxivSupport < Minitest::Test
   def test_cli_meta_flag
     Dir.mktmpdir do |dir|
       File.write(File.join(dir, "paper.tex"), "\\documentclass{article}\n\\title{CLI Title}\n\\author{Bob Author}\n\\begin{abstract}Quick summary\\end{abstract}\n\\begin{document}\\end{document}\n")
+      FileUtils.mkdir_p(File.join(dir, '.build'))
+      FileUtils.mkdir_p(File.join(dir, 'figures'))
+      File.write(File.join(dir, 'figures', 'chart.png'), 'PNG')
+      File.write(File.join(dir, '.build', 'paper.fls'), "INPUT ./figures/chart.png\n")
+      File.write(File.join(dir, '.build', 'paper.log'), 'Output written on paper.pdf (7 pages).')
       Dir.chdir(dir) do
-        stdout, status = Open3.capture2(BIN, "--meta", "paper.tex")
+        stdout, status = Open3.capture2(BIN, '--meta', '--junk-dir', '.build', 'paper.tex')
         assert status.success?
         assert_includes stdout, "Title:"
         assert_includes stdout, "CLI Title"
         assert_includes stdout, "Authors:"
         assert_includes stdout, "Bob Author"
+        assert_includes stdout, '7 pages, 1 figure.'
         assert_includes stdout, "==> Wrote paper metadata to: arxiv_paper_meta.txt"
         assert File.file?("arxiv_paper_meta.txt")
       end
@@ -266,7 +272,7 @@ class TestArxivSupport < Minitest::Test
       File.write(File.join(dir, 'paper.tex'), tex_content)
 
       Dir.chdir(dir) do
-        stdout, status = Open3.capture2(BIN, '--arxiv', 'paper.tex')
+        stdout, status = Open3.capture2(BIN, '--arxiv', '--junk-dir', '.build', 'paper.tex')
         assert status.success?, "l --arxiv failed: #{stdout}"
         assert_includes stdout, '==> arXiv Preparation Complete!'
         assert_includes stdout, '[1] Submission Archive : arxiv_paper.zip'
@@ -274,6 +280,7 @@ class TestArxivSupport < Minitest::Test
 
         assert File.file?('arxiv_paper.zip')
         assert File.file?('arxiv_paper_meta.txt')
+        assert File.file?('.build/paper.fls')
 
         entries, = Open3.capture2('unzip', '-l', 'arxiv_paper.zip')
         assert_includes entries, 'paper.tex'

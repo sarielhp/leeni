@@ -45,17 +45,23 @@ class LatexPackager
     fig_sources = discover_figure_sources(deps[:figures])
     zip_filename = @options[:zip_name] || "#{@bfilename}.zip"
 
-    return false unless stage_and_create_zip(zip_filename, deps, fig_sources)
+    candidate = stage_and_create_zip(zip_filename, deps, fig_sources)
+    return false unless candidate
 
-    kind = @options[:zip_flat] ? 'flat ' : ''
-    puts Rainbow("==> Created portable #{kind}zip: #{zip_filename}").green.bright
+    publish_packaged_archive(candidate, zip_filename)
+  ensure
+    FileUtils.rm_f(candidate) if candidate && File.file?(candidate)
+  end
 
-    if @options[:verify] && !verify_archive!(zip_filename)
-      FileUtils.rm_f(zip_filename)
-      warn Rainbow("[FAIL] Verification failed. Removed unverified #{zip_filename}.").red.bright
+  def publish_packaged_archive(candidate, zip_filename)
+    if @options[:verify] && !verify_archive!(candidate)
+      warn Rainbow("[FAIL] Verification failed. Preserved existing #{zip_filename}.").red.bright
       return false
     end
 
+    File.rename(candidate, zip_filename)
+    kind = @options[:zip_flat] ? 'flat ' : ''
+    puts Rainbow("==> Created portable #{kind}zip: #{zip_filename}").green.bright
     zip_filename
   end
 
@@ -134,20 +140,14 @@ class LatexPackager
 
   def scan_bib_from_logs_and_aux
     candidates = []
-    blg_candidates = [
-      File.join(junk_dir, "#{@bfilename}.blg"),
-      "junk/#{@bfilename}.blg",
-      ".junk/#{@bfilename}.blg"
-    ].uniq
-    blg_file = blg_candidates.find { |f| File.file?(f) }
-    if blg_file
+    blg_file = File.join(junk_dir, "#{@bfilename}.blg")
+    if File.file?(blg_file)
       blg_content = LaTeXUtils.safe_read(blg_file)
       blg_content.scan(/(?:Found BibTeX data source|Looking for bibtex file)\s+'([^']+)'/) { |m| candidates << m[0] }
       blg_content.scan(/Database file #\d+:\s*([^\s]+)/) { |m| candidates << m[0] }
     end
 
-    aux_dirs = [junk_dir, 'junk', '.junk'].uniq
-    Dir.glob("{#{aux_dirs.join(',')}}/**/*.aux").uniq.each do |f|
+    Dir.glob(File.join(junk_dir, '**', '*.aux')).each do |f|
       LaTeXUtils.safe_read(f).scan(/\\bibdata\{([^}]+)\}/).flatten.flat_map { |s| s.split(',') }.each do |stem|
         cand = "#{stem.strip}.bib"
         candidates << cand if File.file?(cand)
@@ -160,13 +160,8 @@ class LatexPackager
     candidates = Dir.glob('*.bib') + Dir.glob('{refs,bib,bibliography}/**/*.bib')
     candidates.concat(scan_bib_from_logs_and_aux)
 
-    bcf_candidates = [
-      File.join(junk_dir, "#{@bfilename}.bcf"),
-      "junk/#{@bfilename}.bcf",
-      ".junk/#{@bfilename}.bcf"
-    ].uniq
-    bcf_file = bcf_candidates.find { |f| File.file?(f) }
-    if bcf_file
+    bcf_file = File.join(junk_dir, "#{@bfilename}.bcf")
+    if File.file?(bcf_file)
       LaTeXUtils.safe_read(bcf_file).scan(/<bcf:datasource[^>]*>([^<]+)<\/bcf:datasource>/).flatten.each do |ds|
         candidates << ds if File.file?(ds)
       end
@@ -186,11 +181,15 @@ class LatexPackager
 
     if @options[:zip_flat]
       return false unless stage_flattened_main_tex(stage_dir, !deps[:styles].empty?)
-    else
-      stage_main_tex(stage_dir, !deps[:styles].empty?)
-      deps[:tex_inputs].each { |f| copy_preserving_path(f, stage_dir) if File.file?(f) }
+      return stage_remaining_assets(stage_dir, deps, fig_sources)
     end
 
+    stage_main_tex(stage_dir, !deps[:styles].empty?)
+    deps[:tex_inputs].each { |f| copy_preserving_path(f, stage_dir) if File.file?(f) }
+    stage_remaining_assets(stage_dir, deps, fig_sources)
+  end
+
+  def stage_remaining_assets(stage_dir, deps, fig_sources)
     stage_styles(deps[:styles], stage_dir)
 
     discover_local_bib_files.each { |f| copy_preserving_path(f, stage_dir) if File.file?(f) }
@@ -233,26 +232,34 @@ class LatexPackager
       return false
     end
 
-    Dir.mktmpdir('latex_it_stage_') do |stage_dir|
+    candidate = archive_candidate_path(zip_filename)
+    FileUtils.rm_f(candidate)
+    succeeded = Dir.mktmpdir('latex_it_stage_') do |stage_dir|
       return false unless stage_all_assets(stage_dir, deps, fig_sources)
 
-      zip_abs = File.expand_path(zip_filename)
-      FileUtils.rm_f(zip_abs)
-      zip_out, zip_status = Dir.chdir(stage_dir) { Open3.capture2e('zip', '-q', '-r', zip_abs, '.') }
-      unless zip_status.success? && File.file?(zip_abs) && File.size(zip_abs).positive?
+      zip_out, zip_status = Dir.chdir(stage_dir) { Open3.capture2e('zip', '-q', '-r', candidate, '.') }
+      unless zip_status.success? && File.file?(candidate) && File.size(candidate).positive?
         warn Rainbow("[FAIL] Failed to create #{zip_filename}: #{zip_out}").red.bright
         return false
       end
+      true
     end
-    true
+    succeeded ? candidate : false
+  ensure
+    FileUtils.rm_f(candidate) if candidate && !succeeded && File.file?(candidate)
+  end
+
+  def archive_candidate_path(zip_filename)
+    absolute = File.expand_path(zip_filename)
+    File.join(File.dirname(absolute), ".#{File.basename(absolute, '.zip')}.tmp.#{Process.pid}.zip")
   end
 
   def copy_target_outputs(stage_dir)
-    pdf_candidates = ["#{@bfilename}.pdf", File.join(junk_dir, "#{@bfilename}.pdf"), "junk/#{@bfilename}.pdf", ".junk/#{@bfilename}.pdf"].uniq
+    pdf_candidates = ["#{@bfilename}.pdf", File.join(junk_dir, "#{@bfilename}.pdf")]
     pdf_source = pdf_candidates.find { |f| File.file?(f) }
     FileUtils.cp(pdf_source, File.join(stage_dir, "#{@bfilename}.pdf")) if pdf_source
 
-    bbl_candidates = ["#{@bfilename}.bbl", File.join(junk_dir, "#{@bfilename}.bbl"), "junk/#{@bfilename}.bbl", ".junk/#{@bfilename}.bbl"].uniq
+    bbl_candidates = ["#{@bfilename}.bbl", File.join(junk_dir, "#{@bfilename}.bbl")]
     bbl_source = bbl_candidates.find { |f| File.file?(f) }
     if bbl_source && LaTeXUtils.bbl_has_entries?(bbl_source)
       FileUtils.cp(bbl_source, File.join(stage_dir, "#{@bfilename}.bbl"))

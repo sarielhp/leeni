@@ -68,11 +68,13 @@ The codebase is organized into modular files under `lib/latex_it/`:
 | `brace_checker.rb` | Static lexical environment and brace validator. |
 | `diagnostics.rb` | AUCTeX-compatible log parser and 4-tier diagnostic classifier. |
 | `error_catalog.rb` | Declarative catalog of 55 TeX/LaTeX compilation errors with token extractors and explanations. |
-| `builder.rb` | Orchestrator managing passes, `junk/` isolation, process execution, and locking. |
+| `builder.rb` | Orchestrator managing convergence, caching, bibliography scheduling, and output finalization. |
+| `build_runtime.rb` | Build locking, workspace preparation, compiler process execution, timeouts, and individual LaTeX passes. |
 | `packager.rb` | Bundler for portable paper zip archives (`-z`) and `/tmp` sandbox verifier (`-t`). |
 | `flattener.rb` | Recursive subfile inliner and comment sanitizer for arXiv packages. |
 | `meta_extractor.rb` | Source parser extracting Title, Authors, and MathJax-compatible Abstract. |
 | `arxiv.rb` | arXiv submission manager, biblatex version shielding, and visual page verification. |
+| `cli_targets.rb` | CLI target dispatch for compilation, metadata, bibliography extraction, and arXiv workflows. |
 
 ---
 

@@ -7,13 +7,14 @@
 # ==============================================================================
 
 class LaTeXBibLocator
-  def self.locate(citekey, token = nil, bfilename = nil, search_dir = Dir.pwd)
-    new(bfilename, search_dir).locate(citekey, token)
+  def self.locate(citekey, token = nil, bfilename = nil, search_dir = Dir.pwd, junk_dir: nil)
+    new(bfilename, search_dir, junk_dir: junk_dir).locate(citekey, token)
   end
 
-  def initialize(bfilename = nil, search_dir = Dir.pwd)
+  def initialize(bfilename = nil, search_dir = Dir.pwd, junk_dir: nil)
     @bfilename = bfilename
     @search_dir = search_dir
+    @junk_dir = junk_dir
   end
 
   def locate(citekey, token = nil)
@@ -38,10 +39,11 @@ class LaTeXBibLocator
   end
 
   def collect_from_blg
-    candidates = [
-      File.join(@search_dir, '.junk', "#{@bfilename}.blg"),
-      File.join(@search_dir, 'junk', "#{@bfilename}.blg")
-    ]
+    candidates = if @junk_dir
+                   [File.join(File.expand_path(@junk_dir, @search_dir), "#{@bfilename}.blg")]
+                 else
+                   %w[.junk junk].map { |dir| File.join(@search_dir, dir, "#{@bfilename}.blg") }
+                 end
     blg_path = candidates.find { |p| File.file?(p) }
     return [] unless blg_path
 

@@ -18,7 +18,7 @@ module QualityGate
     test_arxiv_worker.rb test_arxiv_fixups.rb test_sample_arxiv.rb test_bump.rb
   ].freeze
   MEDIUM_TESTS = %w[
-    test_compile_mode.rb test_llm_mode.rb test_json_mode.rb
+    test_compile_mode.rb test_pathological_latex.rb test_llm_mode.rb test_json_mode.rb
     test_bib_integration.rb test_bws_review.rb test_bib_extractor.rb
     test_raw_mode.rb test_metadata_report_review.rb test_arxiv_runner_review.rb
     test_build_cache.rb test_vim_integration.rb test_destructive_paths.rb
@@ -64,6 +64,8 @@ module QualityGate
     return if status.success?
 
     abort_failure('RuboCop static analysis failed', output)
+  rescue Errno::ENOENT
+    abort_failure('RuboCop is not installed', 'Run tools/setup_ruby_dev to install the development dependencies.')
   end
 
   def self.run_tests!(files)

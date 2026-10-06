@@ -45,10 +45,16 @@ module LaTeXDiagnostics
   end
 
   def latex_error_line?(line)
+    return false if typeset_source_echo?(line)
+
     line.match?(/^!\s+\S/) ||
       line.match?(/^Runaway argument\?/) ||
       line.match?(/^Error:\s/i) ||
       line.match?(/^.+?:\d+:\s+(?!warning\b)(?!\(see\b)\S/i)
+  end
+
+  def typeset_source_echo?(line)
+    line.match?(/^\s*\\[A-Z][A-Z0-9]*\/\S+\s/)
   end
 
   def extract_error_line(err_text)
@@ -350,7 +356,7 @@ module LaTeXDiagnostics
     real_file = LaTeXErrorCatalog.find_source_file(file_path) || file_path
     return nil unless real_file && File.file?(real_file)
 
-    lines = File.readlines(real_file)
+    lines = LaTeXUtils.safe_read(real_file).lines
     idx = line_no - 1
     return nil if idx < 0 || idx >= lines.size
 
@@ -964,7 +970,9 @@ module LaTeXDiagnostics
   end
 
   def error_line_match(line)
-    if line =~ /^([^\s:]+):(\d+):\s+(?!warning\b)(?!\(see\b)\S+/i
+    return [false, nil] if typeset_source_echo?(line)
+
+    if line =~ /^(.+?):(\d+):\s+(?!warning\b)(?!\(see\b)\S+/i
       [true, Regexp.last_match(1)]
     elsif line =~ /^!\s+\S+/ || line =~ /^Runaway argument\?/ || line =~ /^Error:\s+/i
       [true, nil]
@@ -975,11 +983,13 @@ module LaTeXDiagnostics
 
   def collect_error_block(lines, start_idx)
     err_block = [lines[start_idx]]
+    missing_file = lines[start_idx].match?(/File `?[^']+'? not found/i)
+    block_limit = missing_file ? 14 : 6
     i = start_idx + 1
-    while i < lines.size && err_block.size < 6
+    while i < lines.size && err_block.size < block_limit
       curr = lines[i]
       break if curr =~ /^!\s*(?:==>\s*)?(?:Emergency stop|Fatal error occurred)/i ||
-               curr =~ /^.+:\d+:\s+(?!warning\b)/i ||
+               (curr =~ /^.+:\d+:\s+(?!warning\b)/i && !missing_file_location?(curr, missing_file)) ||
                curr =~ /^!\s+\S+/ || curr =~ /^Runaway argument\?/ ||
                curr =~ WARNING_LINE_PATTERN ||
                curr =~ /^(?:Overfull|Underfull) \\(?:hbox|vbox)/ ||
@@ -990,6 +1000,10 @@ module LaTeXDiagnostics
       break if curr =~ /^l\.\d+/
     end
     [err_block, i]
+  end
+
+  def missing_file_location?(line, missing_file)
+    missing_file && line.match?(/^.+:\d+:\s+(?:Emergency stop|Fatal error occurred)/i)
   end
 
   def extract_argument_token(err_block)
@@ -1055,7 +1069,18 @@ module LaTeXDiagnostics
     err_text = err_block.join("\n")
     line_no = extract_error_line(err_text)
     file_name = err_file || current_log_file(file_stack)
-    classification = LaTeXErrorCatalog.classify(err_text, err_block, file: file_name, line: line_no)
+    classification = LaTeXErrorCatalog.classify(
+      err_text, err_block, file: file_name, line: line_no, junk_dir: diagnostics_junk_dir
+    )
+    if classification&.[](:id) == :file_not_found
+      resource_location = locate_missing_resource_request(classification[:token])
+      if resource_location
+        file_name, line_no = resource_location
+        classification = LaTeXErrorCatalog.classify(
+          err_text, err_block, file: file_name, line: line_no, junk_dir: diagnostics_junk_dir
+        )
+      end
+    end
     cat_id = classification ? classification[:id] : :generic
     token = (cat_id == :undefined_control_sequence && classification&.[](:token)) ? classification[:token] : (extract_argument_token(err_block) || classification&.[](:token))
     token = nil if token.to_s.match?(/\s/)
@@ -1074,6 +1099,19 @@ module LaTeXDiagnostics
     [item, next_idx]
   end
 
+  def locate_missing_resource_request(resource)
+    stem = resource.to_s.sub(/\.(?:tex|sty|cls|bib)\z/i, '')
+    return nil if stem.empty?
+
+    pattern = /\\(?:input|include|usepackage|RequirePackage|includegraphics|bibliography|addbibresource)\s*(?:\[[^\]]*\])?\s*\{[^}]*#{Regexp.escape(stem)}[^}]*\}/
+    collect_source_candidates.each do |file|
+      LaTeXUtils.safe_read(file).each_line.with_index(1) do |line, line_no|
+        return [file, line_no] if line.sub(/(?<!\\)%.*\z/, '').match?(pattern)
+      end
+    end
+    nil
+  end
+
   def generate_bib_companions(errors)
     companions = []
     seen = {}
@@ -1085,7 +1123,8 @@ module LaTeXDiagnostics
                    err[:file].to_s.end_with?('.bbl')
       next unless is_bib_cmd || err[:token]
 
-      loc = LaTeXBibLocator.locate(err[:bib_entry], err[:token], @bfilename, Dir.pwd)
+      loc = LaTeXBibLocator.locate(err[:bib_entry], err[:token], @bfilename, Dir.pwd,
+                                   junk_dir: diagnostics_junk_dir)
       next unless loc
 
       loc_key = [loc[:file], loc[:line]]
@@ -1329,12 +1368,14 @@ module LaTeXDiagnostics
   end
 
   def normalized_message(item)
-    if item[:err_block] && !item[:err_block].empty?
-      raw_msg = item[:err_block].first.to_s.strip
-      extract_clean_error_message(raw_msg)
-    else
-      item[:text].to_s
-    end
+    message = if item[:err_block] && !item[:err_block].empty?
+                raw_msg = item[:err_block].first.to_s.strip
+                extract_clean_error_message(raw_msg)
+              else
+                item[:text].to_s
+              end
+    count = item[:repeat_count].to_i
+    count > 1 ? "#{message} (repeated #{count} times)" : message
   end
 
   TEXTUAL_SOURCE_EXT = %w[.tex .sty .cls .bib .bbl .dtx .ltx .cfg].freeze
@@ -1866,15 +1907,17 @@ module LaTeXDiagnostics
     @junk_dir || (respond_to?(:resolve_junk_dir, true) ? resolve_junk_dir : 'junk')
   end
 
+  def diagnostic_artifact_candidates(extension)
+    primary = File.join(diagnostics_junk_dir, "#{@bfilename}.#{extension}")
+    return [primary] if @junk_dir
+
+    [primary, "junk/#{@bfilename}.#{extension}", ".junk/#{@bfilename}.#{extension}"].uniq
+  end
+
   def collect_source_candidates
     candidates = []
     candidates << @filename if @filename && File.file?(@filename)
-    fls_candidates = [
-      File.join(diagnostics_junk_dir, "#{@bfilename}.fls"),
-      "junk/#{@bfilename}.fls",
-      ".junk/#{@bfilename}.fls"
-    ].uniq
-    fls_file = fls_candidates.find { |f| File.file?(f) }
+    fls_file = diagnostic_artifact_candidates('fls').find { |f| File.file?(f) }
     if @bfilename && fls_file && respond_to?(:extract_fls_dependencies, true)
       candidates.concat(extract_fls_dependencies(fls_file).select { |f| f.end_with?('.tex') })
     end
@@ -1911,12 +1954,7 @@ module LaTeXDiagnostics
   def resolve_target_pdf
     return "#{@bfilename}.pdf" if @bfilename && File.file?("#{@bfilename}.pdf")
 
-    pdf_candidates = [
-      File.join(diagnostics_junk_dir, "#{@bfilename}.pdf"),
-      "junk/#{@bfilename}.pdf",
-      ".junk/#{@bfilename}.pdf"
-    ].uniq
-    pdf_candidates.find { |f| File.file?(f) }
+    diagnostic_artifact_candidates('pdf').find { |f| File.file?(f) }
   end
 
   def whatever_diagnostic?(item)
@@ -2131,9 +2169,30 @@ module LaTeXDiagnostics
   end
 
   COMPILER_BRACE_ERROR_PATTERN = /(?:Runaway argument\?|File ended while scanning use of|Extra \}, or forgotten \\endgroup|Extra \\endgroup|Too many \}'s|Missing \} inserted|Paragraph ended before .* was complete|\\begin\{.*\} ended by \\end\{.*\})/i.freeze
+  COMPILER_BRACE_CASCADE_IDS = %i[
+    paragraph_ended_before_complete file_ended_while_scanning
+  ].freeze
 
   def compiler_indicates_brace_error?(content)
     content.match?(COMPILER_BRACE_ERROR_PATTERN)
+  end
+
+  def suppress_compiler_brace_cascades(errors, brace_errors)
+    return errors if brace_errors.empty?
+
+    errors.reject { |error| COMPILER_BRACE_CASCADE_IDS.include?(error[:catalog_id]) }
+  end
+
+  def suppress_environment_mismatch_cascades(errors)
+    primary = errors.find { |error| error[:catalog_id] == :mismatched_environment }
+    return errors unless primary && format_display_path(primary[:file]) != format_display_path(@filename)
+
+    errors.reject do |error|
+      next false if error.equal?(primary)
+
+      format_display_path(error[:file]) == format_display_path(@filename) &&
+        error[:text].to_s.match?(/\\begin\{document\} ended by|Extra \\endgroup/i)
+    end
   end
 
   def report_compile_mode_errors(errors, content, io: $stderr)
@@ -2211,6 +2270,8 @@ module LaTeXDiagnostics
                    else
                      []
                    end
+    compiler_errors = suppress_compiler_brace_cascades(compiler_errors, brace_errors)
+    compiler_errors = suppress_environment_mismatch_cascades(compiler_errors)
     errors = prepare_error_items(compiler_errors) + brace_errors
 
     return report_compile_mode_errors(errors, content, io: io) if compile_mode?
@@ -2613,6 +2674,7 @@ module LaTeXDiagnostics
     clean_content = LaTeXUtils.filter_subcommand_noise(content)
     clean_content.each_line do |line|
       next if line =~ /^!\s*(?:==>\s*)?(?:Emergency stop|Fatal error occurred)/i
+      next if typeset_source_echo?(line)
 
       if line =~ /^!\s+\S+/ ||
          line =~ /^.+:\d+:\s+(?:(?:LaTeX|Package|Class)\s+Error:|Undefined control sequence|Error:|Runaway argument\?|Missing\s|Extra\s|You can't use)/i ||

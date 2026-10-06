@@ -1663,6 +1663,20 @@ class TestLatexItCLI < Minitest::Test
     end
   end
 
+  def test_atomic_copy_failure_preserves_existing_target
+    Dir.mktmpdir do |dir|
+      missing_src = File.join(dir, 'missing.pdf')
+      dst = File.join(dir, 'final.pdf')
+      File.write(dst, '%PDF-1.4 known good')
+
+      builder = LatexBuilder.new('main.tex', {})
+      assert_raises(Errno::ENOENT) { builder.send(:atomic_copy, missing_src, dst) }
+
+      assert_equal '%PDF-1.4 known good', File.read(dst)
+      assert_empty Dir.glob(File.join(dir, '*.tmp*'))
+    end
+  end
+
   def test_discover_bib_files_includes_aux_bibdata_and_subdirectories
     Dir.mktmpdir do |dir|
       Dir.chdir(dir) do

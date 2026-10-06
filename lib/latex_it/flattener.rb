@@ -243,7 +243,8 @@ module LaTeXFlattener
         url_depth += 1
         i += macro.length
         next
-      elsif url_depth > 0
+      end
+      if url_depth > 0
         if c == '{'
           url_depth += 1
         elsif c == '}'

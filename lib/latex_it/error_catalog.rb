@@ -107,7 +107,7 @@ module LaTeXErrorCatalog
     vspace wedge widehat widetilde width Xi xi zeta
   ].freeze
 
-  def self.suggest_command(raw_tok, file: nil, macro: nil)
+  def self.suggest_command(raw_tok, file: nil, macro: nil, junk_dir: nil)
     return 'Undefined command; check spelling or \\usepackage' if raw_tok.nil? || raw_tok.empty?
 
     cmd = raw_tok.to_s.strip.sub(/\A\\/, '')
@@ -118,7 +118,7 @@ module LaTeXErrorCatalog
     pkg = PACKAGE_COMMANDS[cmd]
     return "Command '\\#{cmd}'#{macro_ctx} requires \\usepackage{#{pkg}}" if pkg
 
-    project_macros = LaTeXMacroHarvester.harvest(file)
+    project_macros = LaTeXMacroHarvester.harvest(file, junk_dir: junk_dir)
     suggestion = find_closest_command(cmd, project_macros)
     if suggestion
       sug_pkg = project_macros.include?(suggestion) ? nil : PACKAGE_COMMANDS[suggestion]
@@ -528,7 +528,9 @@ module LaTeXErrorCatalog
       pattern: /Undefined control sequence/i,
       title: 'Undefined Control Sequence',
       token_extractor: UNDEFINED_CS_EXTRACTOR,
-      hint: ->(tok, file = nil, macro = nil) { suggest_command(tok, file: file, macro: macro) },
+      hint: lambda do |tok, file = nil, macro = nil, junk_dir = nil|
+        suggest_command(tok, file: file, macro: macro, junk_dir: junk_dir)
+      end,
       why: 'LaTeX does not recognize this macro or command name.',
       fix: 'Check for typos or include the package defining this macro in preamble.',
       doc_slug: '02_undefined_control_sequence'
@@ -1016,7 +1018,7 @@ module LaTeXErrorCatalog
     }
   ].freeze
 
-  def self.classify(err_text, err_block = [], file: nil, line: nil)
+  def self.classify(err_text, err_block = [], file: nil, line: nil, junk_dir: nil)
     text = err_text.to_s
     CATALOG.each do |entry|
       match = entry[:pattern].match(text)
@@ -1024,7 +1026,7 @@ module LaTeXErrorCatalog
 
       token = extract_token(entry, match, err_block, file: file, line: line)
       _cs, macro = (entry[:id] == :undefined_control_sequence) ? extract_undefined_cs_info(err_block) : [token, nil]
-      hint = resolve_hint(entry[:hint], token, file: file, macro: macro)
+      hint = resolve_hint(entry[:hint], token, file: file, macro: macro, junk_dir: junk_dir)
       root_line, root_col = extract_root_location(entry, token, hint, file, line, err_block: err_block)
 
       why = if entry[:id] == :undefined_control_sequence && macro
@@ -1115,13 +1117,14 @@ module LaTeXErrorCatalog
     end
   end
 
-  def self.resolve_hint(hint, token, file: nil, macro: nil)
+  def self.resolve_hint(hint, token, file: nil, macro: nil, junk_dir: nil)
     return hint.to_s unless hint.respond_to?(:call)
 
     case hint.parameters.size
     when 1 then hint.call(token)
     when 2 then hint.call(token, file)
-    else hint.call(token, file, macro)
+    when 3 then hint.call(token, file, macro)
+    else hint.call(token, file, macro, junk_dir)
     end
   end
 

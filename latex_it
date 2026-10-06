@@ -46,8 +46,11 @@ require_relative 'lib/latex_it/builder'
 require_relative 'lib/latex_it/packager'
 require_relative 'lib/latex_it/arxiv'
 require_relative 'lib/latex_it/bib_extractor'
+require_relative 'lib/latex_it/cli_targets'
 
 module LatexCLI
+  extend LatexCLITargets
+
   def self.run(argv = ARGV, prog_name = File.basename($PROGRAM_NAME))
     $stdout.sync = true
     $stderr.sync = true
@@ -357,7 +360,7 @@ module LatexCLI
   def self.add_compilation_options_target(opts, options)
     opts.separator ''
     opts.separator '  Output Management & Cleaning:'
-    opts.on('-c', '--clean', 'Clean temporary build files in junk/ (.aux, .bbl, .log) before compilation') { options[:clean] = true }
+    opts.on('-c', '--clean', 'Clean temporary build files in junk/ and regenerable root artifacts before compilation') { options[:clean] = true }
     opts.on('-C', '--clean-only', 'Clean auxiliary files in directory and exit without building') { options[:clean_only] = true }
     opts.on('--junk-dir DIR', 'Directory for temporary build artifacts (default: junk or .junk)') do |v|
       options[:junk_dir] = v
@@ -523,7 +526,7 @@ module LatexCLI
       '  -f, --force          Force compilation run (bypasses build cache)',
       '  -u, --single-pass    Single pass only (fast draft, skip bib/extra passes)',
       '  -r, --raw            Print raw compiler output (debug mode)',
-      '  -c, --clean          Clean temporary build files (junk/, .aux, .bbl)',
+      '  -c, --clean          Clean temporary build files (preserves .bbl and metadata)',
       '  -x, --explain        Display plain-English explanations for diagnostics',
       '  -B, --bib-extract    Extract cited bib entries into local .bib file',
       '  -e, --engine ENGINE  Compiler engine: x (xelatex), l (lualatex), p (pdflatex)',
@@ -732,7 +735,7 @@ module LatexCLI
     return false if options[:emacs] || ENV['INSIDE_EMACS']
     return false if ENV['TERM'] == 'dumb' || ENV['TERM'] == 'unknown'
     return false if ENV['NO_COLOR'] && !ENV['NO_COLOR'].empty?
-    return false unless $stdout.tty? && $stderr.tty?
+    return false unless $stdout.tty?
 
     osc8_capable_terminal?
   end
@@ -762,78 +765,6 @@ module LatexCLI
     end
   end
 
-  def self.execute_targets(argv, options)
-    targets = argv.empty? ? [LaTeXUtils.find_main_latex_file('.', options[:exclude_main_tex])] : argv
-    targets.each do |target|
-      if options[:meta_only]
-        process_meta_target(target, options)
-      elsif options[:arxiv]
-        process_arxiv_target(target, options)
-      elsif options[:bib_extract]
-        process_bib_extract_target(target, options)
-      else
-        process_standard_target(target, options)
-      end
-    end
-  end
-
-  def self.process_bib_extract_target(target, options)
-    builder = LatexBuilder.new(target, options)
-    exit 1 unless LaTeXBibExtractor.extract!(builder, options[:bib_extract_name])
-  end
-
-  # Every other target handler reaches a Dir.chdir into the document's
-  # directory (builder.rb, packager.rb, arxiv.rb all do it); this one did not,
-  # so `l --meta sub/paper.tex` probed junk/paper.fls and junk/paper.log in the
-  # *caller's* directory -- silently returning default page and figure counts,
-  # or worse, counts from an unrelated document that happened to be there --
-  # and wrote arxiv_paper_meta.txt next to the caller instead of the paper.
-  def self.process_meta_target(target, options)
-    Dir.chdir(File.expand_path(File.dirname(target))) do
-      write_meta_for(File.basename(target), options)
-    end
-  end
-
-  def self.write_meta_for(target, options)
-    bname = File.basename(target, '.tex')
-    pdf_path = File.file?("#{bname}.pdf") ? "#{bname}.pdf" : "junk/#{bname}.pdf"
-    fls_path = "junk/#{bname}.fls"
-    log_path = "junk/#{bname}.log"
-
-    meta = LaTeXMetaExtractor.extract(target, '.', pdf_path, fls_path, log_path, options[:comments])
-    meta_txt = LaTeXMetaExtractor.format_meta_txt(meta)
-    meta_filename = "arxiv_#{bname}_meta.txt"
-    LaTeXMetaExtractor.write_meta_file(meta_filename, meta_txt)
-
-    puts Rainbow("\n========================= Paper Metadata =========================").cyan.bright
-    puts meta_txt
-    puts Rainbow('==================================================================').cyan.bright
-    puts Rainbow("==> Wrote paper metadata to: #{meta_filename}\n").green.bright
-  end
-
-  # A submission package must never be assembled from a cached build. All three
-  # staging scanners read junk/<base>.fls and the reference PDF is taken from
-  # junk/ as well, so an up-to-date cache silently omits any figure or style
-  # added since the last real compile and compares the rebuild against a
-  # possibly days-old reference -- which \today alone is enough to make differ.
-  def self.arxiv_build_options(options)
-    options.merge(force: true)
-  end
-
-  def self.process_arxiv_target(target, options)
-    builder = LatexBuilder.new(target, arxiv_build_options(options))
-    exit 1 unless LatexArxivPackager.new(builder).package!
-  end
-
-  def self.process_standard_target(target, options)
-    builder = LatexBuilder.new(target, options)
-    exit 1 unless builder.run!
-
-    if options[:zip] || options[:verify]
-      packager = LatexPackager.new(builder)
-      exit 1 unless packager.package!
-    end
-  end
 end
 
 if __FILE__ == $PROGRAM_NAME || (File.exist?($PROGRAM_NAME) && File.identical?(__FILE__, $PROGRAM_NAME))

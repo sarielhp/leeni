@@ -97,7 +97,7 @@ module LaTeXHelpManual
     [
       'Cleaning & Output Management:',
       '  -c, --clean',
-      '      Remove temporary build artifacts in junk/ (.aux, .bbl, .log, etc.) before',
+      '      Remove temporary build artifacts in junk/ and regenerable root files before',
       '      initiating the compilation build.',
       '      Example:',
       '        l -c paper.tex',

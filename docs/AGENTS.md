@@ -19,9 +19,11 @@ This document provides architectural guidelines, core invariants, development wo
   - `flattener.rb`: TeX input tree resolution, comment stripping, and flattening.
   - `meta_extractor.rb`: Paper metadata parsing (title, authors, abstract, comments).
   - `diagnostics.rb`: LaTeX compilation log diagnostic analysis, AUCTeX error extraction, and 4-tier categorization.
-  - `builder.rb`: Compilation lifecycle manager, pass scheduler, `junk/` isolation, and lockfile protection.
+  - `builder.rb`: Compilation lifecycle manager, convergence scheduler, caching, and output finalization.
+  - `build_runtime.rb`: Locking, `junk/` workspace preparation, compiler execution, timeouts, and LaTeX passes.
   - `packager.rb`: Portable zip archive bundler (`-z`), active figure source discovery, and styles isolation.
   - `arxiv.rb`: Sanitized, flattened arXiv submission packager and sandbox verification.
+  - `cli_targets.rb`: CLI target dispatch for builds, metadata, bibliography extraction, and arXiv workflows.
 - **Workflow & Quality Tooling** (`tools/`):
   - [`tools/gate_audit_code`](tools/gate_audit_code): High-performance AST metrics auditor enforcing cognitive complexity, depth, and method sizing.
   - [`tools/bundle`](tools/bundle): Compiles modular `lib/` components into a single standalone executable.

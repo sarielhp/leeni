@@ -23,11 +23,12 @@ module LaTeXMacroHarvester
 
   @cache = {}
 
-  def self.harvest(file_path = nil)
+  def self.harvest(file_path = nil, junk_dir: nil)
     root = determine_project_root(file_path)
     return [] unless root
 
-    @cache[root] ||= scan_project(root, file_path)
+    cache_key = [root, junk_dir]
+    @cache[cache_key] ||= scan_project(root, file_path, junk_dir: junk_dir)
   end
 
   def self.clear_cache!
@@ -87,20 +88,21 @@ module LaTeXMacroHarvester
     File.exist?(base) ? base : nil
   end
 
-  def self.scan_project(root, file_path = nil)
-    files = collect_source_files(root, file_path)
+  def self.scan_project(root, file_path = nil, junk_dir: nil)
+    files = collect_source_files(root, file_path, junk_dir: junk_dir)
     macros = []
     files.each { |f| scan_file_for_macros(f, macros) }
     macros.uniq
   end
 
-  def self.collect_source_files(root, file_path = nil)
-    files = collect_fls_files(root, file_path)
+  def self.collect_source_files(root, file_path = nil, junk_dir: nil)
+    files = collect_fls_files(root, file_path, junk_dir: junk_dir)
     candidates = Dir.glob(File.join(root, '**', '*.{tex,sty,cls}'))
     collect_symlink_dir_files(root, candidates)
+    excluded = EXCLUDED_DIRS + [File.basename(junk_dir.to_s)].reject(&:empty?)
 
     candidates.reject! do |path|
-      excluded_dir?(path) || (File.file?(path) && File.size(path) > 1_000_000)
+      excluded_dir?(path, excluded) || (File.file?(path) && File.size(path) > 1_000_000)
     end
     (files + candidates).uniq[0...200]
   end
@@ -116,15 +118,17 @@ module LaTeXMacroHarvester
     nil
   end
 
-  def self.collect_fls_files(root, file_path = nil)
+  def self.collect_fls_files(root, file_path = nil, junk_dir: nil)
     fls_candidates = []
     if file_path && !file_path.to_s.strip.empty?
       stem = File.basename(file_path.to_s.strip, '.*')
-      fls_candidates << File.join(root, '.junk', "#{stem}.fls")
-      fls_candidates << File.join(root, 'junk', "#{stem}.fls")
+      artifact_dirs = junk_dir ? [junk_dir] : %w[.junk junk]
+      artifact_dirs.each { |dir| fls_candidates << File.expand_path(File.join(dir, "#{stem}.fls"), root) }
       fls_candidates << File.join(root, "#{stem}.fls")
     end
-    fls_candidates.concat(Dir.glob(File.join(root, '{junk,.junk}', '*.fls')))
+    unless junk_dir
+      fls_candidates.concat(Dir.glob(File.join(root, '{junk,.junk}', '*.fls')))
+    end
 
     files = []
     fls_candidates.uniq.each do |fls|
@@ -150,9 +154,9 @@ module LaTeXMacroHarvester
     nil
   end
 
-  def self.excluded_dir?(path)
+  def self.excluded_dir?(path, excluded = EXCLUDED_DIRS)
     parts = path.split(File::SEPARATOR)
-    (parts & EXCLUDED_DIRS).any?
+    (parts & excluded).any?
   end
 
   def self.scan_file_for_macros(file_path, macros)

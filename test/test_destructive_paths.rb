@@ -43,6 +43,9 @@ class TestDestructivePaths < Minitest::Test
         File.write('err_analysis.rb', 'user script')
         File.write('bounds.err.tex', 'user source')
         File.write('log.txt', 'user log')
+        File.write('paper.bbl', '\\bibitem{only-copy} Supplied bibliography')
+        File.write('paper.bbl.bak', '\\bibitem{backup} Previous bibliography')
+        File.write('arxiv_paper_meta.txt', 'submission metadata')
 
         LaTeXUtils.clean_directory('.', false)
 
@@ -50,6 +53,9 @@ class TestDestructivePaths < Minitest::Test
         assert_path_exists 'err_analysis.rb', "clean_directory removed a user file matching 'err_*'"
         assert_path_exists 'bounds.err.tex', "clean_directory removed a user file matching '*.err*'"
         assert_path_exists 'log.txt', 'clean_directory removed a user-authored log.txt'
+        assert_path_exists 'paper.bbl', 'clean_directory removed the only supplied bibliography'
+        assert_path_exists 'paper.bbl.bak', 'clean_directory removed a bibliography backup'
+        assert_path_exists 'arxiv_paper_meta.txt', 'clean_directory removed final submission metadata'
       end
     end
   end
@@ -59,16 +65,18 @@ class TestDestructivePaths < Minitest::Test
       Dir.chdir(dir) do
         FileUtils.mkdir_p('junk')
         File.write('junk/paper.aux', 'artifact')
-        %w[paper.aux paper.bbl paper.blg paper.log paper.out paper.toc texput.log missfont.log].each do |f|
+        %w[paper.aux paper.blg paper.log paper.out paper.toc texput.log missfont.log].each do |f|
           File.write(f, 'artifact')
         end
+        File.write('paper.bbl', '\\bibitem{preserved} Bibliography')
 
         LaTeXUtils.clean_directory('.', false)
 
         refute Dir.exist?('junk'), 'clean_directory left junk/ in place'
-        %w[paper.aux paper.bbl paper.blg paper.log paper.out paper.toc texput.log missfont.log].each do |f|
+        %w[paper.aux paper.blg paper.log paper.out paper.toc texput.log missfont.log].each do |f|
           refute_path_exists f, "clean_directory left the build artifact #{f}"
         end
+        assert_path_exists 'paper.bbl', 'clean_directory removed a non-regenerable bibliography'
       end
     end
   end

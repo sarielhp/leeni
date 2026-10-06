@@ -29,6 +29,14 @@ class LatexArxivPackager
 
   private
 
+  def junk_dir
+    @builder.junk_dir
+  end
+
+  def build_artifact(extension)
+    File.join(junk_dir, "#{@bfilename}.#{extension}")
+  end
+
   def do_package
     return false unless ensure_compiled!
 
@@ -37,31 +45,31 @@ class LatexArxivPackager
 
     Dir.mktmpdir('latex_it_arxiv_stage_') do |stage_dir|
       return false unless stage_arxiv_files(stage_dir)
-      return false unless build_arxiv_zip(stage_dir, zip_filename)
-
-      write_arxiv_metadata(meta_filename)
+      candidate = build_arxiv_zip(stage_dir, zip_filename)
+      return false unless candidate
 
       reference_pdf = arxiv_reference_pdf
       if @options[:arxiv_verify] != false
-        verified = verify_arxiv_sandbox!(zip_filename, reference_pdf)
-        return quarantine_unverified_package(zip_filename, meta_filename) unless verified
+        verified = verify_arxiv_sandbox!(candidate, reference_pdf)
+        return quarantine_unverified_package(candidate, zip_filename) unless verified
       end
 
+      metadata_candidate = metadata_candidate_path(meta_filename)
+      write_arxiv_metadata(metadata_candidate)
+      File.rename(candidate, zip_filename)
+      File.rename(metadata_candidate, meta_filename)
       file_count = count_zip_entries(zip_filename)
       announce_arxiv_completion(zip_filename, meta_filename, file_count)
       true
+    ensure
+      FileUtils.rm_f(candidate) if candidate && File.file?(candidate)
+      FileUtils.rm_f(metadata_candidate) if metadata_candidate && File.file?(metadata_candidate)
     end
   end
 
-  # The zip and the metadata file are written before verification runs, so a
-  # failed check used to leave them sitting in the project directory looking
-  # exactly like a verified pair. Renaming them makes the state visible, so a
-  # user who scrolls past the red [FAIL] -- or a script that ignores the exit
-  # code -- cannot upload a package the tool has already rejected.
-  def quarantine_unverified_package(zip_filename, meta_filename)
+  def quarantine_unverified_package(candidate, zip_filename)
     quarantined = "#{zip_filename}.unverified"
-    FileUtils.mv(zip_filename, quarantined, force: true) if File.file?(zip_filename)
-    FileUtils.rm_f(meta_filename)
+    FileUtils.mv(candidate, quarantined, force: true) if File.file?(candidate)
     warn Rainbow("[FAIL] Verification failed. Package renamed to #{quarantined} -- do not submit it.").red.bright
     false
   end
@@ -71,7 +79,7 @@ class LatexArxivPackager
     @builder.options[:no_env] = true
     return false unless @builder.run_in_current_directory!
 
-    fls_path = "junk/#{@bfilename}.fls"
+    fls_path = build_artifact('fls')
     pdf_path = arxiv_reference_pdf
     unless File.file?(fls_path) && pdf_path
       warn Rainbow('[FAIL] Pre-flight compilation did not produce a usable PDF and recorder file.').red.bright
@@ -81,7 +89,7 @@ class LatexArxivPackager
   end
 
   def arxiv_reference_pdf
-    junk_pdf = "junk/#{@bfilename}.pdf"
+    junk_pdf = build_artifact('pdf')
     return File.expand_path(junk_pdf) if File.file?(junk_pdf) && File.size(junk_pdf).positive?
 
     root_pdf = "#{@bfilename}.pdf"
@@ -109,7 +117,7 @@ class LatexArxivPackager
   end
 
   def stage_revtex4_files(stage_dir)
-    fls_path = "junk/#{@bfilename}.fls"
+    fls_path = build_artifact('fls')
     files = LaTeXCompatibility.files_used_by_fls(fls_path, @options)
     files.each do |source|
       destination = File.join(stage_dir, File.basename(source))
@@ -121,7 +129,7 @@ class LatexArxivPackager
   end
 
   def stage_bbl(stage_dir)
-    bbl_source = File.file?("#{@bfilename}.bbl") ? "#{@bfilename}.bbl" : "junk/#{@bfilename}.bbl"
+    bbl_source = File.file?("#{@bfilename}.bbl") ? "#{@bfilename}.bbl" : build_artifact('bbl')
     if File.file?(bbl_source) && LaTeXUtils.bbl_has_entries?(bbl_source)
       FileUtils.cp(bbl_source, File.join(stage_dir, "#{@bfilename}.bbl"))
     else
@@ -130,7 +138,7 @@ class LatexArxivPackager
   end
 
   def stage_active_figures(stage_dir)
-    fls_path = "junk/#{@bfilename}.fls"
+    fls_path = build_artifact('fls')
     return unless File.file?(fls_path)
 
     fls_content = LaTeXUtils.safe_read(fls_path)
@@ -151,7 +159,7 @@ class LatexArxivPackager
   end
 
   def stage_local_styles(stage_dir)
-    fls_path = "junk/#{@bfilename}.fls"
+    fls_path = build_artifact('fls')
     return unless File.file?(fls_path)
 
     fls_content = LaTeXUtils.safe_read(fls_path)
@@ -175,7 +183,7 @@ class LatexArxivPackager
 
     puts Rainbow(' -- BibLaTeX detected: bundling local distribution files for arXiv shielding...').cyan
     harvested = []
-    fls_path = "junk/#{@bfilename}.fls"
+    fls_path = build_artifact('fls')
     if File.file?(fls_path)
       content = LaTeXUtils.safe_read(fls_path)
       content.scan(/^INPUT\s+(\S*\/biblatex\/\S+\.(?:sty|cfg|bbx|cbx|lbx|def))$/).flatten.each do |f|
@@ -207,7 +215,7 @@ class LatexArxivPackager
   end
 
   def detect_biblatex?
-    return true if File.file?("junk/#{@bfilename}.bcf")
+    return true if File.file?(build_artifact('bcf'))
 
     main_content = LaTeXUtils.safe_read(@filename)
     main_content.include?('biblatex')
@@ -249,21 +257,34 @@ class LatexArxivPackager
       return false
     end
 
-    zip_abs = File.expand_path(zip_filename)
-    FileUtils.rm_f(zip_abs)
+    candidate = archive_candidate_path(zip_filename)
+    FileUtils.rm_f(candidate)
     zip_out, status = Dir.chdir(stage_dir) do
-      Open3.capture2e('zip', '-q', '-r', zip_abs, '.')
+      Open3.capture2e('zip', '-q', '-r', candidate, '.')
     end
-    return true if status.success? && File.file?(zip_abs) && File.size(zip_abs).positive?
+    valid = status.success? && File.file?(candidate) && File.size(candidate).positive?
+    return candidate if valid
 
     warn Rainbow("[FAIL] Failed to create #{zip_filename}: #{zip_out}").red.bright
     false
+  ensure
+    FileUtils.rm_f(candidate) if candidate && !valid && File.file?(candidate)
+  end
+
+  def archive_candidate_path(zip_filename)
+    absolute = File.expand_path(zip_filename)
+    File.join(File.dirname(absolute), ".#{File.basename(absolute, '.zip')}.tmp.#{Process.pid}.zip")
+  end
+
+  def metadata_candidate_path(meta_filename)
+    absolute = File.expand_path(meta_filename)
+    File.join(File.dirname(absolute), ".#{File.basename(absolute, '.txt')}.tmp.#{Process.pid}.txt")
   end
 
   def write_arxiv_metadata(meta_filename)
-    pdf_path = File.file?("#{@bfilename}.pdf") ? "#{@bfilename}.pdf" : "junk/#{@bfilename}.pdf"
-    fls_path = "junk/#{@bfilename}.fls"
-    log_path = "junk/#{@bfilename}.log"
+    pdf_path = File.file?("#{@bfilename}.pdf") ? "#{@bfilename}.pdf" : build_artifact('pdf')
+    fls_path = build_artifact('fls')
+    log_path = build_artifact('log')
     comments = @options[:comments]
 
     meta = LaTeXMetaExtractor.extract(@filename, '.', pdf_path, fls_path, log_path, comments)

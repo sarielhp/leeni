@@ -33,14 +33,13 @@ module LaTeXUtils
   # `log.txt`, `err_*`, `*.err*` -- were removed for that reason; the tool's own
   # copies of those are `junk/log.txt`, `junk/log.txt.1` and `junk/err_<engine>`.
   JUNK_PATTERNS = [
-    '*.{aux,bbl,bbl.bak,blg,bcf,run.xml}',
+    '*.{aux,blg,bcf,run.xml}',
     '*.{log,out,toc,lof,lot,thm,idx,ind,ilg}',
     '*.{nav,snm,vrb,synctex.gz,synctex,dvi,ps}',
     '*.{fls,fdb_latexmk,rel,vtc,axp,dpth,md5,soc,build_state.json}',
     '.build_state.json',
     'texput.log', 'missfont.log', 'mfput.log',
-    'flycheck_*.tex',
-    'arxiv_*_meta.txt'
+    'flycheck_*.tex'
   ].freeze
 
   TEX_ENV_VARS = %w[
@@ -450,7 +449,7 @@ module LaTeXUtils
     lines << '  3. Diagnostics & Error Handling:'
     lines << '     l -x                           Display plain-English diagnostic explanations & fixes'
     lines << '     l -a                           Show all diagnostics (including suppressed Whatevers)'
-    lines << '     l -c                           Clean build artifacts (junk/, .aux, .bbl) before building'
+    lines << '     l -c                           Clean regenerable artifacts; preserve .bbl and metadata'
     lines << '     l -C                           Clean directory artifacts and exit without building'
     lines << '     l -s                           Quiet score mode (prints error/alert/warning counts)'
     lines << '     l -W                           Treat compilation warnings as fatal errors'

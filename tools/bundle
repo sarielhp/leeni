@@ -39,10 +39,12 @@ module LatexBundler
     presenters.rb
     diagnostics.rb
     bib_manager.rb
+    build_runtime.rb
     builder.rb
     bib_extractor.rb
     packager.rb
     arxiv.rb
+    cli_targets.rb
   ].freeze
 
   STD_REQUIRES = %w[

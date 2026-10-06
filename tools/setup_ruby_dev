@@ -7,7 +7,7 @@
 # Environment validator and installer for Ruby development tooling:
 # - Ruby Gems: rubocop, ruby-lsp, rainbow, minitest
 # - CLI Tools: ast-grep (sg), repomix, rtk, pdftotext
-# - PATH validation for user gem and local binary directories
+# - PATH validation for local binary directories
 # ==============================================================================
 
 require 'fileutils'
@@ -21,10 +21,6 @@ module RubyDevSetup
   CYAN   = "\e[36m"
   BOLD   = "\e[1m"
   RESET  = "\e[0m"
-
-  def self.user_gem_bindir
-    @user_gem_bindir ||= File.join(Gem.user_dir, 'bin')
-  end
 
   def self.local_bindir
     @local_bindir ||= File.expand_path('~/.local/bin')
@@ -70,7 +66,6 @@ module RubyDevSetup
     paths = ENV['PATH'].to_s.split(File::PATH_SEPARATOR)
 
     dirs = [
-      ['User Gem bin', user_gem_bindir],
       ['User Local bin', local_bindir],
       ['Cargo bin', cargo_bindir]
     ]
@@ -87,7 +82,7 @@ module RubyDevSetup
 
     unless all_ok
       puts "  #{YELLOW}Recommendation: Add the missing paths to your ~/.bashrc or ~/.zshrc:#{RESET}"
-      puts "    export PATH=\"#{user_gem_bindir}:#{local_bindir}:#{cargo_bindir}:$PATH\""
+      puts "    export PATH=\"#{local_bindir}:#{cargo_bindir}:$PATH\""
     end
     puts ''
   end
@@ -102,7 +97,7 @@ module RubyDevSetup
 
     def self.verify_and_install(check_only: false, verbose: false)
       puts "#{BOLD}==> Checking Ruby Gems#{RESET}"
-      FileUtils.mkdir_p(RubyDevSetup.user_gem_bindir)
+      FileUtils.mkdir_p(RubyDevSetup.local_bindir)
 
       GEM_SPECS.each do |spec|
         name = spec[:name]
@@ -125,14 +120,14 @@ module RubyDevSetup
 
     def self.install_gem(name, bin, desc, verbose: false)
       print "  [..] Installing #{BOLD}#{name}#{RESET} (#{desc})... "
-      cmd = ['gem', 'install', '--user-install', '--bindir', RubyDevSetup.user_gem_bindir, name]
+      cmd = ['gem', 'install', '--user-install', '--bindir', RubyDevSetup.local_bindir, name]
       success = RubyDevSetup.run_cmd(cmd, verbose: verbose)
 
       if success && bin
         # Ensure binstub is generated
-        binstub_path = File.join(RubyDevSetup.user_gem_bindir, bin)
+        binstub_path = File.join(RubyDevSetup.local_bindir, bin)
         unless File.exist?(binstub_path)
-          pristine_cmd = ['gem', 'pristine', name, '--bindir', RubyDevSetup.user_gem_bindir]
+          pristine_cmd = ['gem', 'pristine', name, '--bindir', RubyDevSetup.local_bindir]
           RubyDevSetup.run_cmd(pristine_cmd, verbose: verbose)
         end
       end

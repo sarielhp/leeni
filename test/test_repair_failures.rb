@@ -148,11 +148,14 @@ class TestRepairFailures < Minitest::Test
   def verify_archive_command_failure(klass)
     with_project do |builder|
       File.write('paper.bbl', '\bibitem{old} Previous')
+      archive = klass == LatexPackager ? 'paper.zip' : 'arxiv_paper.zip'
+      File.write(archive, 'known-good archive')
       packager = klass.new(builder)
       out, err = capture_archive_failure(packager, builder)
       refute_includes out, 'Created portable zip'
       refute_includes out, 'Preparation Complete'
       assert_includes err, 'injected zip failure'
+      assert_equal 'known-good archive', File.read(archive)
     end
   end
 
@@ -406,18 +409,60 @@ class TestRepairFailures < Minitest::Test
     end
   end
 
-  def test_packager_removes_zip_on_failed_verification
+  def test_packager_preserves_previous_zip_on_failed_verification
     with_project do |builder|
       builder.options[:verify] = true
+      File.write('paper.zip', 'known-good archive')
       packager = LatexPackager.new(builder)
       def packager.collect_fls_dependencies(_fls); { figures: [], styles: [], tex_inputs: [] }; end
       def packager.discover_figure_sources(_figs); []; end
-      def packager.stage_and_create_zip(zip_name, *_a); File.write(zip_name, 'dummy'); true; end
+      def packager.stage_and_create_zip(zip_name, *_args)
+        candidate = send(:archive_candidate_path, zip_name)
+        File.write(candidate, 'unverified candidate')
+        candidate
+      end
       def packager.verify_archive!(_zip); false; end
 
       _out, err = capture_io { refute packager.send(:do_package) }
-      refute File.exist?('paper.zip')
-      assert_includes err, 'Removed unverified paper.zip'
+      assert_equal 'known-good archive', File.read('paper.zip')
+      assert_empty Dir.glob('.*paper*.tmp.*.zip')
+      assert_includes err, 'Preserved existing paper.zip'
+    end
+  end
+
+  def test_arxiv_quarantine_preserves_previous_verified_archive
+    with_project do |builder|
+      packager = LatexArxivPackager.new(builder)
+      candidate = '.arxiv_paper.tmp.123.zip'
+      File.write('arxiv_paper.zip', 'known-good archive')
+      File.write(candidate, 'failed candidate')
+
+      _out, err = capture_io do
+        refute packager.send(:quarantine_unverified_package, candidate, 'arxiv_paper.zip')
+      end
+
+      assert_equal 'known-good archive', File.read('arxiv_paper.zip')
+      assert_equal 'failed candidate', File.read('arxiv_paper.zip.unverified')
+      assert_includes err, 'do not submit it'
+    end
+  end
+
+  def test_process_capture_preserves_output_when_descendant_holds_pipe
+    with_project do |builder|
+      child = 'sleep 3'
+      script = <<~RUBY
+        STDOUT.sync = true
+        Process.spawn(RbConfig.ruby, '-e', #{child.inspect}, out: STDOUT, err: STDERR)
+        puts 'diagnostic before parent exit'
+        exit 7
+      RUBY
+
+      output, status = builder.send(
+        :capture_with_timeout, {}, [RbConfig.ruby, '-rrbconfig', '-e', script], 10
+      )
+
+      assert_equal 7, status.exitstatus
+      assert_includes output, 'diagnostic before parent exit'
     end
   end
 

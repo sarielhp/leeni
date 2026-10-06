@@ -161,7 +161,7 @@ class LaTeXBibManager
     has_entries = LaTeXUtils.bbl_has_entries?(fnbbl)
     if LaTeXUtils.bib_fatal_error?(tool, bib_out, status_ok)
       restore_bibliography(fnbbl, previous)
-      warn "\nBibliography process failed or produced no valid entries. See #{biberr}."
+      warn "\nBibliography process failed or produced no valid entries.#{bibliography_failure_detail(bib_out)} See #{biberr}."
       @bib_fatal = true
       return false
     end
@@ -174,6 +174,13 @@ class LaTeXBibManager
 
     @builder.update_target_file(fnbbl, root_bbl) if options[:trace] || File.exist?(root_bbl)
     true
+  end
+
+  def bibliography_failure_detail(output)
+    detail = output.to_s.each_line.find do |line|
+      line.match?(/I couldn't open database file|(?:ERROR|FATAL)\s+-/i)
+    end
+    detail ? " #{detail.strip}." : ''
   end
 
   def invoke_bibliography_command(tool, fnbbl, previous)

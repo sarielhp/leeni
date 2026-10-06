@@ -278,7 +278,10 @@ class TestCompileMode < Minitest::Test
         \\end{document}
       TEX
 
-      env = { 'KITTY_WINDOW_ID' => '1', 'TERM' => 'xterm-kitty', 'LATEX_IT_THEME' => 'blush' }
+      env = {
+        'KITTY_WINDOW_ID' => '1', 'TERM' => 'xterm-kitty',
+        'LATEX_IT_THEME' => 'blush', 'NO_COLOR' => nil
+      }
       cmd = "cd #{dir} && #{@bin_path} --compile doc.tex"
       output = String.new
       require 'pty'

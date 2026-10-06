@@ -70,6 +70,7 @@ my_book/
 ### Root `.justfile`:
 Create `.justfile` in the project root:
 
+{% raw %}
 ```just
 # Default task: auto-detect directory and build appropriate target
 default:
@@ -108,6 +109,7 @@ clean-all:
     l -C
     rm -rf chapters/*/junk
 ```
+{% endraw %}
 
 ---
 

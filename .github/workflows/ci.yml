@@ -28,6 +28,9 @@ jobs:
       - name: Install test dependencies
         run: gem install 'minitest:< 6' rainbow --no-document
 
+      - name: Install RuboCop
+        run: gem install rubocop -v 1.91.0 --no-document
+
       - name: Verify bundle integrity & syntax
         run: ./tools/bundle --check
 

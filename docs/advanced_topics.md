@@ -39,7 +39,7 @@ l -Z paper.tex
 
 ### Style File Organization (`--[no-]styles-inject`)
 - **Default (`false`)**: Harvested `.sty` and `.cls` files are placed in the archive root for universal journal submission portal compatibility.
-- **Opt-in (`--styles-inject`)**: Harvested styles are placed into a `styles/` subfolder, and `\def\input@path{{styles/}{./}}` is prepended to the packaged `.tex` file.
+- **Opt-in (`--styles-inject`)**: Harvested styles are placed into a `styles/` subfolder, and {% raw %}`\def\input@path{{styles/}{./}}`{% endraw %} is prepended to the packaged `.tex` file.
 
 ### Packaging Modes Comparison
 

@@ -9,7 +9,7 @@ class TestCLISpellings < Minitest::Test
   BIN = File.expand_path('../leeni', __dir__)
 
   def test_long_option_prefixes_and_omitted_dashes
-    canonical = %w[zip-alone single-pass no-env no-styles-inject update-if-changed arxiv-visual-verify config-show]
+    canonical = %w[zip-alone single-pass no-env no-styles-inject update-if-changed arxiv-visual-verify config-show errors-only]
     canonical.each do |name|
       %w[- --].each do |prefix|
         [name, name.delete('-')].each do |spelling|
@@ -67,6 +67,22 @@ class TestCLISpellings < Minitest::Test
     assert_empty argv
     %i[zip verify force].each { |key| assert_equal true, options[key] }
     assert_equal 3, options[:passes]
+  end
+
+  def test_errors_only_overrides_configured_werror_and_all
+    options = LatexCLI.build_default_options({ 'werror' => true }, 'l', [])
+    LatexCLI.build_option_parser(options).parse!(%w[--all --errors-only])
+    %i[suppress_alerts suppress_warnings suppress_whatevers].each do |key|
+      assert_equal true, options[key]
+    end
+    assert_equal false, options[:all]
+    assert_equal false, options[:werror]
+
+    LatexCLI.build_option_parser(options).parse!(%w[--all --werror])
+    %i[suppress_alerts suppress_warnings suppress_whatevers].each do |key|
+      assert_equal false, options[key]
+    end
+    assert_equal true, options[:werror]
   end
 
   def test_packaging_spelling_variants_harvest_extra_files

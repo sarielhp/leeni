@@ -26,6 +26,7 @@ All long options accept either `-` or `--` and allow internal dashes to be omitt
 | `-x`, `--explain` | Diagnostics | Display plain-English boxed explanations and fixes. |
 | `-a`, `--all` | Diagnostics | Show all diagnostics across all tiers (including Whatevers). |
 | `-W`, `--werror` | Diagnostics | Treat compilation warnings as fatal errors. |
+| `--errors-only` | Diagnostics | Suppress alerts, warnings and Whatevers; fail only on real errors. Disables configured `werror`; with `--all` or `--werror`, the last flag wins. |
 | `-v`, `--verbose` | Diagnostics | Show raw overfull hbox snippet text and resolution steps. |
 | `-r`, `--raw` | Diagnostics | Print raw, unfiltered compiler stdout/stderr. |
 | `--trace` | Diagnostics | Print exact external subprocess commands and environment. |

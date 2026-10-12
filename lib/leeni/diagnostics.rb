@@ -2555,7 +2555,10 @@ module LaTeXDiagnostics
     wrn_records = reg_warns.map { |w| normalize_diagnostic(w, 'warnings') }
     wht_records = what_items.map { |wh| normalize_diagnostic(wh, 'whatevers') }
 
-    all_records = err_records + alt_records + wrn_records + wht_records
+    all_records = err_records
+    all_records += alt_records unless tier_suppressed?(:alerts)
+    all_records += wrn_records unless tier_suppressed?(:warnings)
+    all_records += wht_records unless @options[:suppress_whatevers] == true
     pdf_file = "#{@bfilename}.pdf"
     result = LaTeXDiagnosticResult.new(
       success: !failed,

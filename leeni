@@ -455,6 +455,10 @@ module LatexCLI
       options[:werror] = true
       options[:explicit_werror] = true
     end
+    opts.on('--errors-only', 'Suppress alerts, warnings and Whatevers; only errors cause diagnostic failure') do
+      options.merge!(suppress_alerts: true, suppress_warnings: true, suppress_whatevers: true,
+                     all: false, werror: false, explicit_werror: true)
+    end
     opts.on('-s', '--score', 'Quiet mode: suppress stdout and print only numeric error/alert/warning counts') { options[:score] = true }
     opts.on('-v', '--verbose', 'Verbose output mode (show raw overfull hbox snippet text and resolution steps)') { options[:verbose] = true }
     opts.on('--trace', 'Print exact external subprocess commands, working directory, and environment overrides') do

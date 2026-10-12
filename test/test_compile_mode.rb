@@ -63,6 +63,12 @@ class TestCompileMode < Minitest::Test
       refute_includes out, '── bad.tex'
       refute_includes out, 'Errors:'
       refute_includes out, 'Latex compilation failed'
+
+      out_errors, status_errors = Open3.capture2e(
+        @bin_path, '--compile', '--no-color', '--errors-only', 'bad.tex', chdir: dir
+      )
+      assert_equal 1, status_errors.exitstatus, out_errors
+      assert_includes out_errors, 'error: undefined control sequence'
     end
   end
 
@@ -94,6 +100,16 @@ class TestCompileMode < Minitest::Test
       refute_match(/\.\z/, warn_line)
       assert_match(%r{\e\]8;;file://[^\e]*warn\.tex#3\e\\}, out)
       assert_match(%r{\e\]8;;file://[^\e]*warn\.tex#4\e\\}, out)
+
+      File.write(File.join(dir, '.l.jsonc'), '{"werror": true}')
+      %w[--compile --agent --json].each do |mode|
+        filtered, filtered_status = Open3.capture2e(
+          @bin_path, mode, '--no-color', '--errors-only', '-u', 'warn.tex', chdir: dir
+        )
+        assert_equal 0, filtered_status.exitstatus, filtered
+        refute_includes filtered, '80.00pt too wide'
+        refute_includes filtered, 'nonexistent_ref'
+      end
     end
   end
 

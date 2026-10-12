@@ -91,7 +91,9 @@ module Leeni
       end
 
       # 3. Suppress all diagnostics if clean (no alerts or warnings)
-      active_warnings = alerts + warnings
+      active_warnings = (@options[:suppress_alerts] ? [] : alerts) +
+                        (@options[:suppress_warnings] ? [] : warnings)
+      whatevers = [] if @options[:suppress_whatevers]
       return if active_warnings.empty? && (!@options[:all] || whatevers.empty?)
 
       # 4. Render folded warnings and alerts

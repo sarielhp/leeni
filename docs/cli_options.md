@@ -4,6 +4,18 @@ This document provides a complete reference for all command-line flags and optio
 
 All long options accept either `-` or `--` and allow internal dashes to be omitted. For example, `--zip-alone`, `-zip-alone`, `--zipalone`, and `-zipalone` are equivalent; so are `--no-styles-inject` and `-nostylesinject`. Option values keep their original spelling, including values after `=`. Single-letter options and grouped short flags such as `-zt` still work. A complete recognized long name takes precedence over a short-flag group. Spellings after the `--` separator are treated as filenames.
 
+## Browse this reference
+
+- [Quick reference](#quick-reference-summary)
+- [Building and convergence](#building)
+- [Cleaning and cache](#cleaning)
+- [Diagnostics](#diagnostics)
+- [Paper packaging](#packaging)
+- [arXiv submission](#arxiv)
+- [Environment and configuration](#configuration)
+- [Help and information](#help)
+- [Shortcut commands](#shortcuts)
+
 ---
 
 ## Quick Reference Summary
@@ -20,9 +32,9 @@ All long options accept either `-` or `--` and allow internal dashes to be omitt
 | `--timeout SEC` | Build | Maximum timeout allowed per compiler pass (default: 180s). |
 | `-T`, `--time` | Build | Show execution wall-clock time breakdown per pass. |
 | `--update-if-changed` | Build | Only replace target PDF if extracted text changed (`pdftotext`). |
-| `-c`, `--clean` | Cleaning | Clean temporary build files in `junk/` before compiling. |
-| `-C`, `--clean-only` | Cleaning | Clean auxiliary files in directory and exit without compiling. |
-| `--junk-dir DIR` | Cleaning | Directory for temporary build artifacts (default: `junk`). |
+| `-c`, `--clean` | Cleaning | Clean the project cache and regenerable root files before compiling. |
+| `-C`, `--clean-only` | Cleaning | Clean the project cache and root auxiliary files, then exit. |
+| `--junk-dir DIR` | Cleaning | Override the XDG cache build directory. |
 | `-x`, `--explain` | Diagnostics | Display plain-English boxed explanations and fixes. |
 | `-a`, `--all` | Diagnostics | Show all diagnostics across all tiers (including Whatevers). |
 | `-W`, `--werror` | Diagnostics | Treat compilation warnings as fatal errors. |
@@ -48,6 +60,7 @@ All long options accept either `-` or `--` and allow internal dashes to be omitt
 | `--config-init` | Config | Create a local `.l.jsonc` configuration template in current directory. |
 | `--config-show` | Config | Show active configuration sources and resolved settings. |
 | `--config-save` | Config | Save specified CLI options to configuration file. |
+| `--config-unset KEY` | Config | Remove a saved setting from local or global configuration. |
 | `--vscode-init` | Config | Create VS Code `tasks.json` and `settings.json` in `.vscode/`. |
 | `--gitignore-init` | Config | Create or add standard LaTeX & `junk/` rules to `.gitignore`. |
 | `-m`, `--main` | Info | Print detected main LaTeX file and exit. |
@@ -56,10 +69,10 @@ All long options accept either `-` or `--` and allow internal dashes to be omitt
 
 ---
 
-## 1. Compilation & Convergence Options
+## 1. Compilation & Convergence Options {#building}
 
 ### `-f`, `--force`
-Bypasses `junk/.build_state.json` and forces the first LaTeX pass to run unconditionally. Subsequent passes and BibTeX will only run if required for convergence.
+Bypasses `.build_state.json` in the project cache and forces the first LaTeX pass to run unconditionally. Subsequent passes and BibTeX will only run if required for convergence.
 ```bash
 l -f paper.tex
 ```
@@ -111,29 +124,29 @@ l -T paper.tex
 
 ---
 
-## 2. Cleaning & Workspace Isolation
+## 2. Cleaning & Workspace Isolation {#cleaning}
 
 ### `-c`, `--clean`
-Wipes the `junk/` directory before starting compilation, ensuring a 100% clean rebuild without leftover auxiliary state.
+Wipes the project build cache, legacy `junk/` and `.junk/` directories, and regenerable root auxiliary files before compilation.
 ```bash
 l -c paper.tex
 ```
 
 ### `-C`, `--clean-only`
-Removes temporary auxiliary files (`.aux`, `.log`, `.bbl`, `.fls`, `.toc`, etc.) from the current directory and `junk/`, then exits immediately without compiling.
+Removes the selected project's build cache, legacy `junk/` and `.junk/` directories, and regenerable root auxiliary files (`.aux`, `.log`, `.fls`, `.toc`, etc.). Final PDFs and `.bbl` files are preserved.
 ```bash
 l -C
 ```
 
 ### `--junk-dir DIR`
-Specifies the directory where intermediate build artifacts are isolated. Defaults to `junk` (or auto-detects `.junk` if present).
+Specifies the directory where intermediate build artifacts are isolated. The default is a per-project directory under `$XDG_CACHE_HOME/leeni/projects/` (falling back to `~/.cache`). Set `--junk-dir junk` for the former project-local layout.
 ```bash
 l --junk-dir=.build paper.tex
 ```
 
 ---
 
-## 3. Diagnostics & Error Filtering
+## 3. Diagnostics & Error Filtering {#diagnostics}
 
 ### `-x`, `--explain`
 Renders formatted, plain-English explanation boxes for TeX errors and common warnings, complete with root causes and actionable fixes.
@@ -200,7 +213,7 @@ l --json paper.tex
 
 ---
 
-## 4. Paper Packaging & Portability
+## 4. Paper Packaging & Portability {#packaging}
 
 ### `-z`, `--zip`
 Creates a self-contained portable `.zip` archive containing the paper, active figures, styles, and compiled `.bbl` without system TeX Live packages.
@@ -244,7 +257,7 @@ l -B --bib-name=local_refs.bib paper.tex
 
 ---
 
-## 5. arXiv Submission
+## 5. arXiv Submission {#arxiv}
 
 ### `--arxiv`
 Generates a submission-ready arXiv package: inlines TeX files, strips private comments, shields local biblatex packages, and verifies compilation in an isolated sandbox.
@@ -260,7 +273,7 @@ l --meta paper.tex
 
 ---
 
-## 6. Environment & Configuration
+## 6. Environment & Configuration {#configuration}
 
 ### `--no-env`
 Also accepts `-noenv`, `--noenv`, and `-no-env`.
@@ -301,6 +314,12 @@ Persists CLI options passed on the command line into `.l.jsonc` (or global confi
 l -e lualatex --update-if-changed --config-save
 ```
 
+### `--config-unset KEY`
+Removes a saved setting from `.l.jsonc`, or from the global configuration with `--global`, then exits. Removing `junk_dir` restores the XDG cache default unless another configuration scope sets it.
+```bash
+l --config-unset junk_dir --global
+```
+
 ### `--vscode-init`
 Generates `.vscode/tasks.json` and `settings.json` configured for `leeni` problem matching and build tasks.
 ```bash
@@ -315,7 +334,7 @@ l --gitignore-init
 
 ---
 
-## 7. Help & Information
+## 7. Help & Information {#help}
 
 ### `-m`, `--main`
 Detects and prints the main `.tex` document in the current directory using heuristics and exits immediately.
@@ -337,7 +356,7 @@ l -H
 
 ---
 
-## 8. Symlink Shortcuts & Personalities
+## 8. Symlink Shortcuts & Personalities {#shortcuts}
 
 When installed via `tools/install` (or manually symlinked), `leeni` inspects `$PROGRAM_NAME` to automatically adapt its default behavior based on the command invoked:
 

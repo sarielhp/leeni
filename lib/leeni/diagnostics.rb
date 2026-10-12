@@ -33,7 +33,7 @@ module LaTeXDiagnostics
   # after each Overfull \hbox, so the document's own prose reaches this log
   # verbatim: an unanchored `include?('Error:')` made a paper that discusses
   # error messages fail its own successful build, and the abort happens before
-  # the PDF is copied out of junk/, so the user got no output and no
+  # the PDF is copied out of the build directory, so the user got no output and no
   # explanation. 'WARN - ' was dropped entirely -- that is biber's output
   # format, which never appears in a LaTeX terminal log.
   def count_errors_in_log(st, loga)

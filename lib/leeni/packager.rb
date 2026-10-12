@@ -77,6 +77,8 @@ class LatexPackager
 
       path = line.sub(/^INPUT\s+/, '').strip
       next if path.empty? || path.start_with?("#{junk_dir}/") || path.start_with?('junk/') || path.start_with?('.junk/') || system_texmf_file?(path)
+      workspace_abs = File.expand_path(junk_dir)
+      next if File.expand_path(path).start_with?(workspace_abs + File::SEPARATOR)
 
       clean_path = normalize_dep_path(path)
       next if clean_path == @filename || clean_path == "#{@bfilename}.pdf"

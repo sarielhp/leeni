@@ -18,7 +18,7 @@ class TestConvergenceLoop < Minitest::Test
       Dir.chdir(dir) do
         FileUtils.mkdir_p('junk')
         File.write('paper.tex', "\\documentclass{article}\n\\begin{document}\nx\n\\end{document}\n")
-        yield LatexBuilder.new('paper.tex', { engine: 'xelatex', passes: 3, lock: false, bib: nil }.merge(opts))
+        yield LatexBuilder.new('paper.tex', { engine: 'xelatex', passes: 3, lock: false, bib: nil, junk_dir: 'junk' }.merge(opts))
       end
     end
   end

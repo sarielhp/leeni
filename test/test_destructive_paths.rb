@@ -81,6 +81,52 @@ class TestDestructivePaths < Minitest::Test
     end
   end
 
+  def test_clean_only_removes_external_project_cache_and_manual_auxiliaries
+    Dir.mktmpdir('leeni_clean_external') do |base|
+      project = File.join(base, 'project')
+      cache_home = File.join(base, 'cache-home')
+      FileUtils.mkdir_p(project)
+      original = ENV['XDG_CACHE_HOME']
+      ENV['XDG_CACHE_HOME'] = cache_home
+      cache = LeeniBuildWorkspace.cache_dir(project)
+      FileUtils.mkdir_p(cache)
+      File.write(File.join(cache, '.build_state.json'), '{}')
+      File.write(File.join(project, 'paper.aux'), 'manual compiler output')
+      File.write(File.join(project, 'paper.bbl'), 'bibliography')
+      File.write(File.join(project, 'paper.pdf'), 'final PDF')
+
+      _out, status = Open3.capture2e({ 'XDG_CACHE_HOME' => cache_home }, BIN, '-C', project, chdir: base)
+      assert status.success?
+      refute File.exist?(cache)
+      refute File.exist?(File.join(project, 'paper.aux'))
+      assert File.file?(File.join(project, 'paper.bbl'))
+      assert File.file?(File.join(project, 'paper.pdf'))
+    ensure
+      ENV['XDG_CACHE_HOME'] = original
+    end
+  end
+
+  def test_clean_directory_removes_only_marked_custom_workspace
+    Dir.mktmpdir('leeni_clean_custom') do |base|
+      project = File.join(base, 'project')
+      workspace = File.join(base, 'workspace')
+      unrelated = File.join(base, 'unrelated')
+      FileUtils.mkdir_p([project, unrelated])
+      File.write(File.join(unrelated, 'keep.txt'), 'user data')
+
+      Dir.chdir(project) do
+        builder = LatexBuilder.new('paper.tex', build_options.merge(junk_dir: workspace))
+        builder.send(:junk_dir_create)
+        File.write(File.join(workspace, 'paper.aux'), 'artifact')
+        LaTeXUtils.clean_directory('.', false, workspace_dir: workspace)
+        LaTeXUtils.clean_directory('.', false, workspace_dir: unrelated)
+      end
+
+      refute File.exist?(workspace)
+      assert File.file?(File.join(unrelated, 'keep.txt'))
+    end
+  end
+
   def test_directory_argument_rejects_a_path_that_does_not_exist
     Dir.mktmpdir('leeni_target_test') do |dir|
       Dir.chdir(dir) do

@@ -175,7 +175,7 @@ class TestArxivSupport < Minitest::Test
       FLS
       File.write(File.join(dir, "junk", "paper.fls"), fls_content)
 
-      builder = LatexBuilder.new("paper.tex", {})
+      builder = LatexBuilder.new("paper.tex", { junk_dir: 'junk' })
       packager = LatexArxivPackager.new(builder, { arxiv_verify: false })
 
       Dir.chdir(dir) do
@@ -218,7 +218,7 @@ class TestArxivSupport < Minitest::Test
         File.write('figs/unrecorded.eps', 'DO-NOT-COPY')
         File.write('junk/paper.fls', "INPUT ./figs/nested/plot.EPS\n")
 
-        builder = LatexBuilder.new('paper.tex', {})
+        builder = LatexBuilder.new('paper.tex', { junk_dir: 'junk' })
         packager = LatexArxivPackager.new(builder)
         stage = Dir.mktmpdir('arxiv_stage_')
         begin

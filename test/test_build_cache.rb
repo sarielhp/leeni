@@ -15,7 +15,7 @@ load File.expand_path('../leeni', __dir__)
 # it fails to watch produces a silently stale PDF and an "up-to-date" message.
 class TestBuildCache < Minitest::Test
   def options(extra = {})
-    { engine: 'xelatex', passes: 3, lock: false, bib: nil }.merge(extra)
+    { engine: 'xelatex', passes: 3, lock: false, bib: nil, junk_dir: 'junk' }.merge(extra)
   end
 
   # Builds a project that is genuinely up to date, with a .bib in `bib_subdir`.
@@ -315,7 +315,7 @@ class TestBuildCache < Minitest::Test
       out, status = Open3.capture2e(bin, '--no-color', 'doc.tex', chdir: dir)
       assert_equal 0, status.exitstatus, "Expected exit 0. Output: #{out}"
       assert File.file?(File.join(dir, 'doc.pdf'))
-      assert File.file?(File.join(dir, 'junk', '.build_state.json')), 'Build state should be saved'
+      assert File.file?(File.join(LeeniBuildWorkspace.cache_dir(dir), '.build_state.json')), 'Build state should be saved'
 
       out2, status2 = Open3.capture2e(bin, '--no-color', 'doc.tex', chdir: dir)
       assert_equal 0, status2.exitstatus

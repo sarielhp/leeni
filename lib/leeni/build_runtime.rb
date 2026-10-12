@@ -110,24 +110,29 @@ module LatexBuildRuntime
 
   def junk_dir_create
     dir = junk_dir
-    FileUtils.mkdir_p(File.join(dir, dir))
+    FileUtils.mkdir_p(dir, mode: 0o700)
+    FileUtils.mkdir_p(File.join(dir, File.basename(dir)), mode: 0o700) unless dir.start_with?(File::SEPARATOR)
+    File.write(File.join(dir, '.leeni_workspace'), LeeniBuildWorkspace.project_root)
     target_subdirs = (@options && @options[:junk_subdirs]) || LaTeXUtils::DEFAULT_JUNK_SUBDIRS
-    target_subdirs.each { |subdir| FileUtils.mkdir_p(File.join(dir, subdir)) }
+    target_subdirs.each { |subdir| FileUtils.mkdir_p(File.join(dir, subdir), mode: 0o700) }
     mirror_project_subdirs_to_junk if @options.nil? || @options[:auto_mirror_subdirs] != false
   end
 
   def mirror_project_subdirs_to_junk
     dir = junk_dir
+    project_root = File.expand_path('.')
+    workspace_abs = File.expand_path(dir)
+    workspace_child = workspace_abs.delete_prefix(project_root + File::SEPARATOR).split(File::SEPARATOR).first
     Dir.glob('*/').each do |entry|
       clean_dir = entry.chomp('/')
-      next if clean_dir == dir || clean_dir.start_with?('junk', '.', 'backup')
+      next if clean_dir == workspace_child || clean_dir.start_with?('junk', '.', 'backup')
 
-      FileUtils.mkdir_p(File.join(dir, clean_dir))
+      FileUtils.mkdir_p(File.join(dir, clean_dir), mode: 0o700)
     end
   end
 
   def deep_clean
-    LaTeXUtils.clean_directory('.', true)
+    LaTeXUtils.clean_directory('.', true, workspace_dir: @junk_dir)
   end
 
   def paper_cleanup

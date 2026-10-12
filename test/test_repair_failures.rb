@@ -22,7 +22,7 @@ class TestRepairFailures < Minitest::Test
         File.write('paper.pdf', 'Previous PDF')
         File.write('junk/paper.pdf', 'Previous PDF')
         File.write('junk/paper.fls', "INPUT paper.tex\n")
-        yield LatexBuilder.new('paper.tex', passes: 3)
+        yield LatexBuilder.new('paper.tex', passes: 3, junk_dir: 'junk')
       end
     end
   end

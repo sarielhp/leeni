@@ -162,7 +162,7 @@ LATEXOPTS="-shell-escape -synctex=1" l paper.tex
 
 ## 6. Concurrency & Process Locking (`--lock` / `--no-lock`)
 
-When using editor extensions that compile on save or watch mode (`lw`), multiple `leeni` processes can run concurrently, risking corruption of `junk/` artifacts.
+When using editor extensions that compile on save or watch mode (`lw`), multiple `leeni` processes can run concurrently, risking corruption of build-cache artifacts.
 
 - **Default (`--lock`)**: `leeni` uses an atomic file lock (`flock`) on a target-specific lockfile in `/tmp`. A second process will display a polite waiting indicator until the active build finishes.
 - **Disabling (`--no-lock`)**: When running automated parallel CI test matrices across independent sub-documents, pass `--no-lock` to disable locking:
@@ -196,5 +196,5 @@ When debugging complex build issues or optimizing compilation speed:
 - **Passes**: up to `-n`/`passes` LaTeX passes (default 5, maximum 10). The loop stops as soon as the `.aux` files and the pagination side files (`.toc`, `.lof`, `.lot`, `.out`, `.nav`, `.snm`) stop changing and the pass output requests no rerun.
 - **Not converged**: if a rerun is still requested at the pass limit, or the `.aux` state starts cycling between earlier values, `leeni` stops, emits a `leeni: build did not converge` warning (counted by `--werror` and the JSON output), and does not cache the build.
 - **Bibliography runs**: BibTeX/Biber runs once, and at most twice if the first run is provably stale (uncovered citations, a changed citation set, or a changed `.bcf`). A bibliography still stale at exit prevents caching. With `-n 1` bibliography tools are skipped, since no later pass could use their output.
-- **Stale bibliography files**: a `.bbl`, `.bcf` or biblatex `.aux` left in `junk/` by a build using the other bibliography system is discarded before the first pass.
+- **Stale bibliography files**: a `.bbl`, `.bcf` or biblatex `.aux` left in the build directory by a build using the other bibliography system is discarded before the first pass.
 - **Single bibliography only**: `bibtex` is run on the main document's `.aux` only. `multibib`/`chapterbib` documents that need one BibTeX run per sub-`.aux` are not handled automatically; run those tools by hand.

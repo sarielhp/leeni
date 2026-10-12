@@ -1,6 +1,6 @@
 # Orchestrating Complex Multi-Chapter & Book Setups with `just`
 
-While `leeni` (`l`) manages the LaTeX compilation lifecycle—automating engine selection, bibliography convergence, `junk/` isolation, and diagnostic parsing—large book and multi-chapter projects often require **external upstream tasks** before LaTeX runs (such as generating plots from raw data, building shared tables, or compiling standalone figures).
+While `leeni` (`l`) manages the LaTeX compilation lifecycle—automating engine selection, bibliography convergence, cache isolation, and diagnostic parsing—large book and multi-chapter projects often require **external upstream tasks** before LaTeX runs (such as generating plots from raw data, building shared tables, or compiling standalone figures).
 
 This guide explains how to orchestrate complex setups using **[`just`](https://github.com/casey/just)** alongside `leeni`.
 
@@ -27,7 +27,7 @@ flowchart TD
 ### The Two Modes:
 1. **The Fast Inner Loop (95% of your time): Use `l`**
    - When editing prose, fixing formatting, adjusting math, or tweaking layouts, run `l` directly (or `lw` for watch mode, or editor save hooks).
-   - **Performance**: Sub-second execution (0.1s–0.8s) with automatic 0-pass caching via `junk/.build_state.json`.
+   - **Performance**: Sub-second execution (0.1s–0.8s) with automatic 0-pass caching via the project's `.build_state.json` in the user cache.
 2. **The Asset / Upstream Update (5% of your time): Use `just`**
    - When raw data changes, new plots are created, or shared book assets need regeneration, run `just`.
    - `just` executes the upstream Python/R/data scripts and then invokes `l`.

@@ -60,6 +60,7 @@ class TestLaTeXConfigAndConventions < Minitest::Test
     assert_includes cfg['exclude_source_tex'], '*prefix*.tex'
 
     assert_equal %w[refs bib bibliography], cfg['bib_dirs']
+    refute cfg.key?('junk_dir')
     assert_equal true, cfg['auto_mirror_subdirs']
     assert_equal %w[figs fragment], cfg['junk_subdirs']
     assert_equal %w[computer local private], cfg.dig('arxiv', 'strip_host_patterns')
@@ -135,7 +136,7 @@ class TestLaTeXConfigAndConventions < Minitest::Test
 
       Dir.chdir(dir) do
         builder = LatexBuilder.allocate
-        builder.instance_variable_set(:@options, { auto_mirror_subdirs: true, junk_subdirs: ['figs', 'fragment'] })
+        builder.instance_variable_set(:@options, { junk_dir: 'junk', auto_mirror_subdirs: true, junk_subdirs: ['figs', 'fragment'] })
         builder.send(:junk_dir_create)
 
         assert File.directory?('junk/junk')
@@ -292,37 +293,96 @@ class TestLaTeXConfigAndConventions < Minitest::Test
     end
   end
 
-  def test_junk_dir_auto_detection_and_fallback
+  def test_junk_dir_defaults_to_xdg_cache_and_allows_local_override
     Dir.mktmpdir('leeni_junk_detect') do |dir|
       Dir.chdir(dir) do
         File.write('paper.tex', "\\documentclass{article}\n")
 
-        # 1. Default when neither directory exists
         builder = LatexBuilder.new('paper.tex', {})
-        assert_equal 'junk', builder.junk_dir
+        assert_equal LeeniBuildWorkspace.cache_dir(dir), builder.junk_dir
 
-        # 2. Auto-detect .junk when .junk exists and junk does not
-        FileUtils.mkdir_p('.junk')
-        builder_dot = LatexBuilder.new('paper.tex', {})
-        assert_equal '.junk', builder_dot.junk_dir
-
-        # 3. When both exist, prefer junk for backwards compatibility
-        FileUtils.mkdir_p('junk')
-        builder_both = LatexBuilder.new('paper.tex', {})
-        assert_equal 'junk', builder_both.junk_dir
-
-        # 4. Explicit configuration via config_junk_dir overrides auto-detection
         builder_cfg = LatexBuilder.new('paper.tex', { config_junk_dir: '.junk' })
         assert_equal '.junk', builder_cfg.junk_dir
 
-        # 5. Explicit CLI option overrides both
         builder_cli = LatexBuilder.new('paper.tex', { junk_dir: '.custom_build' })
         assert_equal '.custom_build', builder_cli.junk_dir
 
-        # 6. Normalizes paths with leading ./ and trailing /
         builder_norm = LatexBuilder.new('paper.tex', { junk_dir: './.junk/' })
         assert_equal '.junk', builder_norm.junk_dir
       end
+    end
+  end
+
+  def test_cache_key_handles_projects_outside_home_and_symlink_aliases
+    Dir.mktmpdir('leeni_cache_keys') do |base|
+      project = File.join(base, 'paper')
+      alias_path = File.join(base, 'alias')
+      FileUtils.mkdir_p(project)
+      File.symlink(project, alias_path)
+      old_cache = ENV['XDG_CACHE_HOME']
+      ENV['XDG_CACHE_HOME'] = File.join(base, 'cache')
+
+      assert_equal LeeniBuildWorkspace.cache_dir(project), LeeniBuildWorkspace.cache_dir(alias_path)
+      assert LeeniBuildWorkspace.cache_dir(project).start_with?(File.join(base, 'cache', 'leeni', 'projects'))
+    ensure
+      ENV['XDG_CACHE_HOME'] = old_cache
+    end
+  end
+
+  def test_relative_xdg_cache_home_is_ignored
+    previous = ENV['XDG_CACHE_HOME']
+    ENV['XDG_CACHE_HOME'] = 'relative-cache'
+    assert_equal File.join(Dir.home, '.cache'), LeeniBuildWorkspace.cache_home
+  ensure
+    ENV['XDG_CACHE_HOME'] = previous
+  end
+
+  def test_config_unset_preserves_jsonc_and_reveals_default
+    Dir.mktmpdir('leeni_config_unset') do |dir|
+      config = File.join(dir, '.l.jsonc')
+      File.write(config, "{\n  // Keep this comment\n  \"junk_dir\": \"junk\",\n  \"passes\": 7\n}\n")
+
+      assert LaTeXConfig.unset_setting!('junk_dir', dir: dir)
+      assert_equal 7, LaTeXConfig.load_merged_config(dir)['passes']
+      refute LaTeXConfig.parse_jsonc(File.read(File.join(dir, '.l.jsonc'))).key?('junk_dir')
+      assert_includes File.read(config), '// Keep this comment'
+    end
+  end
+
+  def test_config_unset_handles_saved_last_key_and_compact_json
+    Dir.mktmpdir('leeni_config_unset_last') do |dir|
+      config = File.join(dir, '.l.jsonc')
+      File.write(config, "{\"passes\": 7, \"junk_dir\": \"junk\"}\n")
+      assert LaTeXConfig.unset_setting!('junk_dir', dir: dir)
+      assert_equal({ 'passes' => 7 }, LaTeXConfig.parse_jsonc(File.read(config)))
+
+      File.write(config, "{\"junk_dir\": \"junk\"}\n")
+      assert LaTeXConfig.unset_setting!('junk_dir', dir: dir)
+      assert_equal({}, LaTeXConfig.parse_jsonc(File.read(config)))
+    end
+  end
+
+  def test_config_unset_cli_restores_xdg_default
+    Dir.mktmpdir('leeni_config_unset_cli') do |dir|
+      File.write(File.join(dir, '.l.jsonc'), "{\"junk_dir\": \"junk\"}\n")
+      bin = File.expand_path('../leeni', __dir__)
+      out, status = Open3.capture2e(bin, '--config-unset', 'junk_dir', chdir: dir)
+
+      assert status.success?, out
+      refute LaTeXConfig.parse_jsonc(File.read(File.join(dir, '.l.jsonc'))).key?('junk_dir')
+    end
+  end
+
+  def test_config_unset_cli_targets_global_file
+    Dir.mktmpdir('leeni_config_unset_global') do |home|
+      config = File.join(home, '.config', 'leeni', 'config.jsonc')
+      FileUtils.mkdir_p(File.dirname(config))
+      File.write(config, "{\"junk_dir\": \"junk\", \"passes\": 6}\n")
+      bin = File.expand_path('../leeni', __dir__)
+      out, status = Open3.capture2e({ 'HOME' => home }, bin, '--config-unset', 'junk_dir', '--global', chdir: home)
+
+      assert status.success?, out
+      assert_equal({ 'passes' => 6 }, LaTeXConfig.parse_jsonc(File.read(config)))
     end
   end
 

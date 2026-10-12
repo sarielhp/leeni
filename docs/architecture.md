@@ -6,7 +6,7 @@
 
 ## 1. Design Principles
 
-- **Zero Working-Directory Pollution**: Intermediate auxiliary files are isolated in `junk/`. Only the target PDF, bibliography (`.bbl`), and SyncTeX file (`.synctex.gz`) reside in the project root.
+- **Zero Working-Directory Pollution**: Intermediate auxiliary files are isolated in the XDG user cache. Only the target PDF, bibliography (`.bbl`), and SyncTeX file (`.synctex.gz`) reside in the project root.
 - **Minimal Redundant Builds**: File modification times and content checksums eliminate unnecessary compiler passes when the document is already up to date.
 - **Actionable Diagnostics**: TeX logs are filtered and classified into four tiers, suppressing low-level engine noise so authors can fix errors quickly.
 - **Zero-Dependency Runtime**: Relies almost entirely on the Ruby standard library (`fileutils`, `open3`, `optparse`, `tmpdir`, `shellwords`), requiring only the optional `rainbow` gem for colored terminal output.
@@ -22,7 +22,7 @@ The build pipeline follows an orderly sequence of phases:
 ┌─────────────────────────────────────────────────────────────┐
 │ 1. Discovery      Locate main .tex file, detect engine      │
 │ 2. Pre-Flight     Scan for unclosed braces & syntax errors  │
-│ 3. Workspace      Set up isolated junk/ directory & lockfile│
+│ 3. Workspace      Set up isolated cache directory & lockfile│
 │ 4. Change Check   Compare file hashes; exit if up to date   │
 │ 5. Compiler Loop  Execute LaTeX & BibTeX passes (1 to 10)   │
 │ 6. Export Targets Copy .pdf, .bbl, .synctex.gz to root      │
@@ -38,9 +38,9 @@ The build pipeline follows an orderly sequence of phases:
 - `LaTeXBraceChecker` reads the target source file before invoking LaTeX.
 - Checks lexical balance of curly braces `{ ... }`, detects bracket mistypes like `{]`, and verifies matching environments (`\begin{foo} ... \end{bar}`).
 
-### Phase 3: Directory Isolation (`junk/`)
-- Builds run with `-output-directory=junk`.
-- Build state is recorded in `junk/.build_state.json` (engine, option signature, and a SHA256 per input) and checked by `targets_up_to_date?` before any pass runs.
+### Phase 3: Directory Isolation (XDG Cache)
+- Builds run with `-output-directory` pointing to a per-project directory under `$XDG_CACHE_HOME/leeni/projects/` (default `~/.cache/leeni/projects/`). The key includes a hash of the canonical project path.
+- Build state is recorded in that directory's `.build_state.json` (engine, option signature, and a SHA256 per input) and checked by `targets_up_to_date?` before any pass runs. `--junk-dir junk` keeps the previous local layout.
 
 ### Phase 4: Convergence Pass Scheduling
 - **Check State**: Checks compiler recorder dependencies (`.fls`) and checksums. If no inputs changed and target PDF exists, exits in 0 passes.

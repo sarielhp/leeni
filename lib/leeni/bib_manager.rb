@@ -63,7 +63,7 @@ class LaTeXBibManager
 
   BIBLATEX_AUX_MARKER = '\\abx@aux@'
 
-  # junk/ persists across builds, so a .bcf left by an earlier biblatex build
+  # The build directory persists across builds, so a .bcf left by an earlier biblatex build
   # outlives a switch to bibtex. Biblatex always writes \abx@aux@ lines to the
   # aux, so an aux that has content but none of them proves the control files
   # are stale; trusting them makes biber overwrite the bbl in biblatex format.
@@ -274,7 +274,7 @@ class LaTeXBibManager
 
   AUX_MTIME_SLACK = 2
 
-  # junk/ persists, so it also holds aux files of renamed or earlier documents
+  # The build directory persists, so it also holds aux files of renamed or earlier documents
   # that are never rewritten; feeding those to bib detection can start a
   # spurious bibtex run. The current document's aux tree is the main aux plus
   # everything it \@input's, plus any aux written during this build (bibunits
@@ -292,7 +292,7 @@ class LaTeXBibManager
   end
 
   # Containment is checked on canonical paths so a symlinked directory inside
-  # junk/ cannot lead the closure to files outside it.
+  # Aux traversal cannot lead the closure to files outside the build directory.
   def linked_aux_files(main)
     root = (File.realpath(junk_dir) rescue File.expand_path(junk_dir)) + File::SEPARATOR
     queue = [File.expand_path(main)]

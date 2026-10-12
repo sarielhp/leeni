@@ -9,6 +9,7 @@
 
 require 'fileutils'
 require 'json'
+require_relative 'build_workspace'
 
 module LaTeXConfig
   CONFIG_DIR = File.expand_path('~/.config/leeni')
@@ -34,7 +35,7 @@ module LaTeXConfig
       // "engine": "xelatex",
 
       // Accepted for compatibility and currently has no effect; incremental
-      // rebuilds are automatic via junk/.build_state.json.
+      // rebuilds are automatic via the project build cache.
       "fast": false,
 
       // Maximum compilation passes (1-10, default: 5)
@@ -122,13 +123,13 @@ module LaTeXConfig
       // Directories searched for bibliography (.bib) files (in addition to root)
       "bib_dirs": ["refs", "bib", "bibliography"],
 
-      // Build artifact directory: "junk" (default) or ".junk"
-      "junk_dir": "junk",
+      // Build artifact directory. Unset uses $XDG_CACHE_HOME/leeni/projects/.
+      // Set junk_dir to junk for project-local compatibility.
 
-      // Automatically mirror project subdirectories into junk/ for nested inputs
+      // Automatically mirror project subdirectories into the build directory for nested inputs
       "auto_mirror_subdirs": true,
 
-      // Additional subdirectories inside junk/ to pre-create
+      // Additional subdirectories inside the build directory to pre-create
       "junk_subdirs": ["figs", "fragment"],
 
       // Portable Zip Bundling Settings (invoked via `l -z`)
@@ -430,6 +431,64 @@ module LaTeXConfig
     [:explicit_styles_inject, 'styles_inject', ->(opts) { opts[:inject_styles] }]
   ].freeze
 
+  UNSETTABLE_KEYS = SAVABLE_CLI_MAPPINGS.map { |mapping| mapping[1] }.reject { |key| key == 'styles_inject' }.freeze
+
+  def self.unset_setting!(key, scope: :local, dir: '.')
+    unless UNSETTABLE_KEYS.include?(key)
+      warn "leeni: cannot unset unknown setting: #{key}"
+      return false
+    end
+
+    local_name = LOCAL_CONFIG_CANDIDATES.find { |name| File.file?(File.join(dir, name)) } || '.l.jsonc'
+    file = scope == :global ? GLOBAL_CONFIG_FILE : File.join(dir, local_name)
+    unless File.file?(file)
+      warn "leeni: configuration file does not exist: #{file}"
+      return false
+    end
+
+    content = File.read(file)
+    unless JSON.parse(strip_comments(content)).key?(key)
+      puts "#{key} is already unset in #{file}"
+      return true
+    end
+
+    changed = remove_jsonc_setting(content, key)
+    unless changed
+      puts "#{key} is already unset in #{file}"
+      return true
+    end
+
+    JSON.parse(strip_comments(changed))
+    File.write(file, changed)
+    puts "Unset #{key} in #{file}"
+    true
+  rescue JSON::ParserError => e
+    warn "leeni: refusing to write invalid JSONC after unsetting #{key}: #{e.message}"
+    false
+  end
+
+  def self.remove_jsonc_setting(content, key)
+    quoted = Regexp.escape(key)
+    value = '(?:"(?:[^"\\\\]|\\\\.)*"|true|false|null|-?\\d+(?:\\.\\d+)?)'
+    line = /^[ \t]*"#{quoted}"[ \t]*:[ \t]*#{value}[ \t]*,?[ \t]*(?:\/\/[^\n]*)?\n?/
+    return remove_trailing_comma(content.sub(line, '')) if content.match?(line)
+
+    after_comma = /,[ \t]*"#{quoted}"[ \t]*:[ \t]*#{value}/
+    return content.sub(after_comma, '') if content.match?(after_comma)
+
+    before_comma = /"#{quoted}"[ \t]*:[ \t]*#{value}[ \t]*,/
+    return content.sub(before_comma, '') if content.match?(before_comma)
+
+    sole_value = /"#{quoted}"[ \t]*:[ \t]*#{value}/
+    return content.sub(sole_value, '') if content.match?(sole_value)
+
+    nil
+  end
+
+  def self.remove_trailing_comma(content)
+    content.sub(/,([ \t]*(?:(?:\/\/[^\n]*)?\n[ \t]*)*}\s*\z)/, '\\1')
+  end
+
   def self.extract_savable_settings(options)
     settings = {}
     SAVABLE_CLI_MAPPINGS.each do |flag_key, config_key, extractor|
@@ -637,6 +696,7 @@ module LaTeXConfig
       '# =========================================================================',
       format('# Global file: %s (%s)', info[:global_file], info[:global_exists] ? 'loaded' : 'not found'),
       format('#  Local file: %s', info[:local_file] ? "#{info[:local_file]} (loaded)" : 'none'),
+      format('# Build directory: %s', LeeniBuildWorkspace.resolve(dir, info[:merged_config]['junk_dir'])),
       '',
       JSON.pretty_generate(info[:merged_config])
     ]

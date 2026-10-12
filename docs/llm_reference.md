@@ -31,10 +31,10 @@ l --json paper.tex
 
 ## 2. Core Architectural Invariants
 
-- **Junk Quarantine**: All compilation artifacts (`.aux`, `.log`, `.toc`, `.fls`, `.out`, `.nav`, `.snm`) reside exclusively in `junk/`. Only `<file>.pdf`, `<file>.bbl`, and `<file>.synctex.gz` are written to root.
+- **Build Quarantine**: Compilation artifacts (`.aux`, `.log`, `.toc`, `.fls`, `.out`, `.nav`, `.snm`) reside in a per-project XDG cache directory by default. Only `<file>.pdf`, `<file>.bbl`, and `<file>.synctex.gz` are written to root.
 - **Engine Selection Precedence**: CLI flag (`-e`) / symlink personality (`llua`, `lp`) $>$ `% !TEX program = <engine>` magic comment $>$ `.l.jsonc` `"engine"` $>$ default (`xelatex`).
 - **Convergence Loop**: Multi-pass scheduler runs up to `passes` (default 5). Exits early if `.aux` digests match across passes. Executes BibTeX/Biber if citations are unresolved or `.bib` files modified.
-- **Cache State**: Persisted in `junk/.build_state.json`. If inputs (`*.tex`, `*.bib`, styles) and CLI options match SHA256 hashes, exits `0` in 0 passes.
+- **Cache State**: Persisted in the project's build cache as `.build_state.json`. If inputs (`*.tex`, `*.bib`, styles) and CLI options match SHA256 hashes, exits `0` in 0 passes.
 
 ---
 
@@ -50,9 +50,9 @@ l --json paper.tex
 | `-b` | `--[no-]bib` | boolean | auto | Force or skip bibliography pass (Biber or BibTeX). |
 | `-I` | `--[no-]index` | boolean | `false` | Run `makeindex` when `.idx` changes. |
 | `-e` | `--engine` | `x`,`l`,`p` | `x` (`xelatex`)| Compiler: `x` (`xelatex`), `l` (`lualatex`), `p` (`pdflatex`). |
-| `-c` | `--clean` | flag | `false` | Remove `junk/` artifacts before starting build. |
-| `-C` | `--clean-only` | flag | `false` | Remove `junk/` and root auxiliary files and exit immediately. |
-| *(none)* | `--junk-dir` | string | `junk` | Directory for temporary build artifacts (`junk` or `.junk`). |
+| `-c` | `--clean` | flag | `false` | Remove the project cache and root auxiliary files before building. |
+| `-C` | `--clean-only` | flag | `false` | Remove the project cache, legacy junk directories, and root auxiliary files, then exit. |
+| *(none)* | `--junk-dir` | string | XDG cache | Override the build directory; `junk` selects the former local layout. |
 | `-x` | `--explain` | flag | `false` | Print boxed plain-English explanations on first diagnostic occurrence. |
 | `-a` | `--all` | flag | `false` | Display all diagnostics (disables warning folding and whatever suppression). |
 | `-W` | `--werror` | flag | `false` | Treat alerts and warnings as fatal errors (exit code 1). |
@@ -89,7 +89,7 @@ Global file: `~/.config/leeni/config.jsonc`.
 {
   "engine": "xelatex",               // "xelatex" | "lualatex" | "pdflatex"
   "passes": 5,                       // 1 .. 10
-  "junk_dir": "junk",                // "junk" | ".junk" (build artifact directory)
+  // Set "junk_dir": "junk" only for a project-local build directory.
   "index": false,                    // boolean (makeindex)
   "update_on_diff": false,           // boolean (suppress PDF write if text unchanged)
   "time": false,                     // boolean (timing diagnostics)

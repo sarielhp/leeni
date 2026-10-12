@@ -72,10 +72,10 @@ This creates `.l.jsonc` pre-populated with default settings and comments:
   // Directories searched for bibliography (.bib) files (in addition to root)
   "bib_dirs": ["refs", "bib", "bibliography"],
 
-  // Automatically mirror project subdirectories into junk/ for nested inputs
+  // Automatically mirror project subdirectories into the build directory for nested inputs
   "auto_mirror_subdirs": true,
 
-  // Additional subdirectories inside junk/ to pre-create
+  // Additional subdirectories inside the build directory to pre-create
   "junk_subdirs": ["figs", "fragment"],
 
   // Route styles to styles/ in zip packages
@@ -86,6 +86,14 @@ This creates `.l.jsonc` pre-populated with default settings and comments:
 ```
 
 Comments (`//` and `/* ... */`) and trailing commas are supported in `.l.jsonc` files.
+
+### Build directory and cleanup
+
+With `junk_dir` unset, leeni writes intermediate files to a per-project directory under `$XDG_CACHE_HOME/leeni/projects/`, using `~/.cache` when `XDG_CACHE_HOME` is unset or invalid. The directory name combines the project basename with a hash of its canonical absolute path, so projects outside home work the same way. Final `.pdf`, `.bbl`, and `.synctex.gz` files remain beside the source.
+
+Set `"junk_dir": "junk"` in `.l.jsonc` or use `l --junk-dir junk` to keep the previous local layout. Existing configuration files that contain this setting continue to use it. To remove a saved setting, run `l --config-unset junk_dir` for the local file or `l --config-unset junk_dir --global` for the global file.
+
+`l -C [directory]` removes that project's cache, legacy `junk/` and `.junk/` directories, and known regenerable auxiliary files left by direct TeX runs in the project directory. `l -c` performs the same cleanup before compilation. Final PDFs and `.bbl` files are preserved.
 
 ### Downgrading alerts to warnings
 

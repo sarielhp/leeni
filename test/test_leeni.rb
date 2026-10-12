@@ -20,6 +20,10 @@ class TestLeeniCLI < Minitest::Test
   BIN = File.expand_path('../leeni', __dir__)
   load BIN
 
+  def legacy_builder(target, options = {})
+    LatexBuilder.new(target, { junk_dir: 'junk' }.merge(options))
+  end
+
   def strip_ansi(str)
     str.to_s.gsub(/\e\[[0-9;]*m/, '')
   end
@@ -484,11 +488,11 @@ class TestLeeniCLI < Minitest::Test
       File.write(File.join(dir, 'junk', '.build_state.json'), JSON.generate(state))
 
       Dir.chdir(dir) do
-        stdout, status = Open3.capture2(BIN, '-M', 'paper.tex')
+        stdout, status = Open3.capture2(BIN, '--junk-dir', 'junk', '-M', 'paper.tex')
         assert status.success?
         assert_equal "paper.pdf: extra.tex paper.tex\n\n", stdout
 
-        stdout_long, status_long = Open3.capture2(BIN, '--deps', 'paper.tex')
+        stdout_long, status_long = Open3.capture2(BIN, '--junk-dir', 'junk', '--deps', 'paper.tex')
         assert status_long.success?
         assert_equal "paper.pdf: extra.tex paper.tex\n\n", stdout_long
       end
@@ -496,7 +500,7 @@ class TestLeeniCLI < Minitest::Test
   end
 
   def test_diagnostic_formatting_no_redundant_w
-    builder = LatexBuilder.new('sample.tex', emacs: false, color: true)
+    builder = legacy_builder('sample.tex', emacs: false, color: true)
     formatted = builder.send(:format_diagnostic_line, '42', 'Package hyperref Warning: Token not allowed on input line 42.', :yellow)
     refute_includes formatted, 'W:'
     assert_includes formatted, Rainbow('42').cyan.bright.to_s
@@ -509,13 +513,13 @@ class TestLeeniCLI < Minitest::Test
     assert_equal '42: ❕ Package hyperref Warning: Token not allowed on input line 42.', mono_formatted
 
     # In emacs mode, verify line prefixes are completely suppressed
-    emacs_builder = LatexBuilder.new('sample.tex', emacs: true)
+    emacs_builder = legacy_builder('sample.tex', emacs: true)
     emacs_formatted = emacs_builder.send(:format_diagnostic_line, '42', 'Package hyperref Warning: Token not allowed on input line 42.', :yellow)
     assert_equal 'Package hyperref Warning: Token not allowed on input line 42.', emacs_formatted
   end
 
   def test_diagnostic_formatting_empty_line_str
-    builder = LatexBuilder.new('sample.tex', emacs: false, color: true)
+    builder = legacy_builder('sample.tex', emacs: false, color: true)
     formatted = builder.send(:format_diagnostic_line, '', 'LaTeX Warning: Label(s) may have changed.', :yellow)
     refute_includes formatted, 'W:'
     assert_includes formatted, Rainbow(': ').yellow.bright.to_s
@@ -524,14 +528,14 @@ class TestLeeniCLI < Minitest::Test
     mono_formatted = builder.send(:format_diagnostic_line, '', 'LaTeX Warning: Label(s) may have changed.', :yellow)
     assert_equal ': ❕ LaTeX Warning: Label(s) may have changed.', mono_formatted
 
-    emacs_builder = LatexBuilder.new('sample.tex', emacs: true)
+    emacs_builder = legacy_builder('sample.tex', emacs: true)
     emacs_formatted = emacs_builder.send(:format_diagnostic_line, '', 'LaTeX Warning: Label(s) may have changed.', :yellow)
     assert_equal 'LaTeX Warning: Label(s) may have changed.', emacs_formatted
   end
 
   def test_line_number_colorization_left_and_inside
     Rainbow.enabled = true
-    builder = LatexBuilder.new('sample.tex', emacs: false, color: true)
+    builder = legacy_builder('sample.tex', emacs: false, color: true)
 
     formatted = builder.send(:format_diagnostic_line, '42', 'Package hyperref Warning: on input line 42.', :yellow)
     cyan_bright_42 = Rainbow('42').cyan.bright.to_s
@@ -544,7 +548,7 @@ class TestLeeniCLI < Minitest::Test
 
   def test_error_line_number_colorization
     Rainbow.enabled = true
-    builder = LatexBuilder.new('sample.tex', emacs: false, color: true)
+    builder = legacy_builder('sample.tex', emacs: false, color: true)
 
     err_lines = ['./sample.tex:42: Undefined control sequence.', 'l.42 \\badcommand']
     formatted = builder.send(:format_error_block, err_lines, 42)
@@ -554,7 +558,7 @@ class TestLeeniCLI < Minitest::Test
 
   def test_did_you_mean_rust_style_colorization
     Rainbow.enabled = true
-    builder = LatexBuilder.new('sample.tex', emacs: false, color: true)
+    builder = legacy_builder('sample.tex', emacs: false, color: true)
 
     catalog = { id: :undefined_control_sequence, hint: "Did you mean '\\alpha'?" }
     pointer = builder.send(:render_pointer_line, 3, 5, 5, catalog)
@@ -566,7 +570,7 @@ class TestLeeniCLI < Minitest::Test
 
   def test_left_width_alignment
     Rainbow.enabled = false
-    builder = LatexBuilder.new('sample.tex', emacs: false, color: false)
+    builder = legacy_builder('sample.tex', emacs: false, color: false)
 
     # Testing formatting with width = 10 (as in 1071--1075)
     f_range = builder.send(:format_diagnostic_line, '1071--1075', 'Overfull \\hbox ...', :magenta, width: 10)
@@ -601,7 +605,7 @@ class TestLeeniCLI < Minitest::Test
       fls_path = File.join(dir, 'junk', 'main.fls')
       File.write(fls_path, fls_content)
 
-      builder = LatexBuilder.new('main.tex', {})
+      builder = legacy_builder('main.tex', {})
       Dir.chdir(dir) do
         deps = builder.send(:extract_fls_dependencies, fls_path)
         assert_includes deps, 'main.tex'
@@ -613,7 +617,7 @@ class TestLeeniCLI < Minitest::Test
   end
 
   def test_aux_has_cross_references
-    builder = LatexBuilder.new('main.tex', {})
+    builder = legacy_builder('main.tex', {})
     refute builder.send(:aux_has_cross_references?, "\\relax\n\\@abspage@last{1}\n")
     assert builder.send(:aux_has_cross_references?, "\\newlabel{sec:one}{{1}{1}}\n")
     assert builder.send(:aux_has_cross_references?, "\\citation{knuth1984}\n")
@@ -625,7 +629,7 @@ class TestLeeniCLI < Minitest::Test
       File.write(File.join(dir, 'paper.tex'), 'content')
       File.write(File.join(dir, 'paper.pdf'), 'mock pdf')
       FileUtils.mkdir_p(File.join(dir, 'junk'))
-      builder = LatexBuilder.new('paper.tex', {})
+      builder = legacy_builder('paper.tex', {})
 
       sha = Digest::SHA256.file(File.join(dir, 'paper.tex')).hexdigest
       mtime = File.mtime(File.join(dir, 'paper.tex')).to_i
@@ -641,15 +645,15 @@ class TestLeeniCLI < Minitest::Test
         assert builder.send(:targets_up_to_date?), 'Expected build to be up to date'
 
         # Test force (-u / --force) forces rebuild
-        force_builder = LatexBuilder.new('paper.tex', force: true)
+        force_builder = legacy_builder('paper.tex', force: true)
         refute force_builder.send(:targets_up_to_date?)
 
         # Test single_pass (-1 / --single-pass) forces rebuild
-        single_builder = LatexBuilder.new('paper.tex', single_pass: true)
+        single_builder = legacy_builder('paper.tex', single_pass: true)
         refute single_builder.send(:targets_up_to_date?)
 
         # Test clean forces rebuild
-        clean_builder = LatexBuilder.new('paper.tex', clean: true)
+        clean_builder = legacy_builder('paper.tex', clean: true)
         refute clean_builder.send(:targets_up_to_date?)
 
         # Test modified source triggers rebuild
@@ -673,7 +677,7 @@ class TestLeeniCLI < Minitest::Test
       }
       File.write(File.join(dir, 'junk', '.build_state.json'), JSON.generate(state))
 
-      builder = LatexBuilder.new('paper.tex', werror: true)
+      builder = legacy_builder('paper.tex', werror: true)
       Dir.chdir(dir) do
         refute builder.send(:targets_up_to_date?), 'Expected werror to force rebuild'
       end
@@ -690,7 +694,7 @@ class TestLeeniCLI < Minitest::Test
       }
       File.write(File.join(dir, 'junk', '.build_state.json'), JSON.generate(state))
 
-      builder = LatexBuilder.new('paper.tex', deps: true)
+      builder = legacy_builder('paper.tex', deps: true)
       Dir.chdir(dir) do
         out, = capture_io { builder.send(:export_dependencies) }
         assert_equal "paper.pdf: figures/fig1.pdf paper.tex\n", out
@@ -712,7 +716,7 @@ class TestLeeniCLI < Minitest::Test
       )
     LOG
 
-    builder = LatexBuilder.new('main.tex', {})
+    builder = legacy_builder('main.tex', {})
     warnings = builder.send(:extract_warnings, log_content)
     errors = builder.send(:extract_errors, log_content)
 
@@ -738,7 +742,7 @@ class TestLeeniCLI < Minitest::Test
     refute_match(/^\)/, plain)
     refute_includes plain, './'
 
-    builder_emacs = LatexBuilder.new('main.tex', emacs: true)
+    builder_emacs = legacy_builder('main.tex', emacs: true)
     out_emacs, = capture_io { builder_emacs.send(:print_diagnostics_body, warnings, errors) }
     assert_includes out_emacs, "(chapters/ch1.tex\n"
     assert_includes out_emacs, "(chapters/ch2.tex\n"
@@ -756,7 +760,7 @@ class TestLeeniCLI < Minitest::Test
       l.298         &
     LOG
 
-    builder = LatexBuilder.new('talagrand.tex', {})
+    builder = legacy_builder('talagrand.tex', {})
     errors = builder.send(:extract_errors, log_content)
     assert_equal 2, errors.size
     assert_equal './talagrand.tex', errors[0][:file]
@@ -777,7 +781,7 @@ class TestLeeniCLI < Minitest::Test
       )
     LOG
 
-    builder = LatexBuilder.new('main.tex', {})
+    builder = legacy_builder('main.tex', {})
     warnings = builder.send(:extract_warnings, log_content)
     assert_equal 2, warnings.size
     assert_equal './main.tex', warnings[0][:file]
@@ -796,7 +800,7 @@ class TestLeeniCLI < Minitest::Test
       LOG
       File.write(File.join(dir, 'junk', 'err_xelatex'), log_content)
 
-      builder = LatexBuilder.new('paper.tex', werror: true)
+      builder = legacy_builder('paper.tex', werror: true)
       Dir.chdir(dir) do
         assert_raises(SystemExit) do
           capture_io { builder.send(:analyze_output) }
@@ -879,7 +883,7 @@ class TestLeeniCLI < Minitest::Test
       FileUtils.mkdir_p(File.join(dir, 'junk'))
       File.write(File.join(dir, 'junk', 'paper.aux'), "\\bibdata{refs}\n\\citation{ref1}\n")
 
-      builder = LatexBuilder.new('paper.tex', {})
+      builder = legacy_builder('paper.tex', {})
       Dir.chdir(dir) do
         # 1. paper_cleanup should seed bbl into junk/
         builder.send(:paper_cleanup)
@@ -915,7 +919,7 @@ class TestLeeniCLI < Minitest::Test
       FLS
       File.write(File.join(dir, 'junk', 'paper.fls'), fls_content)
 
-      builder = LatexBuilder.new('paper.tex', extra_files: ['extra.txt'])
+      builder = legacy_builder('paper.tex', extra_files: ['extra.txt'])
       packager = LatexPackager.new(builder)
 
       Dir.chdir(dir) do
@@ -950,7 +954,7 @@ class TestLeeniCLI < Minitest::Test
       FLS
       File.write(File.join(dir, 'junk', 'paper.fls'), fls_content)
 
-      builder = LatexBuilder.new('paper.tex', inject_styles: true)
+      builder = legacy_builder('paper.tex', inject_styles: true)
       packager = LatexPackager.new(builder)
 
       Dir.chdir(dir) do
@@ -990,7 +994,7 @@ class TestLeeniCLI < Minitest::Test
       FLS
       File.write(File.join(dir, 'junk', 'paper.fls'), fls_content)
 
-      builder = LatexBuilder.new('paper.tex', zip_flat: true)
+      builder = legacy_builder('paper.tex', zip_flat: true)
       packager = LatexPackager.new(builder)
 
       Dir.chdir(dir) do
@@ -1076,7 +1080,7 @@ class TestLeeniCLI < Minitest::Test
       LOG
       File.write(log_file, log_content)
 
-      builder = LatexBuilder.new('main.tex', {})
+      builder = legacy_builder('main.tex', {})
       out, err = capture_io do
         assert_raises(SystemExit) do
           builder.send(:report_errors, log_file)
@@ -1096,7 +1100,7 @@ class TestLeeniCLI < Minitest::Test
   end
 
   def test_compilation_failure_concise_single_line_status
-    builder = LatexBuilder.new('main.tex', color: false)
+    builder = legacy_builder('main.tex', color: false)
     msg = builder.send(:format_compilation_failure, 1)
     assert_equal 'Latex compilation failed! (Status: 1)', msg
 
@@ -1121,7 +1125,7 @@ class TestLeeniCLI < Minitest::Test
       File.write(log_file, log_content)
 
       # Default: both alerts and warnings are displayed
-      builder = LatexBuilder.new('main.tex', {})
+      builder = legacy_builder('main.tex', {})
       out, = capture_io do
         Dir.chdir(dir) do
           builder.send(:analyze_output)
@@ -1139,7 +1143,7 @@ class TestLeeniCLI < Minitest::Test
       refute_includes plain, '(Warnings suppressed)'
 
       # When suppress_warnings: true, warnings are suppressed
-      suppressed_builder = LatexBuilder.new('main.tex', suppress_warnings: true)
+      suppressed_builder = legacy_builder('main.tex', suppress_warnings: true)
       out_supp, = capture_io do
         Dir.chdir(dir) do
           suppressed_builder.send(:analyze_output)
@@ -1169,7 +1173,7 @@ class TestLeeniCLI < Minitest::Test
       LOG
       File.write(log_file, log_content)
 
-      builder = LatexBuilder.new('main.tex', {})
+      builder = legacy_builder('main.tex', {})
       out, = capture_io do
         Dir.chdir(dir) do
           builder.send(:analyze_output)
@@ -1186,7 +1190,7 @@ class TestLeeniCLI < Minitest::Test
       assert_includes plain, 'Whatevers: 0'
 
       # Test custom threshold
-      custom_builder = LatexBuilder.new('main.tex', alert_overfull_pt: 50.0)
+      custom_builder = legacy_builder('main.tex', alert_overfull_pt: 50.0)
       out_custom, = capture_io do
         Dir.chdir(dir) do
           custom_builder.send(:analyze_output)
@@ -1221,7 +1225,7 @@ class TestLeeniCLI < Minitest::Test
       File.write(log_file, log_content)
 
       # By default, whatevers are suppressed
-      builder = LatexBuilder.new('main.tex', {})
+      builder = legacy_builder('main.tex', {})
       out, = capture_io do
         Dir.chdir(dir) do
           builder.send(:analyze_output)
@@ -1235,7 +1239,7 @@ class TestLeeniCLI < Minitest::Test
       refute_includes plain, '(Whatevers suppressed)'
 
       # With all: true, whatevers are displayed
-      all_builder = LatexBuilder.new('main.tex', all: true, suppress_whatevers: false)
+      all_builder = legacy_builder('main.tex', all: true, suppress_whatevers: false)
       out_all, = capture_io do
         Dir.chdir(dir) do
           all_builder.send(:analyze_output)
@@ -1268,7 +1272,7 @@ class TestLeeniCLI < Minitest::Test
       File.write(log_file, log_content)
 
       # Without explain flag: no explanation box
-      builder = LatexBuilder.new('main.tex', {})
+      builder = legacy_builder('main.tex', {})
       out, = capture_io do
         Dir.chdir(dir) do
           builder.send(:analyze_output)
@@ -1277,7 +1281,7 @@ class TestLeeniCLI < Minitest::Test
       refute_includes out, 'Diagnostic Explanation'
 
       # With explain: true: boxed explanation printed only on first occurrence
-      expl_builder = LatexBuilder.new('main.tex', explain: true)
+      expl_builder = legacy_builder('main.tex', explain: true)
       out_expl, = capture_io do
         Dir.chdir(dir) do
           expl_builder.send(:analyze_output)
@@ -1308,7 +1312,7 @@ class TestLeeniCLI < Minitest::Test
       LOG
       File.write(log_file, log_content)
 
-      builder = LatexBuilder.new('main.tex', explain: true)
+      builder = legacy_builder('main.tex', explain: true)
       out, = capture_io do
         Dir.chdir(dir) do
           builder.send(:analyze_output)
@@ -1336,7 +1340,7 @@ class TestLeeniCLI < Minitest::Test
       LOG
       File.write(log_file, log_content)
 
-      builder = LatexBuilder.new('main.tex', explain: true)
+      builder = legacy_builder('main.tex', explain: true)
       out, = capture_io do
         Dir.chdir(dir) do
           builder.send(:analyze_output)
@@ -1364,7 +1368,7 @@ class TestLeeniCLI < Minitest::Test
       File.write(log_file, log_content)
 
       # 1. Without link: plain text, no OSC 8 link to guide
-      builder_no_link = LatexBuilder.new('main.tex', link: false)
+      builder_no_link = legacy_builder('main.tex', link: false)
       out_no_link, = capture_io do
         Dir.chdir(dir) do
           builder_no_link.send(:analyze_output)
@@ -1374,7 +1378,7 @@ class TestLeeniCLI < Minitest::Test
       assert_includes out_no_link, 'underfull \hbox (badness 10000)'
 
       # 2. With link: true: clean OSC 8 embedded on underfull \hbox
-      builder_link = LatexBuilder.new('main.tex', link: true)
+      builder_link = legacy_builder('main.tex', link: true)
       out_link, = capture_io do
         Dir.chdir(dir) do
           builder_link.send(:analyze_output)
@@ -1405,7 +1409,7 @@ class TestLeeniCLI < Minitest::Test
       LOG
       File.write(log_file, log_content)
 
-      builder = LatexBuilder.new('main.tex', {})
+      builder = legacy_builder('main.tex', {})
       out, = capture_io do
         Dir.chdir(dir) do
           builder.send(:analyze_output)
@@ -1433,7 +1437,7 @@ class TestLeeniCLI < Minitest::Test
       File.write(log_file, log_content)
 
       # Default threshold 2.5pt: 4.0pt is a Warning
-      builder = LatexBuilder.new('main.tex', {})
+      builder = legacy_builder('main.tex', {})
       out, = capture_io do
         Dir.chdir(dir) do
           builder.send(:analyze_output)
@@ -1444,7 +1448,7 @@ class TestLeeniCLI < Minitest::Test
       assert_includes plain, 'Whatevers: 0'
 
       # Custom threshold 5.0pt: 4.0pt is demoted to Whatever (suppressed)
-      custom_builder = LatexBuilder.new('main.tex', whatever_overfull_pt: 5.0)
+      custom_builder = legacy_builder('main.tex', whatever_overfull_pt: 5.0)
       out_custom, = capture_io do
         Dir.chdir(dir) do
           custom_builder.send(:analyze_output)
@@ -1459,8 +1463,8 @@ class TestLeeniCLI < Minitest::Test
   def test_path_hash_and_project_tmp_file
     Dir.mktmpdir do |dir1|
       Dir.mktmpdir do |dir2|
-        b1 = LatexBuilder.new(File.join(dir1, 'main.tex'), {})
-        b2 = LatexBuilder.new(File.join(dir2, 'main.tex'), {})
+        b1 = legacy_builder(File.join(dir1, 'main.tex'), {})
+        b2 = legacy_builder(File.join(dir2, 'main.tex'), {})
 
         refute_equal b1.send(:path_hash), b2.send(:path_hash)
 
@@ -1478,7 +1482,7 @@ class TestLeeniCLI < Minitest::Test
 
   def test_with_lock_blocks_concurrent_runs
     Dir.mktmpdir do |dir|
-      builder = LatexBuilder.new(File.join(dir, 'paper.tex'), lock: true)
+      builder = legacy_builder(File.join(dir, 'paper.tex'), lock: true)
       executed = false
 
       builder.send(:with_lock) do
@@ -1505,7 +1509,7 @@ class TestLeeniCLI < Minitest::Test
         File.write('junk/paper.pdf', 'dummy pdf')
         File.write('paper.pdf', 'dummy pdf')
 
-        builder = LatexBuilder.new(tex, lock: true)
+        builder = legacy_builder(tex, lock: true)
         builder.send(:snapshot_build_inputs!)
 
         # User modifies paper.tex during compilation
@@ -1529,7 +1533,7 @@ class TestLeeniCLI < Minitest::Test
         File.write('junk/paper.pdf', 'dummy pdf')
         File.write('paper.pdf', 'dummy pdf')
 
-        builder = LatexBuilder.new(tex, lock: true)
+        builder = legacy_builder(tex, lock: true)
         builder.send(:snapshot_build_inputs!)
 
         builder.send(:save_build_state!)
@@ -1548,7 +1552,7 @@ class TestLeeniCLI < Minitest::Test
         log_file = 'junk/test.log'
         File.write(log_file, "LaTeX Warning: Label `foo' multiply defined.\n")
 
-        builder = LatexBuilder.new('paper.tex', {})
+        builder = legacy_builder('paper.tex', {})
 
         # A multiply-defined label is an Alert, not a compile error, so it must
         # not push the pass-failure gate above zero. This replaces a test that
@@ -1589,7 +1593,7 @@ class TestLeeniCLI < Minitest::Test
           \\end{theorem}
           \\end{document}
         LATEX
-        builder = LatexBuilder.new('paper.tex', {})
+        builder = legacy_builder('paper.tex', {})
         errs = builder.send(:check_source_braces)
         assert_equal 1, errs.size
         err = errs.first
@@ -1643,7 +1647,7 @@ class TestLeeniCLI < Minitest::Test
   end
 
   def test_compiler_environment_sets_max_print_line
-    builder = LatexBuilder.new('main.tex', {})
+    builder = legacy_builder('main.tex', {})
     env = builder.send(:pass_environment)
     assert_equal '2048', env['max_print_line']
   end
@@ -1655,7 +1659,7 @@ class TestLeeniCLI < Minitest::Test
       File.write(src, '%PDF-1.4 dummy new')
       File.write(dst, '%PDF-1.4 dummy old')
 
-      builder = LatexBuilder.new('main.tex', {})
+      builder = legacy_builder('main.tex', {})
       builder.send(:atomic_copy, src, dst)
 
       assert_equal '%PDF-1.4 dummy new', File.read(dst)
@@ -1669,7 +1673,7 @@ class TestLeeniCLI < Minitest::Test
       dst = File.join(dir, 'final.pdf')
       File.write(dst, '%PDF-1.4 known good')
 
-      builder = LatexBuilder.new('main.tex', {})
+      builder = legacy_builder('main.tex', {})
       assert_raises(Errno::ENOENT) { builder.send(:atomic_copy, missing_src, dst) }
 
       assert_equal '%PDF-1.4 known good', File.read(dst)
@@ -1685,7 +1689,7 @@ class TestLeeniCLI < Minitest::Test
         File.write('refs/extra.bib', '@article{...}')
         File.write('junk/main.aux', "\\bibdata{extra}\n")
 
-        builder = LatexBuilder.new('main.tex', {})
+        builder = legacy_builder('main.tex', {})
         bibs = builder.send(:discover_bib_files)
         assert_includes bibs, 'refs/extra.bib'
       end
@@ -1701,7 +1705,7 @@ class TestLeeniCLI < Minitest::Test
         bcf = '<bcf:datasource type="file" datatype="bibtex">custom_bibs/chapter.bib</bcf:datasource>'
         File.write('junk/main.bcf', bcf)
 
-        builder = LatexBuilder.new('main.tex', {})
+        builder = legacy_builder('main.tex', {})
         bibs = builder.send(:discover_bib_files)
         assert_includes bibs, 'custom_bibs/chapter.bib'
       end
@@ -1709,7 +1713,7 @@ class TestLeeniCLI < Minitest::Test
   end
 
   def test_capture_pass_output_executes_and_terminates_on_timeout
-    builder = LatexBuilder.new('main.tex', timeout: 1)
+    builder = legacy_builder('main.tex', timeout: 1)
     out, status = builder.send(:capture_pass_output, ['sleep', '5'])
     refute status.success?
     assert_includes out, 'Compilation timed out'
@@ -1735,7 +1739,7 @@ class TestLeeniCLI < Minitest::Test
   end
 
   def test_format_trace_command_includes_cwd_and_overrides
-    builder = LatexBuilder.new('main.tex', trace: true)
+    builder = legacy_builder('main.tex', trace: true)
     env = ENV.to_h.merge('TEXINPUTS' => '.:custom_styles:', 'max_print_line' => '2048')
     cmd = ['xelatex', '-output-directory=junk', 'main.tex']
     formatted = builder.send(:format_trace_command, env, cmd, '/tmp/doc')
@@ -1747,7 +1751,7 @@ class TestLeeniCLI < Minitest::Test
   end
 
   def test_trace_output_during_pass_execution
-    builder = LatexBuilder.new('main.tex', trace: true, timeout: 5)
+    builder = legacy_builder('main.tex', trace: true, timeout: 5)
     out_capture = StringIO.new
     orig_stdout = $stdout
     begin
@@ -1791,12 +1795,12 @@ class TestLeeniCLI < Minitest::Test
         File.write('junk/paper.bbl', bbl_content)
 
         # Without trace: do not contaminate root
-        builder = LatexBuilder.new('paper.tex', {})
+        builder = legacy_builder('paper.tex', {})
         builder.send(:sync_bbl_before_compile)
         refute File.exist?('paper.bbl')
 
         # With trace: promote to root
-        builder_trace = LatexBuilder.new('paper.tex', trace: true)
+        builder_trace = legacy_builder('paper.tex', trace: true)
         builder_trace.send(:sync_bbl_before_compile)
         assert File.exist?('paper.bbl')
         assert_equal bbl_content, File.read('paper.bbl')
@@ -1811,7 +1815,7 @@ class TestLeeniCLI < Minitest::Test
         bbl_content = "\\begin{thebibliography}{1}\n\\bibitem{b} Another\n\\end{thebibliography}\n"
         File.write('junk/paper.bbl', bbl_content)
 
-        builder = LatexBuilder.new('paper.tex', trace: true)
+        builder = legacy_builder('paper.tex', trace: true)
         builder.send(:sync_bbl_to_root)
 
         assert File.exist?('paper.bbl')
@@ -2050,7 +2054,7 @@ class TestLeeniCLI < Minitest::Test
       LOG
       File.write(log_file, log_content)
 
-      builder = LatexBuilder.new('main.tex', {})
+      builder = legacy_builder('main.tex', {})
       out, = capture_io do
         Dir.chdir(dir) do
           builder.send(:analyze_output)

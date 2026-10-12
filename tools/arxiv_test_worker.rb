@@ -308,7 +308,7 @@ module ArxivTestWorker
     end
 
     def compile(*flags)
-      args = [RbConfig.ruby, @latex, '--emacs']
+      args = [RbConfig.ruby, @latex, '--emacs', '--junk-dir', 'junk']
       args += ['--engine', @engine] if @engine
       command([*args, *flags, File.basename(@main)])
     end

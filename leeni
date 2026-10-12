@@ -6,7 +6,7 @@
 #
 # Robust, high-performance LaTeX compilation manager with:
 # - Automatic main file detection (.mainfile or directory scan)
-# - Isolated junk directory output (`junk/`)
+# - Isolated XDG cache output (project-local junk/ remains configurable)
 # - Multi-engine support (xelatex [default], lualatex, pdflatex)
 # - BibTeX and Biber bibliography generation
 # - Single-pass compilation mode (-u)
@@ -70,6 +70,10 @@ module LatexCLI
       validate_output_mode!(options, prog_name)
       @suppress_at_exit_newline = true if options[:compile]
       handle_help_and_examples(parser, options, prog_name, argv)
+
+      if options[:config_unset]
+        exit(LaTeXConfig.unset_setting!(options[:config_unset], scope: options[:config_scope] || :local) ? 0 : 1)
+      end
 
       if options[:config_save]
         LaTeXConfig.save_cli_options!(options)
@@ -137,7 +141,12 @@ module LatexCLI
       puts "Usage: #{prog_name} [directory...]\nClean all LaTeX auxiliary and junk files in the specified directory (default: current directory)."
       return
     end
-    (argv.empty? ? [nil] : argv).each { |d| LaTeXUtils.clean_directory(directory_argument_or_abort(d, prog_name)) }
+    (argv.empty? ? [nil] : argv).each do |d|
+      target = directory_argument_or_abort(d, prog_name)
+      config = LaTeXConfig.load_merged_config(target)
+      workspace = LeeniBuildWorkspace.resolve(target, config['junk_dir'])
+      LaTeXUtils.clean_directory(target, true, workspace_dir: workspace)
+    end
   end
 
   # Resolves a CLI directory argument: a directory is itself, a file is its
@@ -264,6 +273,7 @@ module LatexCLI
       vscode_lw: false,
       raw: cfg['raw'] == true, link: cfg['links'],
       index: cfg['index'] == true, explicit_index: false, config_save: false, config_scope: nil,
+      config_unset: nil,
       explicit_passes: false, explicit_update_on_diff: false, explicit_time: false,
       explicit_raw: false, explicit_trace: false, explicit_werror: false,
       explicit_emacs: false, explicit_help_style: false, explicit_styles_inject: false
@@ -422,9 +432,9 @@ module LatexCLI
   def self.add_compilation_options_target(opts, options)
     opts.separator ''
     opts.separator '  Output Management & Cleaning:'
-    opts.on('-c', '--clean', 'Clean temporary build files in junk/ and regenerable root artifacts before compilation') { options[:clean] = true }
+    opts.on('-c', '--clean', 'Clean build cache and regenerable root artifacts before compilation') { options[:clean] = true }
     opts.on('-C', '--clean-only', 'Clean auxiliary files in directory and exit without building') { options[:clean_only] = true }
-    opts.on('--junk-dir DIR', 'Directory for temporary build artifacts (default: junk or .junk)') do |v|
+    opts.on('--junk-dir DIR', 'Directory for build artifacts (default: $XDG_CACHE_HOME/leeni/projects)') do |v|
       options[:junk_dir] = v
       options[:explicit_junk_dir] = true
     end
@@ -542,6 +552,9 @@ module LatexCLI
     opts.on('--config-show', 'Show active configuration sources and resolved settings and exit') { options[:show_config] = true }
     opts.on('--config-save', 'Save specified CLI option choices to configuration file (default: local .l.jsonc)') do
       options[:config_save] = true
+    end
+    opts.on('--config-unset KEY', 'Remove a saved setting from local or global configuration and exit') do |key|
+      options[:config_unset] = key
     end
     opts.on('--global', 'Target global configuration (~/.config/leeni/config.jsonc) for config operations') do
       options[:config_scope] = :global
@@ -754,7 +767,11 @@ module LatexCLI
       puts LaTeXUtils.find_main_latex_file(directory_argument_or_abort(argv[0], prog_name), options[:exclude_main_tex])
       exit 0
     elsif options[:clean_only]
-      LaTeXUtils.clean_directory(directory_argument_or_abort(argv[0], prog_name))
+      target = directory_argument_or_abort(argv[0], prog_name)
+      config = LaTeXConfig.load_merged_config(target)
+      configured = options[:junk_dir] || config['junk_dir']
+      workspace = LeeniBuildWorkspace.resolve(target, configured)
+      LaTeXUtils.clean_directory(target, true, workspace_dir: workspace)
       exit 0
     end
   end

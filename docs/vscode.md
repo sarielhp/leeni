@@ -101,7 +101,7 @@ If you use the popular [LaTeX Workshop](https://marketplace.visualstudio.com/ite
 
 ## SyncTeX (Forward & Reverse Search)
 
-`leeni` compiles documents with `-synctex=1` by default and automatically exports `<doc>.synctex.gz` (and `<doc>.pdf`) to the project root directory, while also preserving copies in `junk/`.
+`leeni` compiles documents with `-synctex=1` by default and automatically exports `<doc>.synctex.gz` (and `<doc>.pdf`) to the project root directory, while also preserving copies in the per-project build cache.
 
 ### In LaTeX Workshop (Internal Viewer):
 * **Forward Search** (editor $\rightarrow$ PDF): `Ctrl+Alt+J` (macOS: `Cmd+Option+J`) jumps to the corresponding line in the PDF viewer.

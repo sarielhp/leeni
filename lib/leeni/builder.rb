@@ -3,7 +3,7 @@
 # ==============================================================================
 # lib/leeni/builder.rb
 #
-# LaTeX compilation lifecycle manager, pass scheduler, junk/ directory isolation,
+# LaTeX compilation lifecycle manager, pass scheduler, build directory isolation,
 # bibliography handling, lockfile protection, and artifact staging.
 # ==============================================================================
 
@@ -16,6 +16,7 @@ require 'time'
 
 require_relative 'color'
 require_relative 'utils'
+require_relative 'build_workspace'
 require_relative 'compatibility'
 require_relative 'diagnostics'
 require_relative 'brace_checker'
@@ -83,16 +84,7 @@ class LatexBuilder
 
   def resolve_junk_dir
     opts = @options || {}
-    configured = (opts[:junk_dir] || opts[:config_junk_dir]).to_s.strip.chomp('/')
-    configured = configured.delete_prefix('./')
-    return configured unless configured.empty?
-
-    check_dir = @bdir && !@bdir.empty? ? File.expand_path(@bdir) : '.'
-    dot_junk = File.join(check_dir, '.junk')
-    reg_junk = File.join(check_dir, 'junk')
-    return '.junk' if File.directory?(dot_junk) && !File.directory?(reg_junk)
-
-    'junk'
+    LeeniBuildWorkspace.resolve(@bdir, opts[:junk_dir] || opts[:config_junk_dir])
   end
 
   def interactive_tty?
@@ -305,7 +297,7 @@ class LatexBuilder
     LaTeXUtils.safe_read("#{@pdferr}_#{pass}").match?(/Please \(re\)run Biber/i)
   end
 
-  # junk/ persists, so a .bbl from an earlier build in the other bibliography
+  # The build directory persists, so a .bbl from an earlier build in the other bibliography
   # system kills pass 1 ("Missing 'biblatex' package" / "not created by
   # biblatex"), and report_errors exits before any retry is possible. A .bbl
   # whose format contradicts what the sources load is useless; if a preamble
@@ -334,7 +326,7 @@ class LatexBuilder
   # Biblatex aux files hold \abx@aux@ commands that are undefined without the
   # package ("Missing \begin{document}"), so they go with the control files. This
   # only runs when no source loads biblatex, and only touches this document's aux
-  # tree: other documents sharing junk/ (or \includeonly'd chapters) keep theirs.
+  # tree: other documents sharing a build directory (or \includeonly'd chapters) keep theirs.
   def biblatex_leftovers
     auxes = bib_manager.current_aux_files.select { |f| LaTeXUtils.safe_read(f).include?(LaTeXBibManager::BIBLATEX_AUX_MARKER) }
     return [] if auxes.empty? && !File.file?(File.join(@junk_dir, "#{@bfilename}.bcf"))
@@ -491,7 +483,9 @@ class LatexBuilder
       next if path.empty?
 
       abs = File.expand_path(path)
-      if abs.start_with?(root_abs) && File.file?(abs)
+      workspace_abs = File.expand_path(@junk_dir)
+      next if abs == workspace_abs || abs.start_with?(workspace_abs + File::SEPARATOR)
+      if abs.start_with?(root_abs + File::SEPARATOR) && File.file?(abs)
         rel = abs.sub(%r{\A#{Regexp.escape(root_abs)}/?}, '')
         next if rel.start_with?("#{@junk_dir}/") || rel.start_with?('junk/') || rel.start_with?('.junk/') || rel.empty?
 

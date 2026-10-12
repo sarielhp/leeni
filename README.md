@@ -24,7 +24,7 @@
 `leeni` (also invoked as `l`) brings modern compiler diagnostics (like Rust or Typst) to traditional LaTeX workflows (`xelatex`, `lualatex`, and `pdflatex`), while keeping the workspace clean and fully compatible with arXiv submission.
 
 Like `latexmk`, it automates multi-pass convergence and bibliography processing, but adds three core architectural differences:
-1. **Directory isolation**: Intermediate build files (`.aux`, `.log`, `.toc`, etc.) are confined to a `junk/` directory; only final outputs (`.pdf`, `.bbl`, `.synctex.gz`) remain in the working tree.
+1. **Directory isolation**: Intermediate build files (`.aux`, `.log`, `.toc`, etc.) live in the user cache; only final outputs (`.pdf`, `.bbl`, `.synctex.gz`) remain in the working tree.
 2. **4-tier diagnostic filtering**: Separates fatal errors and silent structural corruptions (**Alerts**) from standard warnings and harmless sub-millimeter layout noise (**Whatevers**).
 3. **Dual human and agent interfaces**: Supports interactive terminal diagnostics with explanatory hints (`-x`), strict GNU compiler mode (`-cc`), and token-optimized plaintext for autonomous AI coding agents (`-llm`).
 
@@ -97,7 +97,7 @@ l -r        # Print raw compiler output (debug mode)
 
 | Capability | `leeni` | `latexmk` | `rubber` | Standard IDEs (VS Code / Overleaf) |
 | :--- | :--- | :--- | :--- | :--- |
-| **Intermediate file isolation** | Automatic (`junk/` subdirs mirrored; only `.pdf`, `.bbl`, `.synctex.gz` exported) | Manual (`-outdir`; can break relative `\input` paths) | Manual (`--into`) | Root directory or local `.aux` clutter |
+| **Intermediate file isolation** | Automatic (XDG cache; only `.pdf`, `.bbl`, `.synctex.gz` exported) | Manual (`-outdir`; can break relative `\input` paths) | Manual (`--into`) | Root directory or local `.aux` clutter |
 | **Multi-pass convergence** | Dependency tracking (`.fls`) + SHA256 build state (1–10 passes) | Re-run loop on `.log`/`.aux` changes | Rule-based dependency tree | Fixed passes or background re-compilation |
 | **Silent structural flaw detection** | **Alerts**: Inverted `\label` before `\caption`, duplicate labels, large overflows | None (exits 0; buried in log) | None (exits 0; buried in log) | None (treated as successful compile) |
 | **Sub-millimeter noise suppression** | **Whatevers**: $\le 2.5\text{pt}$ overfulls counted in summary, hidden by default | Emits every warning to log | Emits every warning to log | Displays full warning count in problems pane |
@@ -116,7 +116,7 @@ While humans enjoy rich TrueColor terminal diagnostics and plain-English error e
 - **0 tokens on success**: Exits `0` silently with zero stdout/stderr on clean builds or up-to-date targets.
 - **Precise line & column diagnostics**: Emits exact `file:line:col: error: message` headers so agents jump straight to the fix.
 - **Warning folding**: Automatically collapses 50+ repeated citation or layout warnings into the first 2 instances plus count, preventing context window blowout.
-- **Automatic junk isolation**: Prevents AI agents from hallucinating or editing generated `.aux`, `.log`, or `.fls` files.
+- **Automatic cache isolation**: Keeps generated `.aux`, `.log`, and `.fls` files outside the source tree.
 
 ### Drop-in Configuration for AI Agents (`CLAUDE.md`, `.cursorrules`)
 
@@ -124,7 +124,7 @@ While humans enjoy rich TrueColor terminal diagnostics and plain-English error e
 ### LaTeX Compilation Rule
 When compiling or checking LaTeX documents, always use `l -llm <file>.tex` instead of `pdflatex` or `latexmk`:
 - Runs in token-optimized mode (silent on clean build; exact file:line:col diagnostics on failure).
-- Confines auxiliary build artifacts to `junk/` automatically.
+- Confines auxiliary build artifacts to the user cache automatically.
 ```
 
 *(See [docs/llm_reference.md](docs/llm_reference.md) for the complete token-optimized technical reference.)*
@@ -154,7 +154,7 @@ For technical guides, configuration options, and advanced features, see:
 **No.** Standard compilation (`l`, `l paper.tex`) never touches or modifies your source documents. When generating publication packages (`-Z` or `--arxiv`), source flattening and comment stripping operate exclusively inside isolated temporary staging directories.
 
 ### Where do intermediate build files go?
-All intermediate build files (`.aux`, `.log`, `.out`, `.toc`, `.fls`, `.bcf`, etc.) are placed in the `junk/` directory. Only your final outputs (`<doc>.pdf`, `<doc>.bbl`, and `<doc>.synctex.gz`) reside in your working directory.
+Intermediate build files (`.aux`, `.log`, `.out`, `.toc`, `.fls`, `.bcf`, etc.) go under `$XDG_CACHE_HOME/leeni/projects/` (or `~/.cache/leeni/projects/` when unset). Each project gets a directory named with its basename and a hash of its canonical path, including projects outside home. Only final outputs (`<doc>.pdf`, `<doc>.bbl`, and `<doc>.synctex.gz`) remain in the working directory. Use `--junk-dir junk` or set `"junk_dir": "junk"` to keep the former local layout. `l -C` removes the selected project's cache and root auxiliary files; `l -c` does the same before compiling. Existing `junk/` and `.junk/` directories are also removed by cleanup.
 
 ### Why use `l -llm` instead of an MCP server for AI coding agents?
 Standard GNU compiler plaintext (`file:line: error: message`) takes ~75% fewer context tokens than JSON-RPC payloads, and coding agents already possess native terminal execution tools. For details, see [docs/decisions.md (ADR-0002)](docs/decisions.md).

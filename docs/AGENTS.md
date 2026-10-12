@@ -14,13 +14,14 @@ This document provides architectural guidelines, core invariants, development wo
   - `color.rb`: ANSI color rendering via `Rainbow` with graceful plain-text `NullString` fallback.
   - `compatibility.rb`: Environment adjustments for vendor styles (e.g. `revtex4`).
   - `config.rb`: Unified JSONC configuration loader (`.l.jsonc`, `~/.config/leeni/config.jsonc`) and quote-aware parser.
+  - `build_workspace.rb`: XDG cache location and per-project build directory resolution.
   - `utils.rb`: Engine detection, main file discovery heuristics, noise filtering, and directory cleanup.
   - `brace_checker.rb`: Lexical environment-scoped brace validator and AUCTeX formatter.
   - `flattener.rb`: TeX input tree resolution, comment stripping, and flattening.
   - `meta_extractor.rb`: Paper metadata parsing (title, authors, abstract, comments).
   - `diagnostics.rb`: LaTeX compilation log diagnostic analysis, AUCTeX error extraction, and 4-tier categorization.
   - `builder.rb`: Compilation lifecycle manager, convergence scheduler, caching, and output finalization.
-  - `build_runtime.rb`: Locking, `junk/` workspace preparation, compiler execution, timeouts, and LaTeX passes.
+  - `build_runtime.rb`: Locking, cache workspace preparation, compiler execution, timeouts, and LaTeX passes.
   - `packager.rb`: Portable zip archive bundler (`-z`), active figure source discovery, and styles isolation.
   - `arxiv.rb`: Sanitized, flattened arXiv submission packager and sandbox verification.
   - `cli_targets.rb`: CLI target dispatch for builds, metadata, bibliography extraction, and arXiv workflows.
@@ -57,8 +58,8 @@ This document provides architectural guidelines, core invariants, development wo
   All scripts, tooling, and test runners must be written in idiomatic **Ruby** (`#!/usr/bin/env ruby`). Do not introduce Python, Bash, Sed, or Awk scripts.
 - **Canonical Interface & Anti-Alias Policy (Strict No Redundant Aliases)**:
   Maintain a strictly minimal, clean CLI hierarchy without redundant aliases. Aliases blow up the command-line interface of a program. Every command-line option must have at most one canonical long name and optionally at most one single-letter shortcut (e.g. `-f, --force`, `-u, --single-pass`). Never add multiple single-letter shortcuts (e.g. `-u` and `-1` to the same command) or multiple long option names (e.g. `--single-pass` and `--one-pass`) to the same command. A single-letter shortcut is fine, but two single-letter shortcuts to the same command are strictly prohibited.
-- **Isolated Build Output (`junk/`)**:
-  All intermediate build artifacts must remain confined to `junk/`. Only final targets (`<file>.pdf`, `<file>.bbl`, `<file>.synctex.gz`) are exported to the project root. Cache state lives in `junk/.build_state.json`.
+- **Isolated Build Output (XDG cache by default)**:
+  All intermediate build artifacts must remain confined to the per-project build directory under `$XDG_CACHE_HOME/leeni/projects/` (falling back to `~/.cache`). Explicit `--junk-dir junk` preserves the project-local compatibility layout. Only final targets (`<file>.pdf`, `<file>.bbl`, `<file>.synctex.gz`) are exported to the project root. Cache state lives in the build directory's `.build_state.json`.
 - **Engine Support**:
   `xelatex` is the default engine, with `lualatex` and `pdflatex` supported as alternatives.
 - **Dependency Minimalism**:
@@ -81,7 +82,7 @@ Any modifications to compilation logic must honor the following invariants:
    - **`--fast` / `lw`**: Accepted for compatibility and currently no-ops. Incremental behaviour is provided unconditionally by `targets_up_to_date?`; either implement a distinct meaning for this flag or remove it.
 2. **Bibliography Safety**:
    - Detect tool automatically: Biber (via `.bcf` / `.run.xml`) or BibTeX (via `\bibdata` and `\citation` in `.aux`).
-   - Root `.bbl` is only overwritten if the generated `junk/*.bbl` contains valid bibliography entries (`\bibitem` or `\entry`).
+   - Root `.bbl` is only overwritten if the generated build-directory `.bbl` contains valid bibliography entries (`\bibitem` or `\entry`).
    - `.bbl.bak` is preserved during updates.
 3. **Target PDF Update Guard (`--update-if-changed`)**:
    - When `--update-if-changed` is active and `pdftotext` is available, skip replacing the target PDF if the extracted text layout matches the existing PDF (prevents document viewers from reloading on non-visual edits).

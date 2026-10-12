@@ -68,7 +68,7 @@ We evaluated adding automatic pre-build triggers to `leeni` that would traverse 
 1. **Security & Untrusted Code Execution (CWE-426)**:
    LaTeX document repositories are frequently shared across collaborators, students, and arXiv submissions. Automatically executing arbitrary shell scripts declared in tracked configuration files (`.l.jsonc`) creates an unauthenticated remote code execution (RCE) vulnerability.
 2. **Preservation of Sub-Second 0-Pass Incremental Builds**:
-   `leeni`'s core value proposition is sub-second turnaround and zero-pass caching (`junk/.build_state.json`). Running external Python/shell pipelines before every compile—including editor auto-saves and watch mode (`lw`)—permanently degrades the interactive authoring feedback loop.
+   `leeni`'s core value proposition is sub-second turnaround and zero-pass caching (the project cache's `.build_state.json`). Running external Python/shell pipelines before every compile—including editor auto-saves and watch mode (`lw`)—permanently degrades the interactive authoring feedback loop.
 3. **Deadlock, Fork-Bomb & CWD Ambiguities**:
    If an ancestor script invokes `l` to build sub-assets, recursive hook execution causes fork-bombs or deadlocks on concurrency locks. Furthermore, ancestor scripts break relative paths unless executed within explicit, dedicated task runner boundaries.
 4. **Clean Separation of Concerns**:

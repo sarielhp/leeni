@@ -26,6 +26,7 @@ module LatexBundler
     color.rb
     compatibility.rb
     config.rb
+    build_workspace.rb
     utils.rb
     help_manual.rb
     brace_checker.rb

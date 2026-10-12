@@ -30,7 +30,7 @@ permalink: /
 `leeni` (also invoked as `l`) brings modern compiler diagnostics (like Rust or Typst) to traditional LaTeX workflows (`xelatex`, `lualatex`, and `pdflatex`), while keeping the workspace clean and fully compatible with arXiv submission.
 
 Like `latexmk`, it automates multi-pass convergence and bibliography processing, but adds three core architectural differences:
-1. **Directory isolation**: Intermediate build files (`.aux`, `.log`, `.toc`, etc.) are confined to a `junk/` directory; only final outputs (`.pdf`, `.bbl`, `.synctex.gz`) remain in the working tree.
+1. **Directory isolation**: Intermediate build files (`.aux`, `.log`, `.toc`, etc.) are kept in the user cache by default; only final outputs (`.pdf`, `.bbl`, `.synctex.gz`) remain in the working tree.
 2. **4-tier diagnostic filtering**: Separates fatal errors and silent structural corruptions (**Alerts**) from standard warnings and harmless sub-millimeter layout noise (**Whatevers**).
 3. **Dual human and agent interfaces**: Supports interactive terminal diagnostics with explanatory hints (`-x`), strict GNU compiler mode (`-cc`), and token-optimized plaintext for autonomous AI coding agents (`-llm`).
 
@@ -102,7 +102,7 @@ l -r        # Print raw compiler output (debug mode)
 
 | Capability | `leeni` | `latexmk` | `rubber` | Standard IDEs (VS Code / Overleaf) |
 | :--- | :--- | :--- | :--- | :--- |
-| **Intermediate file isolation** | Automatic (`junk/` subdirs mirrored; only `.pdf`, `.bbl`, `.synctex.gz` exported) | Manual (`-outdir`; can break relative `\input` paths) | Manual (`--into`) | Root directory or local `.aux` clutter |
+| **Intermediate file isolation** | Automatic (XDG cache; only `.pdf`, `.bbl`, `.synctex.gz` exported) | Manual (`-outdir`; can break relative `\input` paths) | Manual (`--into`) | Root directory or local `.aux` clutter |
 | **Multi-pass convergence** | Dependency tracking (`.fls`) + SHA256 build state (1–10 passes) | Re-run loop on `.log`/`.aux` changes | Rule-based dependency tree | Fixed passes or background re-compilation |
 | **Silent structural flaw detection** | **Alerts**: Inverted `\label` before `\caption`, duplicate labels, large overflows | None (exits 0; buried in log) | None (exits 0; buried in log) | None (treated as successful compile) |
 | **Sub-millimeter noise suppression** | **Whatevers**: $\le 2.5\text{pt}$ overfulls counted in summary, hidden by default | Emits every warning to log | Emits every warning to log | Displays full warning count in problems pane |
@@ -138,7 +138,7 @@ When compiling or checking LaTeX documents, always use `l -llm <file>.tex` inste
 
 ## Documentation
 
-For technical guides, configuration options, and advanced features, see:
+Start with [help by topic]({{ "/help/" | relative_url }}) to find the right guide. The complete references are also listed here:
 
 - **[CLI Options Reference](cli_options.html)**: Complete command-line options catalog, usage examples, and flag reference.
 - **[Diagnostics Guide](diagnostics.html)**: The 4-tier diagnostic hierarchy (**Alerts** & **Whatevers** explained), error explanations (`-x`), and threshold tuning.

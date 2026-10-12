@@ -76,7 +76,7 @@ class ErrorCorpusRunner
   end
 
   def test_example(dir)
-    cmd = [RbConfig.ruby, LEENI, '--no-lock', '-f', 'example.tex']
+    cmd = [RbConfig.ruby, LEENI, '--no-lock', '--junk-dir', 'junk', '-f', 'example.tex']
     out, status = Open3.capture2e(*cmd, chdir: dir)
     cleanup_junk(dir)
 

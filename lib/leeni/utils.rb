@@ -10,6 +10,7 @@
 require 'fileutils'
 require 'io/console'
 require 'pathname'
+require_relative 'build_workspace'
 begin
   require 'unicode/display_width'
 rescue LoadError
@@ -26,12 +27,12 @@ module LaTeXUtils
   # backup directory to exclude from bundles, so cleaning must not delete it.
   JUNK_BUILD_DIRS = %w[junk .junk styles/junk styles/.junk figs/junk figs/.junk refs/junk refs/.junk].freeze
 
-  # Every scratch file this tool writes lives under `junk/`, which is removed
-  # wholesale via JUNK_BUILD_DIRS. These patterns therefore only ever run over
+  # Scratch files live in the selected build directory, which is removed
+  # wholesale when cleaning. These patterns therefore only ever run over
   # the project root, where a match can only be a TeX-generated artifact or a
   # file the user wrote by hand. Patterns that cannot distinguish the two --
   # `log.txt`, `err_*`, `*.err*` -- were removed for that reason; the tool's own
-  # copies of those are `junk/log.txt`, `junk/log.txt.1` and `junk/err_<engine>`.
+  # copies of those are `log.txt`, `log.txt.1` and `err_<engine>` there.
   JUNK_PATTERNS = [
     '*.{aux,blg,bcf,run.xml}',
     '*.{log,out,toc,lof,lot,thm,idx,ind,ilg}',
@@ -385,6 +386,7 @@ module LaTeXUtils
     with_pdf = candidates.select do |f|
       base = File.basename(f, '.tex')
       File.exist?(File.join(dir, "#{base}.pdf")) ||
+        File.exist?(File.join(LeeniBuildWorkspace.cache_dir(dir), "#{base}.pdf")) ||
         File.exist?(File.join(dir, 'junk', "#{base}.pdf")) ||
         File.exist?(File.join(dir, '.junk', "#{base}.pdf"))
     end
@@ -406,7 +408,7 @@ module LaTeXUtils
     dir.to_s
   end
 
-  def self.clean_directory(dir = '.', verbose = true)
+  def self.clean_directory(dir = '.', verbose = true, workspace_dir: nil)
     target_dir = File.expand_path(dir)
     return unless File.directory?(target_dir)
 
@@ -419,6 +421,20 @@ module LaTeXUtils
         Dir.glob(pat).each { |f| FileUtils.rm_f(f) }
       end
     end
+
+    cache = LeeniBuildWorkspace.cache_dir(target_dir)
+    FileUtils.rm_rf(cache)
+    clean_custom_workspace(target_dir, workspace_dir) if workspace_dir
+  end
+
+  def self.clean_custom_workspace(target_dir, workspace_dir)
+    path = File.expand_path(workspace_dir, target_dir)
+    return if path == LeeniBuildWorkspace.cache_dir(target_dir)
+    return if path == target_dir || target_dir.start_with?(path + File::SEPARATOR)
+    return unless File.file?(File.join(path, '.leeni_workspace'))
+    return unless File.read(File.join(path, '.leeni_workspace')).strip == LeeniBuildWorkspace.project_root(target_dir)
+
+    FileUtils.rm_rf(path)
   end
 
   def self.reset_latex_environment!

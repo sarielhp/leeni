@@ -2,6 +2,8 @@
 
 This document provides a complete reference for all command-line flags and options supported by `leeni` (`l`).
 
+All long options accept either `-` or `--` and allow internal dashes to be omitted. For example, `--zip-alone`, `-zip-alone`, `--zipalone`, and `-zipalone` are equivalent; so are `--no-styles-inject` and `-nostylesinject`. Option values keep their original spelling, including values after `=`. Single-letter options and grouped short flags such as `-zt` still work. A complete recognized long name takes precedence over a short-flag group. Spellings after the `--` separator are treated as filenames.
+
 ---
 
 ## Quick Reference Summary
@@ -32,6 +34,7 @@ This document provides a complete reference for all command-line flags and optio
 | `-llm`, `--agent` | Diagnostics | Token-optimized mode for AI agents (zero ANSI, folded warnings, silent on success). |
 | `--json` | Diagnostics | Output structured compilation and diagnostic results as JSON. |
 | `-z`, `--zip` | Packaging | Create self-contained portable zip archive of paper. |
+| `--zip-alone` | Packaging | Bundle styles and verify an isolated build with no errors or alerts and matching PDF. |
 | `-Z`, `--zip-flat` | Packaging | Create self-contained portable zip archive with inlined `.tex`. |
 | `-t`, `--verify` | Packaging | Verify portability by testing compilation in `/tmp` sandbox. |
 | `-B`, `--bib-extract` | Packaging | Extract cited bibliography entries into local `.bib` file. |
@@ -204,6 +207,13 @@ Creates a self-contained portable `.zip` archive containing the paper, active fi
 l -z paper.tex
 ```
 
+### `--zip-alone`
+Creates a portable ZIP with required non-system styles in `styles/` and injects the LaTeX search path into the packaged source. Forces a fresh initial build, extracts the archive into a new temporary directory, and rebuilds with `--no-env`. Verification requires a newly generated, nonempty PDF, zero errors and alerts, identical extracted text layout, and identical rendered pages at 150 dpi. Requires `pdftotext` and `pdftoppm`; verification failure preserves any existing archive. Standard LaTeX packages must still be installed.
+
+```bash
+l --zip-alone paper.tex
+```
+
 ### `-Z`, `--zip-flat`
 Creates a flattened `.zip` archive where all nested `\input` and `\include` subfiles are recursively inlined into a single monolithic `.tex` file (required by journals like IEEE, Springer, and Elsevier).
 ```bash
@@ -244,6 +254,8 @@ l --meta paper.tex
 ## 6. Environment & Configuration
 
 ### `--no-env`
+Also accepts `-noenv`, `--noenv`, and `-no-env`.
+
 Unsets ambient TeX environment variables (`TEXINPUTS`, `BIBINPUTS`, `BSTINPUTS`, `TEXMFHOME`, etc.) to prevent host machine configuration pollution.
 ```bash
 l --no-env paper.tex

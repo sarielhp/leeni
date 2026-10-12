@@ -73,6 +73,7 @@ module LatexCLITargets
   end
 
   def process_standard_target(target, options)
+    options = options.merge(zip: true, inject_styles: true, verify: true, force: true) if options[:zip_alone]
     builder = LatexBuilder.new(target, options)
     exit 1 unless builder.run!
     return unless options[:zip] || options[:verify]

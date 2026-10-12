@@ -169,7 +169,7 @@ class TestDestructivePaths < Minitest::Test
     extras = LatexCLI.extract_extra_cli_files(argv)
 
     assert_empty extras
-    assert_equal ['weird--name.tex'], argv,
+    assert_equal ['--', 'weird--name.tex'], argv,
                  '`--` claimed the target as bundle payload with no packaging flag present'
   end
 

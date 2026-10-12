@@ -60,11 +60,11 @@ module LatexCLI
     begin
       return if early_personality_dispatch(argv, prog_name)
 
+      normalize_argv!(argv)
       extra_cli_files = extract_extra_cli_files(argv)
       cfg = LaTeXConfig.load_merged_config
       options = build_default_options(cfg, prog_name, extra_cli_files)
 
-      normalize_argv!(argv)
       parser = build_option_parser(options)
       parse_options!(parser, argv, prog_name)
       validate_output_mode!(options, prog_name)
@@ -162,16 +162,32 @@ module LatexCLI
 
   # Flags that make `-- <files>` mean "extra files to bundle". Everywhere else
   # `--` keeps its POSIX meaning of "end of options".
-  PACKAGING_LONG_FLAGS = %w[--zip --zip-flat --verify --arxiv].freeze
+  PACKAGING_LONG_FLAGS = %w[--zip --zip-flat --zip-alone --verify --arxiv --zip-name --arxiv-name].freeze
 
   def self.packaging_requested?(argv)
-    argv.any? do |arg|
-      next true if PACKAGING_LONG_FLAGS.include?(arg)
-      next true if arg.start_with?('--zip-name', '--arxiv-name')
-      next false unless arg.start_with?('-') && !arg.start_with?('--')
+    normalized = argv.dup
+    normalize_long_options!(normalized)
+    parser = build_option_parser({})
+    skip_value = false
+    normalized.each do |arg|
+      if skip_value
+        skip_value = false
+        next
+      end
+      return false if arg == '--'
+      return true if packaging_flag?(arg)
 
-      arg[1..].chars.any? { |c| c == 'z' || c == 'Z' || c == 't' }
+      skip_value = option_requires_next_value?(arg, parser)
     end
+    false
+  end
+
+  def self.packaging_flag?(arg)
+    flag = arg.split('=', 2).first
+    return true if PACKAGING_LONG_FLAGS.include?(flag)
+    return false unless flag.start_with?('-') && !flag.start_with?('--')
+
+    flag[1..].chars.any? { |c| c == 'z' || c == 'Z' || c == 't' }
   end
 
   # Claims the files after `--` as bundle payload, but only when a packaging
@@ -183,7 +199,6 @@ module LatexCLI
     return [] unless (sep_idx = argv.index('--'))
 
     unless packaging_requested?(argv)
-      argv.delete_at(sep_idx)
       return []
     end
 
@@ -257,7 +272,7 @@ module LatexCLI
 
   def self.build_zip_options(cfg, extra_cli_files)
     {
-      zip: false, zip_flat: cfg.dig('zip', 'flat') == true, verify: false, zip_name: nil,
+      zip: false, zip_alone: false, zip_flat: cfg.dig('zip', 'flat') == true, verify: false, zip_name: nil,
       inject_styles: (cfg.dig('zip', 'styles_inject') || cfg.dig('zip', 'inject_styles')) == true,
       fig_sources: cfg.dig('zip', 'fig_sources') || ['.fig', '.ipe', '.svg', '.asy', '.gp', '.gnuplot', '.py', '.R'],
       extra_files: (Array(cfg.dig('zip', 'include')) + extra_cli_files).uniq
@@ -277,21 +292,67 @@ module LatexCLI
   end
 
   def self.normalize_argv!(argv)
+    normalize_long_options!(argv)
     normalize_bib_extract_args!(argv)
-    argv.map! do |arg|
-      case arg
-      when '-cc' then '--compile'
-      when '-llm' then '--llm'
-      when /\A-([2-9]|\d{2,})\z/ then "--context=#{$1}"
-      else arg
+  end
+
+  # Derive accepted spellings from the parser so new long options automatically
+  # accept one/two leading dashes and any omitted internal dashes. Values and
+  # operands after -- retain their exact spelling.
+  def self.normalize_long_options!(argv)
+    parser = build_option_parser({})
+    names = parser.top.long.keys.group_by { |name| name.delete('-') }
+    skip_value = false
+    argv.each_with_index do |arg, index|
+      if skip_value
+        skip_value = false
+        next
       end
+      break if arg == '--'
+      next unless arg.start_with?('-')
+
+      flag, value = arg.split('=', 2)
+      canonical = canonical_option_flag(flag, names)
+      argv[index] = value.nil? ? canonical : "#{canonical}=#{value}"
+      skip_value = value.nil? && option_requires_next_value?(argv[index], parser)
     end
   end
 
+  def self.canonical_option_flag(flag, names)
+    return '--compile' if flag == '-cc'
+    return "--context=#{$1}" if flag =~ /\A-([2-9]|\d{2,})\z/
+
+    matches = names[flag.sub(/\A--?/, '').delete('-')]
+    matches&.one? ? "--#{matches.first}" : flag
+  end
+
+  def self.option_requires_next_value?(flag, parser)
+    return false unless flag.start_with?('-') && !flag.include?('=')
+
+    if flag.start_with?('--')
+      return parser.top.long[flag.delete_prefix('--')].is_a?(OptionParser::Switch::RequiredArgument)
+    end
+
+    characters = flag.delete_prefix('-').chars
+    characters.each_with_index do |character, index|
+      option = parser.top.short[character]
+      next unless option.is_a?(OptionParser::Switch::RequiredArgument)
+
+      return index == characters.size - 1
+    end
+    false
+  end
+
   def self.normalize_bib_extract_args!(argv)
+    parser = build_option_parser({})
     i = 0
     while i < argv.size
       arg = argv[i]
+      break if arg == '--'
+      if option_requires_next_value?(arg, parser)
+        i += 2
+        next
+      end
       if arg =~ /^--bib-extract=(.+)$/
         val = Regexp.last_match(1)
         argv[i] = '--bib-extract'
@@ -411,6 +472,9 @@ module LatexCLI
     opts.separator ''
     opts.separator '  Paper Bundling, Bibliography & Portability:'
     opts.on('-z', '--zip', 'Create a self-contained portable zip archive of paper, styles, and figures') { options[:zip] = true }
+    opts.on('--zip-alone', 'Bundle styles and verify an isolated rebuild with no errors or alerts and matching PDF') do
+      options.merge!(zip_alone: true, zip: true, inject_styles: true, verify: true, force: true)
+    end
     opts.on('-Z', '--zip-flat', 'Create a self-contained portable zip archive with inlined/flattened .tex') do
       options[:zip] = true
       options[:zip_flat] = true

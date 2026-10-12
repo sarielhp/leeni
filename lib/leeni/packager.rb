@@ -8,6 +8,7 @@
 # ==============================================================================
 
 require 'fileutils'
+require 'json'
 require 'open3'
 require 'rbconfig'
 require 'tmpdir'
@@ -217,12 +218,7 @@ class LatexPackager
       return false
     end
 
-    if @options[:inject_styles] && has_styles && !content.include?('input@path')
-      injection = "\\makeatletter\n\\def\\input@path{{styles/}{./}}\n\\makeatother\n"
-      content = inject_into_tex(content, injection)
-    end
-
-    File.write(dest_path, content)
+    File.write(dest_path, inject_style_search_path(content, has_styles))
     true
   end
 
@@ -271,13 +267,19 @@ class LatexPackager
     FileUtils.mkdir_p(File.dirname(dest_path))
 
     content = LaTeXUtils.safe_read(@filename)
-    if @options[:inject_styles] && has_styles && !content.include?('input@path')
-      injection = "\\makeatletter\n\\def\\input@path{{styles/}{./}}\n\\makeatother\n"
-      injected_content = inject_into_tex(content, injection)
-      File.write(dest_path, injected_content)
-    else
-      File.write(dest_path, content)
-    end
+    File.write(dest_path, inject_style_search_path(content, has_styles))
+  end
+
+  def inject_style_search_path(content, has_styles)
+    return content unless @options[:inject_styles] && has_styles
+    return content if content.include?('input@path') && !@options[:zip_alone]
+
+    definition = if content.include?('input@path')
+                   "\\providecommand\\input@path{}\n\\g@addto@macro\\input@path{{styles/}{./}}"
+                 else
+                   '\\def\\input@path{{styles/}{./}}'
+                 end
+    inject_into_tex(content, "\\makeatletter\n#{definition}\n\\makeatother\n")
   end
 
   def inject_into_tex(content, injection)
@@ -358,26 +360,83 @@ class LatexPackager
     ruby_bin = RbConfig.ruby
     script_bin = LEENI_EXECUTABLE
     cmd = [ruby_bin, script_bin, '--no-env', '--engine', @builder.engine_name]
+    cmd += ['--json', '--all', '--force'] if @options[:zip_alone]
     cmd += ['--timeout', @options[:timeout].to_s] if @options[:timeout]
     cmd << @filename
 
-    compile_out, compile_stat = Open3.capture2e(sandbox_environment(tmpdir), *cmd, chdir: tmpdir)
+    compile_out, compile_err, compile_stat = Open3.capture3(sandbox_environment(tmpdir), *cmd, chdir: tmpdir)
     new_pdf = File.join(tmpdir, "#{@bfilename}.pdf")
 
-    if compile_stat.success? && File.file?(new_pdf)
-      return false unless verify_pdf_diff(backup_pdf, new_pdf)
-
-      puts Rainbow("[VERIFIED] Archive successfully verified: self-contained and compiles in clean environment.").green.bright
-      true
-    else
+    unless compile_stat.success? && File.file?(new_pdf) && File.size(new_pdf).positive?
       warn Rainbow("[FAIL] Verification failed! Document did not compile in clean environment.").red.bright
       warn compile_out
-      false
+      warn compile_err unless compile_err.empty?
+      return false
     end
+    return false if @options[:zip_alone] && !verify_clean_diagnostics(compile_out)
+    return false unless verify_pdf_diff(backup_pdf, new_pdf)
+    return false if @options[:zip_alone] && !verify_pdf_visual_match(backup_pdf, new_pdf)
+
+    puts Rainbow("[VERIFIED] Archive successfully verified: self-contained and compiles in clean environment.").green.bright
+    true
+  end
+
+  def verify_clean_diagnostics(output)
+    result = JSON.parse(output)
+    raise TypeError, 'expected a diagnostic result object' unless result.is_a?(Hash)
+
+    summary = result.fetch('summary')
+    raise TypeError, 'expected diagnostic counts' unless summary.is_a?(Hash)
+
+    if result['success'] == true && summary.fetch('errors') == 0 && summary.fetch('alerts') == 0
+      puts Rainbow(' -- Isolated build has no errors or alerts.').green
+      return true
+    end
+
+    warn Rainbow('[FAIL] Isolated build reported errors or alerts.').red.bright
+    warn output
+    false
+  rescue JSON::ParserError, KeyError, TypeError => e
+    warn Rainbow("[FAIL] Could not verify isolated build diagnostics: #{e.message}").red.bright
+    false
+  end
+
+  def verify_pdf_visual_match(original, rebuilt)
+    unless LaTeXUtils.command_available?('pdftoppm')
+      warn Rainbow("[FAIL] --zip-alone verification requires 'pdftoppm'.").red.bright
+      return false
+    end
+
+    Dir.mktmpdir('leeni_zip_visual_') do |directory|
+      pages = [original, rebuilt].each_with_index.map do |pdf, index|
+        prefix = File.join(directory, "pdf#{index}")
+        output, status = Open3.capture2e('pdftoppm', '-r', '150', pdf, prefix)
+        unless status.success?
+          warn Rainbow("[FAIL] Could not render PDF for verification: #{output}").red.bright
+          return false
+        end
+        Dir.glob("#{prefix}-*.ppm").sort_by { |path| path[/-(\d+)\.ppm\z/, 1].to_i }
+      end
+      matching = !pages[0].empty? && pages[0].size == pages[1].size &&
+                 pages[0].zip(pages[1]).all? { |left, right| File.size(left).positive? && FileUtils.compare_file(left, right) }
+      unless matching
+        warn Rainbow('[FAIL] Rebuilt PDF pages differ visually from the bundled PDF.').red.bright
+        return false
+      end
+      puts Rainbow(' -- All PDF pages match visually at 150 dpi.').green
+      true
+    end
+  rescue SystemCallError => e
+    warn Rainbow("[FAIL] Could not compare PDF pages: #{e.message}").red.bright
+    false
   end
 
   def verify_pdf_diff(orig_pdf, new_pdf)
     unless LaTeXUtils.command_available?('pdftotext')
+      if @options[:zip_alone]
+        warn Rainbow("[FAIL] --zip-alone verification requires 'pdftotext'.").red.bright
+        return false
+      end
       puts Rainbow(" -- PDF text comparison skipped: 'pdftotext' is unavailable.").yellow
       return true
     end

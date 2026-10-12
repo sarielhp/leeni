@@ -13,7 +13,7 @@ module QualityGate
     test_brace_checker.rb test_author_names.rb test_compile_format.rb
     test_diagnostic_record.rb test_presenters.rb
     test_log_recognisers.rb test_deep_diagnostics.rb test_diagnostic_formatting.rb
-    test_repair_failures.rb test_config.rb test_color_theme.rb
+    test_repair_failures.rb test_config.rb test_color_theme.rb test_cli_spellings.rb
     test_author_verification.rb test_visual_verification.rb test_compatibility.rb
     test_arxiv_worker.rb test_arxiv_fixups.rb test_sample_arxiv.rb test_bump.rb
   ].freeze
@@ -21,7 +21,7 @@ module QualityGate
     test_compile_mode.rb test_pathological_latex.rb test_llm_mode.rb test_json_mode.rb
     test_bib_integration.rb test_bws_review.rb test_bib_extractor.rb
     test_raw_mode.rb test_metadata_report_review.rb test_arxiv_runner_review.rb
-    test_build_cache.rb test_vim_integration.rb test_destructive_paths.rb
+    test_build_cache.rb test_vim_integration.rb test_destructive_paths.rb test_zip_alone.rb
     test_arxiv.rb test_config_save.rb test_code_metrics.rb test_convergence_loop.rb
     test_sample_arxiv_review.rb test_arxiv_cycle.rb test_emacs_auctex.rb
   ].freeze

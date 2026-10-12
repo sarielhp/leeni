@@ -28,6 +28,14 @@ To include arbitrary supplementary datasets or notes:
 l -z paper.tex -- notes.txt data/*.csv
 ```
 
+### Verified Standalone Archive (`--zip-alone`)
+
+```bash
+l --zip-alone paper.tex
+```
+
+Combines ZIP creation, style isolation and search-path injection, and mandatory verification. It builds fresh dependencies, extracts the ZIP into a new temporary directory, and runs `l --no-env` there with an empty user home and no personal TeX tree. Success requires a new nonempty PDF, no errors or alerts, identical extracted text layout, and identical rendered pages at 150 dpi. Ordinary warnings are permitted. Both `pdftotext` and `pdftoppm` are required. An unsuccessful verification leaves an existing ZIP unchanged. Standard LaTeX packages remain an installation requirement.
+
 ### Flattened Single-File Archive (`-Z` / `--zip-flat`)
 Many journal portals (such as Springer Nature, IEEE Author Portal, and Elsevier Editorial Manager) require all LaTeX content in a single monolithic `.tex` file without nested `\input` or `\include` directories.
 
@@ -130,6 +138,8 @@ tools/bws_run /path/to/paper -- leeni paper.tex
 ## 5. Environment Sanitization & Overrides
 
 ### Sanitizing Environment (`--no-env`)
+The spellings `-noenv`, `--noenv`, and `-no-env` also work.
+
 Stray environment variables in `~/.bashrc` or `~/.zshrc` (such as `TEXINPUTS=".:/old/path:"`) can cause mysterious compiler errors. The `--no-env` flag unsets TeX-related variables during execution:
 
 ```bash

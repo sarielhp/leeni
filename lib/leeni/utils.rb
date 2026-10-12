@@ -460,6 +460,7 @@ module LaTeXUtils
     lines << '  5. Portable Paper Bundling & Verification:'
     lines << '     l -z                           Bundle paper, active styles, and figures into paper.zip'
     lines << '     l -z -t                        Bundle paper into zip and verify build in /tmp sandbox'
+    lines << '     l --zip-alone                  Bundle styles and verify a clean build with matching PDF'
     lines << '     l -z -- figs/extra.png         Include extra supplemental files in the portable bundle'
     lines << ''
     lines << '  6. arXiv Submission Preparation:'

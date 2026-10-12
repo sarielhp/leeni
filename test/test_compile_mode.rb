@@ -143,7 +143,7 @@ class TestCompileMode < Minitest::Test
     end
   end
 
-  def test_cc_short_form_and_redundant_aliases
+  def test_cc_short_form_and_long_option_prefixes
     Dir.mktmpdir('compile_shorthand') do |dir|
       tex = File.join(dir, 'doc.tex')
       File.write(tex, <<~TEX)
@@ -168,10 +168,10 @@ class TestCompileMode < Minitest::Test
       refute status_double.success?
       assert_match(/invalid option: --cc/i, stderr_double)
 
-      # Redundant single-dash long alias -compile must be rejected
-      _, stderr_compile, status_compile = Open3.capture3(@bin_path, '-compile', 'doc.tex')
-      refute status_compile.success?
-      assert_match(/invalid option/i, stderr_compile)
+      # Long names accept a single dash too.
+      out_compile, status_compile = Open3.capture2e(@bin_path, '-compile', '-nocolor', 'doc.tex', chdir: dir)
+      assert_equal 1, status_compile.exitstatus
+      assert_match(/^doc\.tex:3:1: error: undefined control sequence/, out_compile)
     end
   end
 

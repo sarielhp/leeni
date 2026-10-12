@@ -198,6 +198,7 @@ module LaTeXHelpManual
       '      Bundle required styles in styles/ and add the LaTeX search path. Rebuild the',
       '      extracted archive with --no-env; require no errors or alerts, identical PDF',
       '      text layout, and matching rendered pages (150 dpi). Requires pdftotext/pdftoppm.',
+      '      Add --errors-only to allow alerts in the isolated build; PDF comparisons still apply.',
       '      Example:',
       '        l --zip-alone paper.tex',
       '',

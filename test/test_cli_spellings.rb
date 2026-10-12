@@ -77,12 +77,14 @@ class TestCLISpellings < Minitest::Test
     end
     assert_equal false, options[:all]
     assert_equal false, options[:werror]
+    assert_equal true, options[:errors_only]
 
     LatexCLI.build_option_parser(options).parse!(%w[--all --werror])
     %i[suppress_alerts suppress_warnings suppress_whatevers].each do |key|
       assert_equal false, options[key]
     end
     assert_equal true, options[:werror]
+    assert_equal false, options[:errors_only]
   end
 
   def test_packaging_spelling_variants_harvest_extra_files

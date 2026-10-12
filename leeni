@@ -447,6 +447,7 @@ module LatexCLI
       options[:suppress_whatevers] = false
       options[:suppress_warnings] = false
       options[:suppress_alerts] = false
+      options[:errors_only] = false
     end
     opts.on('--[no-]badges', 'Display visual severity badges/emojis for all diagnostics (default: on)') do |v|
       options[:badges] = v
@@ -457,7 +458,7 @@ module LatexCLI
     end
     opts.on('--errors-only', 'Suppress alerts, warnings and Whatevers; only errors cause diagnostic failure') do
       options.merge!(suppress_alerts: true, suppress_warnings: true, suppress_whatevers: true,
-                     all: false, werror: false, explicit_werror: true)
+                     all: false, errors_only: true, werror: false, explicit_werror: true)
     end
     opts.on('-s', '--score', 'Quiet mode: suppress stdout and print only numeric error/alert/warning counts') { options[:score] = true }
     opts.on('-v', '--verbose', 'Verbose output mode (show raw overfull hbox snippet text and resolution steps)') { options[:verbose] = true }

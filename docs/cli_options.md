@@ -215,6 +215,14 @@ Creates a portable ZIP with required non-system styles in `styles/` and injects 
 l --zip-alone paper.tex
 ```
 
+Add `--errors-only` to suppress alerts and warnings in both builds and allow alerts during archive verification:
+
+```bash
+l --zipalone --errors-only paper.tex
+```
+
+Real errors still fail verification. PDF text and rendered-page comparisons still apply.
+
 ### `-Z`, `--zip-flat`
 Creates a flattened `.zip` archive where all nested `\input` and `\include` subfiles are recursively inlined into a single monolithic `.tex` file (required by journals like IEEE, Springer, and Elsevier).
 ```bash

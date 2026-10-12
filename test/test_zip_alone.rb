@@ -69,6 +69,16 @@ class TestZipAlone < Minitest::Test
       assert_includes output, 'Preserved existing paper.zip'
       assert_equal 'previous archive', File.read(File.join(dir, 'paper.zip'))
       assert_empty Dir.glob(File.join(dir, '.paper.tmp.*.zip'))
+
+      [%w[--zipalone --errors-only], %w[--errors-only --zipalone]].each do |flags|
+        filtered, filtered_status = Open3.capture2e(BIN, *flags, 'paper.tex', chdir: dir)
+        assert filtered_status.success?, filtered
+        assert_includes filtered, 'Isolated build has no errors.'
+        assert_includes filtered, 'Text layout exact match confirmed'
+        assert_includes filtered, 'All PDF pages match visually'
+        refute_includes filtered, 'too wide'
+        refute_equal 'previous archive', File.binread(File.join(dir, 'paper.zip'))
+      end
     end
   end
 
@@ -106,6 +116,17 @@ class TestZipAlone < Minitest::Test
       capture_io { refute packager.send(:verify_pdf_diff, 'original.pdf', 'rebuilt.pdf') }
       capture_io { refute packager.send(:verify_pdf_visual_match, 'original.pdf', 'rebuilt.pdf') }
     end
+  end
+
+  def test_errors_only_verification_still_rejects_errors_and_failed_builds
+    packager = LatexPackager.new(LatexBuilder.new('paper.tex', zip_alone: true, errors_only: true))
+    result = { success: true, summary: { errors: 0, alerts: 1, warnings: 1 } }
+    capture_io { assert packager.send(:verify_clean_diagnostics, JSON.generate(result)) }
+    result[:summary][:errors] = 1
+    capture_io { refute packager.send(:verify_clean_diagnostics, JSON.generate(result)) }
+    result[:summary][:errors] = 0
+    result[:success] = false
+    capture_io { refute packager.send(:verify_clean_diagnostics, JSON.generate(result)) }
   end
 
   def test_visual_comparison_catches_graphics_changes_with_identical_text

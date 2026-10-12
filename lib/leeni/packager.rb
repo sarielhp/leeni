@@ -361,6 +361,8 @@ class LatexPackager
     script_bin = LEENI_EXECUTABLE
     cmd = [ruby_bin, script_bin, '--no-env', '--engine', @builder.engine_name]
     cmd += ['--json', '--all', '--force'] if @options[:zip_alone]
+    cmd << '--errors-only' if @options[:errors_only]
+    cmd << '--werror' if @options[:errors_only] && @options[:werror]
     cmd += ['--timeout', @options[:timeout].to_s] if @options[:timeout]
     cmd << @filename
 
@@ -388,12 +390,14 @@ class LatexPackager
     summary = result.fetch('summary')
     raise TypeError, 'expected diagnostic counts' unless summary.is_a?(Hash)
 
-    if result['success'] == true && summary.fetch('errors') == 0 && summary.fetch('alerts') == 0
-      puts Rainbow(' -- Isolated build has no errors or alerts.').green
+    rejected_tiers = @options[:errors_only] ? %w[errors] : %w[errors alerts]
+    tier_names = rejected_tiers.join(' or ')
+    if result['success'] == true && rejected_tiers.all? { |tier| summary.fetch(tier) == 0 }
+      puts Rainbow(" -- Isolated build has no #{tier_names}.").green
       return true
     end
 
-    warn Rainbow('[FAIL] Isolated build reported errors or alerts.').red.bright
+    warn Rainbow("[FAIL] Isolated build reported #{tier_names}.").red.bright
     warn output
     false
   rescue JSON::ParserError, KeyError, TypeError => e

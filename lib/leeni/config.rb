@@ -94,6 +94,10 @@ module LaTeXConfig
       "suppress_warnings": false,
       "suppress_alerts": false,
 
+      // Persistently downgrade selected diagnostic categories from alert to warning.
+      // Example: ["type3_font", "inverted_label", "overfull_hbox_alert"]
+      "alert_as_warning": [],
+
       // Filename patterns ignored when auto-detecting the main .tex document
       "exclude_main_tex": [
         "prefix*.tex",

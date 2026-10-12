@@ -496,7 +496,8 @@ module LaTeXUtils
     return nil if names.empty?
 
     pages = find_type3_font_pages(pdf_path)
-    { fonts: names, pages: pages }
+    objects = stdout.lines.grep(/\s+Type 3\s+/).filter_map { |line| line[/\s(\d+)\s+\d+\s*$/, 1] }.uniq
+    { fonts: names, pages: pages, glyph_kind: classify_type3_fonts(pdf_path, objects) }
   rescue StandardError
     nil
   end
@@ -511,6 +512,78 @@ module LaTeXUtils
       names << (parts[0] || '[none]')
     end
     names.uniq
+  end
+
+  # Only downgrade when every glyph uses known vector operators. Resource calls
+  # and unfamiliar syntax remain unknown rather than being assumed scalable.
+  TYPE3_VECTOR_OPERATORS = %w[d0 d1 q Q cm m l c v y h re S s f F f* B B* b b* n W W*
+                              w J j M d G g RG rg K k].freeze
+  TYPE3_NUMBER = /\A[+-]?(?:\d+(?:\.\d*)?|\.\d+)\z/.freeze
+
+  def self.classify_type3_fonts(pdf_path, objects)
+    return :unavailable unless command_available?('mutool')
+    return :unknown if objects.empty?
+
+    kinds = objects.map { |object| classify_type3_object(pdf_path, object) }
+    return :bitmap if kinds.include?(:bitmap)
+
+    kinds.all?(:vector) ? :vector : :unknown
+  end
+
+  def self.classify_type3_object(pdf_path, object)
+    dictionary = decoded_pdf_object(pdf_path, "#{object}/CharProcs")
+    return :unknown unless dictionary
+
+    entries = dictionary[/<<\s*(.*?)\s*>>/m, 1]
+    return :unknown unless entries
+
+    references = %r{/[^\s/<>]+\s+\d+\s+\d+\s+R}
+    return :unknown unless entries.gsub(references, '').strip.empty?
+
+    glyph_count = entries.scan(references).size
+    output = decoded_pdf_object(pdf_path, "#{object}/CharProcs/*")
+    return :unknown unless output && glyph_count.positive?
+
+    streams = output.scan(/\bstream\r?\n(.*?)endstream/m).flatten
+    return :unknown unless streams.size == glyph_count
+
+    kinds = streams.map { |stream| classify_type3_glyph(stream) }
+    return :bitmap if kinds.include?(:bitmap)
+
+    kinds.all?(:vector) ? :vector : :unknown
+  end
+
+  def self.decoded_pdf_object(pdf_path, path)
+    output, error, status = Open3.capture3('mutool', 'show', pdf_path, path)
+    return output.b if status.success? && error.empty?
+
+    nil # Repair warnings or failed decoding cannot establish vector glyphs.
+  rescue StandardError
+    nil # Inspection is optional; callers retain the alert on failure.
+  end
+
+  def self.classify_type3_glyph(stream)
+    tokens = stream.gsub(/%[^\r\n]*/, '').gsub(/[\[\]]/, ' ').split
+    return :bitmap if tokens.include?('BI')
+    return :unknown unless tokens.include?('d0') || tokens.include?('d1')
+
+    tokens.all? { |token| TYPE3_NUMBER.match?(token) || TYPE3_VECTOR_OPERATORS.include?(token) } ? :vector : :unknown
+  end
+
+  def self.type3_font_message(type3)
+    pages = type3[:pages].empty? ? '' : " on page #{type3[:pages].join(', ')}"
+    kind = type3[:glyph_kind]
+    detail = { vector: 'all glyphs confirmed vector', bitmap: 'bitmap glyphs detected',
+               unavailable: 'MuPDF/mutool is not installed' }.fetch(kind, 'glyph inspection inconclusive')
+    message = "Type 3 fonts: #{type3[:fonts].join(', ')}#{pages} (#{detail})."
+    return message if kind == :vector
+
+    message + ' Type 3 does not necessarily mean bitmap. Install MuPDF (the package providing mutool) ' \
+      'and ensure mutool is on PATH to enable automatic vector checks. ' \
+      'Bitmap fonts may look pixelated; check the publisher\'s requirements. ' \
+      'Regenerate affected figures with scalable fonts (for Matplotlib, set pdf.fonttype = 42); ' \
+      'for LaTeX text, consider lmodern. To keep this diagnostic as a warning, ' \
+      'set "alert_as_warning": ["type3_font"] in .l.jsonc or ~/.config/leeni/config.jsonc.'
   end
 
   def self.find_type3_font_pages(pdf_path)

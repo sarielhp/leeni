@@ -1218,9 +1218,9 @@ module LaTeXErrorCatalog
       fix: 'Remove \\label or switch to a numbered math environment (equation or align).'
     },
     type3_font: {
-      title: 'Alert: Type 3 (Raster Bitmap) Font in PDF',
-      why: 'PDF contains unscaled bitmapped fonts. IEEE, ACM, and arXiv submission portals will reject this document.',
-      fix: 'Ensure scalable vector fonts are used (e.g. \\usepackage[T1]{fontenc} and \\usepackage{lmodern}), or replace bitmap EPS/figures.'
+      title: 'Type 3 Font in PDF',
+      why: 'Type 3 glyphs can be vector or bitmap. Confirmed vector glyphs are a warning; bitmap or unverified glyphs remain an alert. Acceptance depends on the target publisher.',
+      fix: 'Install MuPDF with mutool on PATH for automatic inspection. Use scalable fonts: regenerate plots with Matplotlib pdf.fonttype = 42, or use lmodern for LaTeX text. Persist a downgrade with "alert_as_warning": ["type3_font"] in project .l.jsonc or global ~/.config/leeni/config.jsonc.'
     }
   }.freeze
 

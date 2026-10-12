@@ -87,6 +87,32 @@ This creates `.l.jsonc` pre-populated with default settings and comments:
 
 Comments (`//` and `/* ... */`) and trailing commas are supported in `.l.jsonc` files.
 
+### Downgrading alerts to warnings
+
+Set `alert_as_warning` to a list of diagnostic category IDs in `.l.jsonc`
+for one project, or `~/.config/leeni/config.jsonc` for all projects:
+
+```jsonc
+{
+  "alert_as_warning": ["type3_font", "inverted_label", "overfull_hbox_alert"]
+}
+```
+
+Other alert categories include `unnumbered_label` and `multiply_defined_label`.
+The `category` field in `l --json` identifies each diagnostic. A local list
+replaces the global list; use `[]` locally to restore the default severities.
+Downgraded items remain visible as warnings, with matching counts and output
+in terminal, JSON, and editor modes. Errors are unaffected; `--werror` still
+treats warnings as fatal.
+
+Type 3 fonts can contain vector outlines or bitmap glyphs. When `mutool` from
+MuPDF is on PATH, leeni inspects all glyph programs of the detected Type 3
+fonts. If every program uses supported vector operations, this diagnostic
+automatically becomes a warning. Bitmap glyphs, unsupported operations (such
+as calls to external drawing resources), failed inspection, and missing
+MuPDF keep it as an alert. The fallback includes installation and font
+regeneration guidance. No additional tool is required for the manual override.
+
 ---
 
 ## 3. Global Configuration

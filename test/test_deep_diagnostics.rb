@@ -6,10 +6,97 @@ require 'minitest/mock'
 require 'tmpdir'
 require 'open3'
 require 'stringio'
+require 'zlib'
 
 load File.expand_path('../leeni', __dir__)
 
 class TestDeepDiagnostics < Minitest::Test
+  def test_type3_glyph_classification_is_conservative
+    assert_equal :vector, LaTeXUtils.classify_type3_glyph("500 0 0 0 500 700 d1\n0 0 m 500 700 l f")
+    assert_equal :vector, LaTeXUtils.classify_type3_glyph("500 0 d0 % BI in comment\n")
+    assert_equal :bitmap, LaTeXUtils.classify_type3_glyph('500 0 d0 BI /W 1 /H 1 ID x EI')
+    assert_equal :unknown, LaTeXUtils.classify_type3_glyph('500 0 d0 /Image1 Do')
+    assert_equal :unknown, LaTeXUtils.classify_type3_glyph('500 0 d0 /Sh1 sh')
+    assert_equal :unknown, LaTeXUtils.classify_type3_glyph('')
+  end
+
+  def test_mutool_checks_compressed_vector_and_bitmap_glyphs
+    skip 'mutool not installed' unless LaTeXUtils.command_available?('mutool')
+
+    Dir.mktmpdir('leeni_glyphs_') do |dir|
+      path = File.join(dir, 'fonts.pdf')
+      write_glyph_pdf(path, ['500 0 d0 0 0 m 100 100 l f', '500 0 d0'])
+      assert_equal :vector, LaTeXUtils.classify_type3_fonts(path, ['1'])
+      write_glyph_pdf(path, ['500 0 d0 0 0 m 100 100 l f', '500 0 d0 BI /W 1 /H 1 ID x EI'])
+      assert_equal :bitmap, LaTeXUtils.classify_type3_fonts(path, ['1'])
+      write_glyph_pdf(path, ['500 0 d0 /Image1 Do'])
+      assert_equal :unknown, LaTeXUtils.classify_type3_fonts(path, ['1'])
+      assert_equal :unknown, LaTeXUtils.classify_type3_fonts(path, ['99'])
+    end
+  end
+
+  def write_glyph_pdf(path, glyphs)
+    references = glyphs.each_index.map { |i| "/g#{i} #{i + 3} 0 R" }.join(' ')
+    objects = ['<< /Type /Font /Subtype /Type3 /CharProcs 2 0 R >>', "<< #{references} >>"]
+    glyphs.each do |glyph|
+      compressed = Zlib::Deflate.deflate(glyph)
+      objects << ("<< /Length #{compressed.bytesize} /Filter /FlateDecode >>\nstream\n".b + compressed + "\nendstream")
+    end
+    # A real xref avoids MuPDF repair warnings, which deliberately prevent a downgrade.
+    pdf = "%PDF-1.4\n".b
+    offsets = objects.each_with_index.map do |object, i|
+      offset = pdf.bytesize
+      pdf << "#{i + 1} 0 obj\n" << object << "\nendobj\n"
+      offset
+    end
+    xref = pdf.bytesize
+    pdf << "xref\n0 #{objects.size + 1}\n0000000000 65535 f \n"
+    offsets.each { |offset| pdf << format("%010d 00000 n \n", offset) }
+    pdf << "trailer\n<< /Size #{objects.size + 1} >>\nstartxref\n#{xref}\n%%EOF\n"
+    File.binwrite(path, pdf)
+  end
+
+  def test_missing_and_failed_mutool_keep_font_inspection_unverified
+    LaTeXUtils.stub(:command_available?, false) do
+      assert_equal :unavailable, LaTeXUtils.classify_type3_fonts('paper.pdf', ['1'])
+    end
+    LaTeXUtils.stub(:command_available?, true) do
+      Open3.stub(:capture3, ->(*) { raise Errno::ENOENT }) do
+        assert_equal :unknown, LaTeXUtils.classify_type3_fonts('paper.pdf', ['1'])
+      end
+    end
+    message = LaTeXUtils.type3_font_message(fonts: ['test'], pages: [1], glyph_kind: :unavailable)
+    assert_includes message, 'Install MuPDF'
+    assert_includes message, 'alert_as_warning'
+    refute_includes message, 'will reject'
+  end
+
+  def test_font_severity_and_persistent_category_overrides
+    builder = LatexBuilder.new('main.tex', alert_as_warning: ['inverted_label'], color: false)
+    items = [
+      { text: 'Type 3 vector', alert_type: :type3_font, tier: 'warnings', base_color: :yellow },
+      { text: 'Alert: inverted label', alert_type: :inverted_label, base_color: :red },
+      { text: 'Unnumbered label', alert_type: :unnumbered_label, base_color: :red }
+    ]
+    builder.stub(:extract_alerts, items) do
+      alerts, warnings, whatevers = builder.partition_diagnostics('', [])
+      assert_equal [:unnumbered_label], alerts.map { |item| item[:alert_type] }
+      assert_equal %i[type3_font inverted_label], warnings.map { |item| item[:alert_type] }
+      assert warnings.all? { |item| item[:tier] == 'warnings' && item[:base_color] == :yellow }
+      assert_equal 'Warning: inverted label', warnings.last[:text]
+      assert_empty whatevers
+      records = builder.collect_compile_records(errors: [], alerts: alerts, warnings: warnings, whatevers: [])
+      assert_equal %w[alerts warnings warnings], records.map { |record| record[:tier] }
+    end
+  end
+
+  def test_local_alert_overrides_replace_global_preferences
+    cfg = LaTeXConfig.deep_merge({ 'alert_as_warning' => ['inverted_label'] }, 'alert_as_warning' => ['type3_font'])
+    options = LatexCLI.build_default_options(cfg, 'leeni', [])
+    assert_equal ['type3_font'], options[:alert_as_warning]
+    assert_equal [], LaTeXConfig.parse_jsonc(LaTeXConfig::DEFAULT_CONFIG_TEMPLATE)['alert_as_warning']
+  end
+
   def test_inverted_label_detected_when_before_caption
     Dir.mktmpdir('leeni_test_label_') do |dir|
       path = File.join(dir, 'test.tex')

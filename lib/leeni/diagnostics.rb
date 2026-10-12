@@ -1935,10 +1935,9 @@ module LaTeXDiagnostics
     type3 = LaTeXUtils.check_type3_fonts(target_pdf)
     return [] unless type3
 
-    fonts_str = type3[:fonts].join(', ')
-    pages_str = type3[:pages].empty? ? '' : " on page #{type3[:pages].join(', ')}"
-    msg = "Type 3 (raster bitmap) font detected: #{fonts_str}#{pages_str}"
-    formatted = format_diagnostic_line('', msg, :red)
+    msg = LaTeXUtils.type3_font_message(type3)
+    color = type3[:glyph_kind] == :vector ? :yellow : :red
+    formatted = format_diagnostic_line('', msg, color)
     [{
       file: target_pdf,
       line: 0,
@@ -1946,7 +1945,8 @@ module LaTeXDiagnostics
       text: msg,
       formatted: formatted,
       alert_type: :type3_font,
-      base_color: :red,
+      tier: color == :yellow ? 'warnings' : 'alerts',
+      base_color: color,
       index: 60000
     }]
   end
@@ -1992,11 +1992,27 @@ module LaTeXDiagnostics
       end
     end
 
+    downgraded, alert_items = alert_items.partition { |item| alert_as_warning?(item) }
+    downgraded.each { |item| downgrade_alert!(item) }
+    regular_warnings.concat(downgraded)
     alert_items.each { |i| i[:tier] = 'alerts' }
     regular_warnings.each { |i| i[:tier] = 'warnings' }
     whatevers.each { |i| i[:tier] = 'whatevers' }
 
     [alert_items, regular_warnings, whatevers]
+  end
+
+  def alert_as_warning?(item)
+    return true if item[:tier] == 'warnings'
+
+    Array(@options[:alert_as_warning]).map(&:to_s).include?(diagnostic_category(item).to_s)
+  end
+
+  def downgrade_alert!(item)
+    item[:tier] = 'warnings'
+    item[:base_color] = :yellow
+    item[:text] = item[:text].sub(/^Alert:/, 'Warning:')
+    item[:formatted] = format_diagnostic_line(item[:line_str], item[:text], :yellow, file: item[:file])
   end
 
   def format_tier_count(label, count, color, _suppressed = false)

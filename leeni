@@ -248,6 +248,7 @@ module LatexCLI
       suppress_whatevers: cfg.key?('suppress_whatevers') ? (cfg['suppress_whatevers'] == true) : true,
       suppress_warnings: cfg['suppress_warnings'] == true,
       suppress_alerts: cfg['suppress_alerts'] == true,
+      alert_as_warning: Array(cfg['alert_as_warning']),
       all: false, explain: false, deps: false,
       context_lines: cfg['context_lines'] || 0,
       exclude_main_tex: cfg['exclude_main_tex'] || LaTeXUtils::DEFAULT_EXCLUDE_MAIN_PATTERNS,

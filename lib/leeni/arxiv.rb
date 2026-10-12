@@ -345,9 +345,9 @@ class LatexArxivPackager
     type3 = LaTeXUtils.check_type3_fonts(pdf_path)
     return unless type3
 
-    pages_str = type3[:pages].empty? ? '' : " on page #{type3[:pages].join(', ')}"
-    warn Rainbow("[ALERT] arXiv package PDF contains Type 3 (raster bitmap) fonts: #{type3[:fonts].join(', ')}#{pages_str}.").yellow.bright
-    warn Rainbow('        arXiv/IEEE submission portals may reject this document. Use vector fonts (e.g. lmodern).').yellow
+    downgraded = type3[:glyph_kind] == :vector || Array(@options[:alert_as_warning]).map(&:to_s).include?('type3_font')
+    tier = downgraded ? 'WARNING' : 'ALERT'
+    warn Rainbow("[#{tier}] arXiv package PDF: #{LaTeXUtils.type3_font_message(type3)}").yellow.bright
   end
 
   def verify_arxiv_pdf_match(reference_pdf, rebuilt_pdf)

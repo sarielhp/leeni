@@ -41,10 +41,11 @@ class TestZipAlone < Minitest::Test
       File.write(File.join(project, 'paper.tex'), tex)
       File.write(File.join(project, 'notes.txt'), 'supplement')
       File.write(File.join(external, 'customouter.sty'), "\\ProvidesPackage{customouter}\n\\RequirePackage{custominner}\n")
-      File.write(File.join(external, 'custominner.sty'), "\\ProvidesPackage{custominner}\n\\newcommand{\\customtext}{External style works.}\n")
+      File.write(File.join(external, 'custominner.sty'),
+                 "\\ProvidesPackage{custominner}\n\\newcommand{\\customtext}{External style works.}\n")
 
       output, status = Open3.capture2e({ 'TEXINPUTS' => ".:#{external}:" }, BIN,
-                                     '-zipalone', '--no-styles-inject', 'paper.tex', '--', 'notes.txt', chdir: project)
+                                       '-zipalone', '--no-styles-inject', 'paper.tex', '--', 'notes.txt', chdir: project)
       assert status.success?, output
       assert_includes output, 'Isolated build has no errors or alerts'
       assert_includes output, 'Text layout exact match confirmed'

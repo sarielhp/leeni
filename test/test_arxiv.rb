@@ -1,14 +1,14 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
-require "minitest/autorun"
-require "minitest/mock"
-require "tmpdir"
-require "fileutils"
-require "open3"
+require 'minitest/autorun'
+require 'minitest/mock'
+require 'tmpdir'
+require 'fileutils'
+require 'open3'
 
 class TestArxivSupport < Minitest::Test
-  BIN = File.expand_path("../leeni", __dir__)
+  BIN = File.expand_path('../leeni', __dir__)
   load BIN
 
   def test_meta_extraction_title_and_math
@@ -18,12 +18,13 @@ class TestArxivSupport < Minitest::Test
       \\begin{document}
       \\end{document}
     TEX
-    assert_equal "Fast Approximations of α ≤ β in R^d", LaTeXMetaExtractor.extract_title(tex)
+    assert_equal 'Fast Approximations of α ≤ β in R^d', LaTeXMetaExtractor.extract_title(tex)
   end
 
   def test_clean_latex_math_comprehensive
-    raw = "\\alpha \\beta \\gamma \\Delta \\Omega \\leq \\ge \\approx \\times \\cdot \\in \\infty \\sum \\log(x) \\sqrt{y+1} \\mathbb{R} \\mathcal{H} \\mathfrak{g} $z$"
-    expected = "α β γ Δ Ω ≤ ≥ ≈ × · ∈ ∞ ∑ log(x) √(y+1) R H g z"
+    raw = '\\alpha \\beta \\gamma \\Delta \\Omega \\leq \\ge \\approx \\times \\cdot ' \
+          '\\in \\infty \\sum \\log(x) \\sqrt{y+1} \\mathbb{R} \\mathcal{H} \\mathfrak{g} $z$'
+    expected = 'α β γ Δ Ω ≤ ≥ ≈ × · ∈ ∞ ∑ log(x) √(y+1) R H g z'
     assert_equal expected, LaTeXMetaExtractor.clean_latex_math(raw)
   end
 
@@ -35,10 +36,10 @@ class TestArxivSupport < Minitest::Test
       \\end{document}
     TEX
     authors = LaTeXMetaExtractor.extract_authors(tex)
-    assert_includes authors, "Alice Smith"
-    assert_includes authors, "Timothy M. Chan"
-    refute_includes authors, "University of Illinois"
-    refute_includes authors, "Supported by NSF"
+    assert_includes authors, 'Alice Smith'
+    assert_includes authors, 'Timothy M. Chan'
+    refute_includes authors, 'University of Illinois'
+    refute_includes authors, 'Supported by NSF'
   end
 
   def test_meta_extraction_abstract
@@ -55,9 +56,9 @@ class TestArxivSupport < Minitest::Test
       \\end{document}
     TEX
     abstract = LaTeXMetaExtractor.extract_abstract(tex)
-    refute_includes abstract, "private draft note"
-    assert_includes abstract, "O(n log n)"
-    assert_includes abstract, "x ∈ X"
+    refute_includes abstract, 'private draft note'
+    assert_includes abstract, 'O(n log n)'
+    assert_includes abstract, 'x ∈ X'
     assert_includes abstract, "paragraph.\n\nSecond paragraph"
   end
 
@@ -90,7 +91,8 @@ class TestArxivSupport < Minitest::Test
     TEX
 
     abstract = LaTeXMetaExtractor.extract_abstract_for_arxiv(tex)
-    expected = "First paragraph with Ch\\'erif and \"odd\" spacing. continued with $\\alpha \\leq \\beta$.\n Second paragraph with formatting and 50% complete."
+    expected = "First paragraph with Ch\\'erif and \"odd\" spacing. continued with $\\alpha \\leq \\beta$.\n " \
+               'Second paragraph with formatting and 50% complete.'
     assert_equal expected.encode(Encoding::US_ASCII), abstract
     assert_equal Encoding::US_ASCII, abstract.encoding
     refute_match(/% private note|\\textbf|[[:space:]]+\n[[:space:]]*\n/, abstract)
@@ -117,18 +119,18 @@ class TestArxivSupport < Minitest::Test
         Content of section 2.
       TEX
 
-      File.write(File.join(dir, "main.tex"), main_tex)
-      File.write(File.join(dir, "section1.tex"), sec1_tex)
-      File.write(File.join(dir, "section2.tex"), sec2_tex)
+      File.write(File.join(dir, 'main.tex'), main_tex)
+      File.write(File.join(dir, 'section1.tex'), sec1_tex)
+      File.write(File.join(dir, 'section2.tex'), sec2_tex)
 
-      flattened = LaTeXFlattener.flatten("main.tex", dir)
+      flattened = LaTeXFlattener.flatten('main.tex', dir)
       assert flattened.start_with?("%!TEX TS-program = xelatex\n")
-      assert_includes flattened, "\\newcommand{\\foo}{bar}"
-      assert_includes flattened, "\\section{Second}"
-      assert_includes flattened, "50\\% discount at \\url{https://example.com/%20test}"
-      refute_includes flattened, "Document level comment"
-      refute_includes flattened, "Section 1 comment"
-      refute_includes flattened, "end of line comment"
+      assert_includes flattened, '\\newcommand{\\foo}{bar}'
+      assert_includes flattened, '\\section{Second}'
+      assert_includes flattened, '50\\% discount at \\url{https://example.com/%20test}'
+      refute_includes flattened, 'Document level comment'
+      refute_includes flattened, 'Section 1 comment'
+      refute_includes flattened, 'end of line comment'
     end
   end
 
@@ -157,25 +159,27 @@ class TestArxivSupport < Minitest::Test
 
   def test_arxiv_packaging_and_dual_announcement
     Dir.mktmpdir do |dir|
-      FileUtils.mkdir_p(File.join(dir, "figs"))
-      FileUtils.mkdir_p(File.join(dir, "junk"))
+      FileUtils.mkdir_p(File.join(dir, 'figs'))
+      FileUtils.mkdir_p(File.join(dir, 'junk'))
 
-      File.write(File.join(dir, "paper.tex"), "\\documentclass{article}\n\\title{Test Paper}\n\\author{Jane Doe}\n\\begin{abstract}Abstract text\\end{abstract}\n\\begin{document}Hello\\end{document}\n")
-      File.write(File.join(dir, "paper.pdf"), "PDF-DUMMY")
-      File.write(File.join(dir, "paper.bbl"), "\\begin{thebibliography}{1}\n\\bibitem{key} Author, Title.\n\\end{thebibliography}\n")
-      File.write(File.join(dir, "paper.bib"), "@article{key, title={T}}\n")
-      File.write(File.join(dir, "figs", "fig1.pdf"), "PDF-FIGURE")
-      File.write(File.join(dir, "figs", "fig1.fig"), "FIG-RAW-SOURCE")
-      File.write(File.join(dir, "figs", "fig1.ipe"), "IPE-RAW-SOURCE")
+      File.write(File.join(dir, 'paper.tex'),
+                 "\\documentclass{article}\n\\title{Test Paper}\n\\author{Jane Doe}\n" \
+                 "\\begin{abstract}Abstract text\\end{abstract}\n\\begin{document}Hello\\end{document}\n")
+      File.write(File.join(dir, 'paper.pdf'), 'PDF-DUMMY')
+      File.write(File.join(dir, 'paper.bbl'), "\\begin{thebibliography}{1}\n\\bibitem{key} Author, Title.\n\\end{thebibliography}\n")
+      File.write(File.join(dir, 'paper.bib'), "@article{key, title={T}}\n")
+      File.write(File.join(dir, 'figs', 'fig1.pdf'), 'PDF-FIGURE')
+      File.write(File.join(dir, 'figs', 'fig1.fig'), 'FIG-RAW-SOURCE')
+      File.write(File.join(dir, 'figs', 'fig1.ipe'), 'IPE-RAW-SOURCE')
 
       fls_content = <<~FLS
         INPUT /usr/share/texlive/texmf-dist/tex/latex/base/article.cls
         INPUT ./figs/fig1.pdf
         INPUT ./paper.tex
       FLS
-      File.write(File.join(dir, "junk", "paper.fls"), fls_content)
+      File.write(File.join(dir, 'junk', 'paper.fls'), fls_content)
 
-      builder = LatexBuilder.new("paper.tex", { junk_dir: 'junk' })
+      builder = LatexBuilder.new('paper.tex', { junk_dir: 'junk' })
       packager = LatexArxivPackager.new(builder, { arxiv_verify: false })
 
       Dir.chdir(dir) do
@@ -183,27 +187,27 @@ class TestArxivSupport < Minitest::Test
           builder.stub(:run_in_current_directory!, true) { assert packager.package! }
         end
 
-        assert File.file?("arxiv_paper.zip")
-        assert File.file?("arxiv_paper_meta.txt")
+        assert File.file?('arxiv_paper.zip')
+        assert File.file?('arxiv_paper_meta.txt')
 
-        assert_includes out, "==> arXiv Preparation Complete!"
-        assert_includes out, "[1] Submission Archive : arxiv_paper.zip"
-        assert_includes out, "[2] Paper Metadata     : arxiv_paper_meta.txt"
+        assert_includes out, '==> arXiv Preparation Complete!'
+        assert_includes out, '[1] Submission Archive : arxiv_paper.zip'
+        assert_includes out, '[2] Paper Metadata     : arxiv_paper_meta.txt'
 
-        meta_content = File.read("arxiv_paper_meta.txt")
+        meta_content = File.read('arxiv_paper_meta.txt')
         assert_includes meta_content, "Title:\nTest Paper"
         assert_includes meta_content, "Authors:\nJane Doe"
         assert_includes meta_content, "Abstract:\nAbstract text"
 
-        entries, = Open3.capture2("unzip", "-l", "arxiv_paper.zip")
-        assert_includes entries, "paper.tex"
-        assert_includes entries, "paper.bbl"
-        assert_includes entries, "figs/fig1.pdf"
+        entries, = Open3.capture2('unzip', '-l', 'arxiv_paper.zip')
+        assert_includes entries, 'paper.tex'
+        assert_includes entries, 'paper.bbl'
+        assert_includes entries, 'figs/fig1.pdf'
 
-        refute_includes entries, "paper.pdf"
-        refute_includes entries, "paper.bib"
-        refute_includes entries, "figs/fig1.fig"
-        refute_includes entries, "figs/fig1.ipe"
+        refute_includes entries, 'paper.pdf'
+        refute_includes entries, 'paper.bib'
+        refute_includes entries, 'figs/fig1.fig'
+        refute_includes entries, 'figs/fig1.ipe'
       end
     end
   end
@@ -235,7 +239,9 @@ class TestArxivSupport < Minitest::Test
 
   def test_cli_meta_flag
     Dir.mktmpdir do |dir|
-      File.write(File.join(dir, "paper.tex"), "\\documentclass{article}\n\\title{CLI Title}\n\\author{Bob Author}\n\\begin{abstract}Quick summary\\end{abstract}\n\\begin{document}\\end{document}\n")
+      File.write(File.join(dir, 'paper.tex'),
+                 "\\documentclass{article}\n\\title{CLI Title}\n\\author{Bob Author}\n" \
+                 "\\begin{abstract}Quick summary\\end{abstract}\n\\begin{document}\\end{document}\n")
       FileUtils.mkdir_p(File.join(dir, '.build'))
       FileUtils.mkdir_p(File.join(dir, 'figures'))
       File.write(File.join(dir, 'figures', 'chart.png'), 'PNG')
@@ -244,13 +250,13 @@ class TestArxivSupport < Minitest::Test
       Dir.chdir(dir) do
         stdout, status = Open3.capture2(BIN, '--meta', '--junk-dir', '.build', 'paper.tex')
         assert status.success?
-        assert_includes stdout, "Title:"
-        assert_includes stdout, "CLI Title"
-        assert_includes stdout, "Authors:"
-        assert_includes stdout, "Bob Author"
+        assert_includes stdout, 'Title:'
+        assert_includes stdout, 'CLI Title'
+        assert_includes stdout, 'Authors:'
+        assert_includes stdout, 'Bob Author'
         assert_includes stdout, '7 pages, 1 figure.'
-        assert_includes stdout, "==> Wrote paper metadata to: arxiv_paper_meta.txt"
-        assert File.file?("arxiv_paper_meta.txt")
+        assert_includes stdout, '==> Wrote paper metadata to: arxiv_paper_meta.txt'
+        assert File.file?('arxiv_paper_meta.txt')
       end
     end
   end

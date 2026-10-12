@@ -15,7 +15,7 @@ module LaTeXFlattener
   # unbounded `.*?` a bogus match ran to the next occurrence of that letter,
   # often many lines later, and everything inside was passed through untouched:
   # \input directives there were never inlined and their files never staged.
-  LITERAL_TEX = /\\begin\{(verbatim\*?|Verbatim|BVerbatim|LVerbatim|lstlisting|minted)\}.*?\\end\{\1\}|\\verb\*?(?![a-zA-Z])([^\s])[^\n]*?\2/m.freeze
+  LITERAL_TEX = /\\begin\{(verbatim\*?|Verbatim|BVerbatim|LVerbatim|lstlisting|minted)\}.*?\\end\{\1\}|\\verb\*?(?![a-zA-Z])([^\s])[^\n]*?\2/m
 
   def self.transform_tex(content)
     output = +''
@@ -244,7 +244,7 @@ module LaTeXFlattener
         i += macro.length
         next
       end
-      if url_depth > 0
+      if url_depth.positive?
         if c == '{'
           url_depth += 1
         elsif c == '}'

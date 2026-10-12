@@ -22,7 +22,7 @@ class TestAuthorVerification < Minitest::Test
   def test_author_matching_normalizes_unicode_case_punctuation_and_line_breaks
     pdf_text = "JOSÉ\nDUPONT\n"
 
-    assert @packager.send(:arxiv_author_in_text?, "Jose Dupont", pdf_text)
+    assert @packager.send(:arxiv_author_in_text?, 'Jose Dupont', pdf_text)
     assert @packager.send(:arxiv_author_in_text?, "Jos\u00e9 Dupont", pdf_text)
   end
 

@@ -32,6 +32,7 @@ require_relative 'lib/leeni/compatibility'
 require_relative 'lib/leeni/config'
 require_relative 'lib/leeni/utils'
 require_relative 'lib/leeni/help_manual'
+require_relative 'lib/leeni/cli_help'
 require_relative 'lib/leeni/brace_checker'
 require_relative 'lib/leeni/flattener'
 require_relative 'lib/leeni/meta_extractor'
@@ -54,7 +55,11 @@ module LatexCLI
   def self.run(argv = ARGV, prog_name = File.basename($PROGRAM_NAME))
     $stdout.sync = true
     $stderr.sync = true
-    at_exit { puts '' unless @interrupted || $stdout.closed? || @suppress_at_exit_newline rescue nil }
+    at_exit do
+      puts '' unless @interrupted || $stdout.closed? || @suppress_at_exit_newline
+    rescue StandardError
+      nil
+    end
     LaTeXUtils.initial_pwd = Dir.pwd
 
     begin
@@ -106,8 +111,8 @@ module LatexCLI
   def self.validate_output_mode!(options, prog_name)
     if options[:compile] && options[:emacs_explicit]
       warn "#{prog_name}: error: --compile and --emacs cannot be used together"
-      warn "  Use --compile for GNU standard compiler diagnostics (file:line:col: severity: msg)"
-      warn "  Use --emacs for AUCTeX integration (TeX parenthesized file stack & l.<line> anchors)"
+      warn '  Use --compile for GNU standard compiler diagnostics (file:line:col: severity: msg)'
+      warn '  Use --emacs for AUCTeX integration (TeX parenthesized file stack & l.<line> anchors)'
       exit 2
     end
     options[:emacs] = false if options[:compile]
@@ -138,7 +143,8 @@ module LatexCLI
 
   def self.dispatch_clean_personality(argv, prog_name)
     if argv.include?('-h') || argv.include?('--help')
-      puts "Usage: #{prog_name} [directory...]\nClean all LaTeX auxiliary and junk files in the specified directory (default: current directory)."
+      puts "Usage: #{prog_name} [directory...]\n" \
+           'Clean all LaTeX auxiliary and junk files in the specified directory (default: current directory).'
       return
     end
     (argv.empty? ? [nil] : argv).each do |d|
@@ -196,7 +202,7 @@ module LatexCLI
     return true if PACKAGING_LONG_FLAGS.include?(flag)
     return false unless flag.start_with?('-') && !flag.start_with?('--')
 
-    flag[1..].chars.any? { |c| c == 'z' || c == 'Z' || c == 't' }
+    flag[1..].chars.intersect?(%w[z Z t])
   end
 
   # Claims the files after `--` as bundle payload, but only when a packaging
@@ -207,9 +213,7 @@ module LatexCLI
   def self.extract_extra_cli_files(argv)
     return [] unless (sep_idx = argv.index('--'))
 
-    unless packaging_requested?(argv)
-      return []
-    end
+    return [] unless packaging_requested?(argv)
 
     extra = argv[(sep_idx + 1)..].flat_map { |f| Dir.glob(f).empty? ? [f] : Dir.glob(f) }
     argv.slice!(sep_idx..)
@@ -278,7 +282,7 @@ module LatexCLI
       explicit_raw: false, explicit_trace: false, explicit_werror: false,
       explicit_emacs: false, explicit_help_style: false, explicit_styles_inject: false
     }.merge(build_zip_options(cfg, extra_cli_files))
-     .merge(build_arxiv_options(cfg))
+      .merge(build_arxiv_options(cfg))
   end
 
   def self.build_zip_options(cfg, extra_cli_files)
@@ -331,7 +335,7 @@ module LatexCLI
 
   def self.canonical_option_flag(flag, names)
     return '--compile' if flag == '-cc'
-    return "--context=#{$1}" if flag =~ /\A-([2-9]|\d{2,})\z/
+    return "--context=#{::Regexp.last_match(1)}" if flag =~ /\A-([2-9]|\d{2,})\z/
 
     matches = names[flag.sub(/\A--?/, '').delete('-')]
     matches&.one? ? "--#{matches.first}" : flag
@@ -340,9 +344,7 @@ module LatexCLI
   def self.option_requires_next_value?(flag, parser)
     return false unless flag.start_with?('-') && !flag.include?('=')
 
-    if flag.start_with?('--')
-      return parser.top.long[flag.delete_prefix('--')].is_a?(OptionParser::Switch::RequiredArgument)
-    end
+    return parser.top.long[flag.delete_prefix('--')].is_a?(OptionParser::Switch::RequiredArgument) if flag.start_with?('--')
 
     characters = flag.delete_prefix('-').chars
     characters.each_with_index do |character, index|
@@ -360,6 +362,7 @@ module LatexCLI
     while i < argv.size
       arg = argv[i]
       break if arg == '--'
+
       if option_requires_next_value?(arg, parser)
         i += 2
         next
@@ -369,7 +372,7 @@ module LatexCLI
         argv[i] = '--bib-extract'
         argv.insert(i + 1, '--bib-name', val)
         i += 2
-      elsif (arg == '-B' || arg == '--bib-extract') &&
+      elsif ['-B', '--bib-extract'].include?(arg) &&
             i + 1 < argv.size && argv[i + 1].end_with?('.bib')
         val = argv[i + 1]
         argv[i] = '--bib-extract'
@@ -495,8 +498,14 @@ module LatexCLI
       options[:zip] = true
       options[:zip_flat] = true
     end
-    opts.on('-t', '--verify', 'Verify self-contained portability by testing compilation in /tmp sandbox') { options[:verify] = true; options[:zip] = true }
-    opts.on('--zip-name NAME', 'Specify custom output filename for generated zip archive') { |v| options[:zip] = true; options[:zip_name] = v }
+    opts.on('-t', '--verify', 'Verify self-contained portability by testing compilation in /tmp sandbox') do
+      options[:verify] = true
+      options[:zip] = true
+    end
+    opts.on('--zip-name NAME', 'Specify custom output filename for generated zip archive') do |v|
+      options[:zip] = true
+      options[:zip_name] = v
+    end
     opts.on('-B', '--bib-extract', 'Extract cited bibliography entries into local .bib file (default: <doc>.bib)') { options[:bib_extract] = true }
     opts.on('--bib-name NAME', 'Specify custom output filename for extracted bibliography') do |v|
       options[:bib_extract] = true
@@ -579,7 +588,10 @@ module LatexCLI
 
   def self.add_arxiv_options(opts, options)
     opts.on('--arxiv', 'Prepare sanitized, flattened, submission-ready arXiv zip package') { options[:arxiv] = true }
-    opts.on('--arxiv-name NAME', 'Specify custom output name for arXiv zip package') { |v| options[:arxiv] = true; options[:arxiv_name] = v }
+    opts.on('--arxiv-name NAME', 'Specify custom output name for arXiv zip package') do |v|
+      options[:arxiv] = true
+      options[:arxiv_name] = v
+    end
     opts.on('--meta', 'Extract and display sanitized paper metadata and write arxiv_<file>_meta.txt') { options[:meta_only] = true }
     opts.on('--[no-]arxiv-verify', 'Enable/disable sandbox compile plus exact PDF text verification (default: true)') { |v| options[:arxiv_verify] = v }
     opts.on('--[no-]arxiv-visual-verify', 'Enable/disable rendered PDF page verification (default: true; requires pdftoppm)') { |v| options[:arxiv_visual_verify] = v }
@@ -592,207 +604,13 @@ module LatexCLI
     opts.on('-m', '--main', 'Print the detected main LaTeX root file and exit without compiling') { options[:show_main] = true }
     opts.on('-M', '--deps', 'Print Makefile dependency rule for the document and exit') { options[:deps] = true }
     opts.on('-V', '--version', 'Show version and exit') do
-        puts "leeni #{Leeni::VERSION}"
+      puts "leeni #{Leeni::VERSION}"
       exit 0
     end
     opts.on('-E', '--examples', 'Show detailed usage examples and common workflows') { options[:show_examples] = true }
     opts.on('-h', '--help', 'Show condensed help summary (see -H for all options)') { options[:show_help] = true }
     opts.on('-H', '--help-all', 'Show comprehensive manual of all options with detailed descriptions and examples') { options[:show_help_all] = true }
     opts.on('--help-style STYLE', %w[plain lines], 'Help display style: plain (default) or lines (subdued dividers)') { |v| options[:help_style] = v }
-  end
-
-  def self.condensed_help(_prog_name = 'l')
-    [
-      'Usage: l [options] [document.tex]',
-      '',
-      'Common Options:',
-      '  -f, --force          Force compilation run (bypasses build cache)',
-      '  -u, --single-pass    Single pass only (fast draft, skip bib/extra passes)',
-      '  -r, --raw            Print raw compiler output (debug mode)',
-      '  -c, --clean          Clean temporary build files (preserves .bbl and metadata)',
-      '  -x, --explain        Display plain-English explanations for diagnostics',
-      '  -B, --bib-extract    Extract cited bib entries into local .bib file',
-      '  -e, --engine ENGINE  Compiler engine: x (xelatex), l (lualatex), p (pdflatex)',
-      '',
-      'Help & Discovery:',
-      '  -H, --help-all       Show all available options with full descriptions',
-      '  -E, --examples       Show common usage examples and workflows',
-      '  -h, --help           Show condensed help summary (this message)'
-    ].join("\n")
-  end
-
-  def self.terminal_columns
-    cols = ENV['COLUMNS']&.to_i
-    cols = (cols && cols > 0) ? cols : (IO.console&.winsize&.last rescue nil)
-    cols = 80 if cols.nil? || cols <= 0
-    cols.clamp(40, 120)
-  end
-
-  def self.wrap_words(words, width)
-    lines = []
-    curr = []
-    len = 0
-    words.each do |w|
-      if curr.empty?
-        curr << w
-        len = w.length
-      elsif len + 1 + w.length <= width
-        curr << w
-        len += 1 + w.length
-      else
-        lines << curr.join(' ')
-        curr = [w]
-        len = w.length
-      end
-    end
-    lines << curr.join(' ') unless curr.empty?
-    lines
-  end
-
-  def self.wrap_help_line(line, width)
-    return [line] if line.length <= width
-
-    if (m = line.match(/^(\s{2,}\S.*?\s{2,})(\S.*)$/))
-      leader = m[1]
-      desc = m[2]
-      avail = width - leader.length
-      if avail >= 16
-        desc_lines = wrap_words(desc.split, avail)
-        indent = ' ' * leader.length
-        return [leader + desc_lines[0]] + desc_lines[1..].map { |l| indent + l }
-      end
-    end
-
-    indent = line[/^\s*/] || ''
-    avail = [width - indent.length, 20].max
-    wrap_words(line.strip.split, avail).map { |l| indent + l }
-  end
-
-  def self.colorize_flags(str)
-    str.gsub(/\b[A-Z]{2,}\b/) { |arg| Rainbow(arg).yellow }
-       .gsub(/(-[a-zA-Z0-9]+|--(?:\[no-\])?[a-zA-Z0-9\-_]+)/) { |flag| Rainbow(flag).green.bold }
-  end
-
-  def self.colorize_help_line(line)
-    return line unless Rainbow.enabled
-
-    if (m = line.match(/^(\s*)(Usage:)(\s+)(\S+)(.*)$/))
-      lead, usage, sp, prog, rest = m[1], m[2], m[3], m[4], m[5]
-      colored_rest = rest.gsub(/(\[[^\]]+\])/) { |b| Rainbow(b).cyan }
-      "#{lead}#{Rainbow(usage).cyan.bold}#{sp}#{Rainbow(prog).bold}#{colored_rest}"
-    elsif (m = line.match(/^(\s*)([A-Za-z0-9\s&,\/\-\.]+:)$/))
-      "#{m[1]}#{Rainbow(m[2]).cyan.bold}"
-    elsif (m = line.match(/^(\s{2,})((?:-[a-zA-Z0-9]+,?\s*|--(?:\[no-\])?[a-zA-Z0-9\-_]+(?:\s+[A-Z]+)?(?:,\s*)?)+)( {2,})(\S.*)$/))
-      lead, flags, sp, desc = m[1], m[2], m[3], m[4]
-      "#{lead}#{colorize_flags(flags)}#{sp}#{desc}"
-    elsif (m = line.match(/^(\s{2,})(-[a-zA-Z0-9\-_].*)$/))
-      lead, flags = m[1], m[2]
-      "#{lead}#{colorize_flags(flags)}"
-    elsif (m = line.match(/(run:\s+)(\S+\s+-E)/))
-      line.gsub(m[2], Rainbow(m[2]).bold.cyan)
-    else
-      line
-    end
-  end
-
-  def self.divider_character
-    (ENV['TERM'] == 'dumb' || ENV['LC_ALL'] == 'C' || ENV['LANG'] == 'C') ? '-' : '─'
-  end
-
-  def self.build_help_divider(width)
-    char = divider_character
-    raw = '  ' + (char * [width - 4, 10].max)
-    Rainbow.enabled ? Rainbow(raw).faint.to_s : raw
-  end
-
-  def self.insert_help_dividers(lines, width)
-    divider = build_help_divider(width)
-    result = []
-    in_group = false
-    seen_option = false
-
-    lines.each do |line|
-      plain = line.gsub(/\e\[[0-9;]*m/, '')
-      if plain =~ /^(\s*)([A-Za-z0-9\s&,\/\-\.]+:)$/
-        in_group = true
-        seen_option = false
-        result << line
-      elsif plain =~ /^[A-Z]/ && !plain.start_with?('  ')
-        in_group = false
-        seen_option = false
-        result << line
-      elsif in_group && plain =~ /^\s{2,}(-[a-zA-Z0-9]+|--(?:\[no-\])?[a-zA-Z0-9\-_]+)/
-        result << divider if seen_option
-        seen_option = true
-        result << line
-      else
-        result << line
-      end
-    end
-    result
-  end
-
-  def self.wrap_help(text, width = terminal_columns, help_style = 'plain')
-    wrapped_lines = text.to_s.lines.map(&:chomp)
-                        .flat_map { |line| wrap_help_line(line, width) }
-                        .map { |line| colorize_help_line(line) }
-
-    lines = (help_style == 'lines') ? insert_help_dividers(wrapped_lines, width) : wrapped_lines
-    lines.join("\n")
-  end
-
-  def self.handle_help_and_examples(parser, options, prog_name, argv = [])
-    options[:color] = determine_color_enabled(options) if options[:color].nil?
-    Rainbow.enabled = options[:color]
-
-    if options[:list_themes]
-      base_theme = ENV['LEENI_THEME'] || ENV['L_THEME'] || ENV['COLOR_THEME'] ||
-                   ENV['BASE16_THEME'] || options[:theme] || LatexColor.default_theme
-      LatexColor.active_theme = base_theme
-      puts LatexColor.format_theme_list
-      exit 0
-    end
-
-    if options[:show_config]
-      puts LaTeXConfig.format_active_config('.', scope: options[:config_scope])
-      exit 0
-    end
-
-    # Help is checked first so that it wins over every action, destructive ones
-    # included: `l -C -h` used to clean the directory and exit 0 without ever
-    # printing the usage the user asked for.
-    print_help_or_examples(parser, options, prog_name)
-
-    if options[:show_main]
-      puts LaTeXUtils.find_main_latex_file(directory_argument_or_abort(argv[0], prog_name), options[:exclude_main_tex])
-      exit 0
-    elsif options[:clean_only]
-      target = directory_argument_or_abort(argv[0], prog_name)
-      config = LaTeXConfig.load_merged_config(target)
-      configured = options[:junk_dir] || config['junk_dir']
-      workspace = LeeniBuildWorkspace.resolve(target, configured)
-      LaTeXUtils.clean_directory(target, true, workspace_dir: workspace)
-      exit 0
-    end
-  end
-
-  def self.help_output_text(parser, options, prog_name)
-    manual = options[:show_help_all] ? LaTeXHelpManual.render(prog_name) : condensed_help(prog_name)
-    if (options[:show_help_all] || options[:show_help]) && options[:show_examples]
-      "#{manual}\n\n#{LaTeXUtils.detailed_examples}"
-    elsif options[:show_help_all] || options[:show_help]
-      manual
-    elsif options[:show_examples]
-      LaTeXUtils.detailed_examples(parser.banner)
-    end
-  end
-
-  def self.print_help_or_examples(parser, options, prog_name)
-    output = help_output_text(parser, options, prog_name)
-    return unless output
-
-    puts wrap_help(output, terminal_columns, options[:help_style])
-    exit 0
   end
 
   def self.configure_environment(options)
@@ -820,7 +638,7 @@ module LatexCLI
   def self.determine_links_enabled(options)
     return options[:link] unless options[:link].nil?
     return false if options[:emacs] || ENV['INSIDE_EMACS']
-    return false if ENV['TERM'] == 'dumb' || ENV['TERM'] == 'unknown'
+    return false if %w[dumb unknown].include?(ENV['TERM'])
     return false if ENV['NO_COLOR'] && !ENV['NO_COLOR'].empty?
     return false unless $stdout.tty?
 
@@ -851,9 +669,6 @@ module LatexCLI
       LatexColor.active_theme = base_theme
     end
   end
-
 end
 
-if __FILE__ == $PROGRAM_NAME || (File.exist?($PROGRAM_NAME) && File.identical?(__FILE__, $PROGRAM_NAME))
-  LatexCLI.run
-end
+LatexCLI.run if __FILE__ == $PROGRAM_NAME || (File.exist?($PROGRAM_NAME) && File.identical?(__FILE__, $PROGRAM_NAME))

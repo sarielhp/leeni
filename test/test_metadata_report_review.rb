@@ -27,8 +27,8 @@ class TestMetadataReportReview < Minitest::Test
       "\\begin{document}\\maketitle Example.\\end{document}\n"
   end
 
-  def run_report(dir, *args)
-    Open3.capture2e('ruby', BIN, dir, *args)
+  def run_report(dir, *)
+    Open3.capture2e('ruby', BIN, dir, *)
   end
 
   def test_source_checksum_mismatch_fails_without_report
@@ -130,7 +130,7 @@ class TestMetadataReportReview < Minitest::Test
       assert_equal 'review', abstract['status']
       assert_equal 'available', abstract['availability']
       assert_equal 'low_similarity', abstract.dig('warning', 'code')
-      assert report['warnings'].any? { |warning| warning.include?('very little text') }
+      assert(report['warnings'].any? { |warning| warning.include?('very little text') })
     end
   end
 

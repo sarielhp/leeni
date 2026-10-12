@@ -18,7 +18,8 @@ class TestErrorCatalog < Minitest::Test
   def test_classify_misplaced_alignment_tab_in_equation_star
     Dir.mktmpdir do |dir|
       file = File.join(dir, 'test.tex')
-      File.write(file, "\\documentclass{article}\n\\begin{document}\n\\begin{equation*}\n  x = 1 & y = 2\n\\end{equation*}\n\\end{document}\n")
+      File.write(file,
+                 "\\documentclass{article}\n\\begin{document}\n\\begin{equation*}\n  x = 1 & y = 2\n\\end{equation*}\n\\end{document}\n")
       text = "#{file}:4: Misplaced alignment tab character &.\nl.4   x = 1 &"
       item = LaTeXErrorCatalog.classify(text, text.lines, file: file, line: 4)
       assert item
@@ -111,10 +112,10 @@ class TestErrorCatalog < Minitest::Test
 
   def test_classify_undefined_control_sequence_in_macro_expansion
     err_lines = [
-      "./t_cover.tex:208: Undefined control sequence.",
-      "\\DotProd #1#2->\\permut ",
-      "                       {{#1},{#2}}",
-      "l.208 \\end{align*}"
+      './t_cover.tex:208: Undefined control sequence.',
+      '\\DotProd #1#2->\\permut ',
+      '                       {{#1},{#2}}',
+      'l.208 \\end{align*}'
     ]
     item = LaTeXErrorCatalog.classify(err_lines.join("\n"), err_lines)
     assert item
@@ -142,25 +143,25 @@ class TestErrorCatalog < Minitest::Test
 
       err_lines = [
         "#{file}:8: Undefined control sequence.",
-        "\\DotProd #1#2->\\permut ",
-        "                       {{#1},{#2}}",
-        "l.8 \\end{align*}"
+        '\\DotProd #1#2->\\permut ',
+        '                       {{#1},{#2}}',
+        'l.8 \\end{align*}'
       ]
       item = LaTeXErrorCatalog.classify(err_lines.join("\n"), err_lines, file: file, line: 8)
       assert item
       assert_equal :undefined_control_sequence, item[:id]
       assert_equal '\\permut', item[:token]
-      assert_equal 5, item[:root_line], "Expected root_line to point to line 5 containing \\DotProd"
-      assert_equal 3, item[:root_col], "Expected root_col to point to \\DotProd"
+      assert_equal 5, item[:root_line], 'Expected root_line to point to line 5 containing \\DotProd'
+      assert_equal 3, item[:root_col], 'Expected root_col to point to \\DotProd'
     end
   end
 
   def test_classify_undefined_control_sequence_in_argument
     err_lines = [
-      "! Undefined control sequence.",
-      "<argument>  x &= 1 \\\\ y &= \\unknownMacro ",
-      "                                         \\\\ z &= 2 ",
-      "l.8 \\end{align*}"
+      '! Undefined control sequence.',
+      '<argument>  x &= 1 \\\\ y &= \\unknownMacro ',
+      '                                         \\\\ z &= 2 ',
+      'l.8 \\end{align*}'
     ]
     item = LaTeXErrorCatalog.classify(err_lines.join("\n"), err_lines)
     assert item
@@ -185,7 +186,7 @@ class TestErrorCatalog < Minitest::Test
   end
 
   def test_classify_missing_dollar
-    text = "./main.tex:8: Missing $ inserted."
+    text = './main.tex:8: Missing $ inserted.'
     item = LaTeXErrorCatalog.classify(text, text.lines)
     assert item
     assert_equal :missing_dollar, item[:id]
@@ -207,7 +208,9 @@ class TestErrorCatalog < Minitest::Test
   def test_classify_missing_dollar_unclosed_single
     Dir.mktmpdir do |dir|
       file = File.join(dir, 'test.tex')
-      File.write(file, "\\documentclass{article}\n\\begin{document}\nHere is an unclosed $x + y = z formula.\n\nNext paragraph.\n\\end{document}\n")
+      File.write(file,
+                 "\\documentclass{article}\n\\begin{document}\nHere is an unclosed $x + y = z formula.\n\n" \
+                 "Next paragraph.\n\\end{document}\n")
       text = "#{file}:4: Missing $ inserted.\nl.4"
       item = LaTeXErrorCatalog.classify(text, text.lines, file: file, line: 4)
       assert item
@@ -220,13 +223,13 @@ class TestErrorCatalog < Minitest::Test
     Dir.mktmpdir do |dir|
       file = File.join(dir, 'test.tex')
       content = [
-        "\\documentclass{article}",
-        "\\begin{document}",
-        "Let $x be an arbitrary variable.",
-        "We can compute $y = f(x)$ easily.",
-        "Finally, we see that $z > 0$ holds.",
-        "",
-        "\\end{document}"
+        '\\documentclass{article}',
+        '\\begin{document}',
+        'Let $x be an arbitrary variable.',
+        'We can compute $y = f(x)$ easily.',
+        'Finally, we see that $z > 0$ holds.',
+        '',
+        '\\end{document}'
       ].join("\n")
       File.write(file, content)
       text = "#{file}:6: Missing $ inserted.\nl.6"
@@ -255,7 +258,7 @@ class TestErrorCatalog < Minitest::Test
     assert item
     assert_equal :extra_closing_brace, item[:id]
 
-    text2 = "./main.tex:12: Extra }, or forgotten $."
+    text2 = './main.tex:12: Extra }, or forgotten $.'
     item2 = LaTeXErrorCatalog.classify(text2, text2.lines)
     assert item2
     assert_equal :extra_closing_brace, item2[:id]
@@ -269,7 +272,7 @@ class TestErrorCatalog < Minitest::Test
   end
 
   def test_classify_environment_undefined_extracts_token
-    text = "./main.tex:3: LaTeX Error: Environment myenv undefined."
+    text = './main.tex:3: LaTeX Error: Environment myenv undefined.'
     item = LaTeXErrorCatalog.classify(text, text.lines)
     assert item
     assert_equal :environment_undefined, item[:id]
@@ -294,7 +297,7 @@ class TestErrorCatalog < Minitest::Test
   end
 
   def test_classify_command_already_defined_extracts_token
-    text = "./main.tex:2: LaTeX Error: Command \\foo already defined."
+    text = './main.tex:2: LaTeX Error: Command \\foo already defined.'
     item = LaTeXErrorCatalog.classify(text, text.lines)
     assert item
     assert_equal :command_already_defined, item[:id]
@@ -303,42 +306,42 @@ class TestErrorCatalog < Minitest::Test
   end
 
   def test_classify_extra_alignment_tab
-    text = "./main.tex:4: Extra alignment tab has been changed to \\cr."
+    text = './main.tex:4: Extra alignment tab has been changed to \\cr.'
     item = LaTeXErrorCatalog.classify(text, text.lines)
     assert item
     assert_equal :extra_alignment_tab, item[:id]
   end
 
   def test_classify_missing_number_treated_as_zero
-    text = "./main.tex:3: Missing number, treated as zero."
+    text = './main.tex:3: Missing number, treated as zero.'
     item = LaTeXErrorCatalog.classify(text, text.lines)
     assert item
     assert_equal :missing_number_treated_as_zero, item[:id]
   end
 
   def test_classify_illegal_unit_of_measure
-    text = "./main.tex:3: Illegal unit of measure (pt inserted)."
+    text = './main.tex:3: Illegal unit of measure (pt inserted).'
     item = LaTeXErrorCatalog.classify(text, text.lines)
     assert item
     assert_equal :illegal_unit_of_measure, item[:id]
   end
 
   def test_classify_double_subscript
-    text = "./main.tex:3: Double subscript."
+    text = './main.tex:3: Double subscript.'
     item = LaTeXErrorCatalog.classify(text, text.lines)
     assert item
     assert_equal :double_subscript, item[:id]
   end
 
   def test_classify_double_superscript
-    text = "./main.tex:3: Double superscript."
+    text = './main.tex:3: Double superscript.'
     item = LaTeXErrorCatalog.classify(text, text.lines)
     assert item
     assert_equal :double_superscript, item[:id]
   end
 
   def test_classify_option_clash_for_package_extracts_token
-    text = "./main.tex:3: LaTeX Error: Option clash for package geometry."
+    text = './main.tex:3: LaTeX Error: Option clash for package geometry.'
     item = LaTeXErrorCatalog.classify(text, text.lines)
     assert item
     assert_equal :option_clash_for_package, item[:id]
@@ -347,14 +350,14 @@ class TestErrorCatalog < Minitest::Test
   end
 
   def test_classify_lonely_item
-    text = "./main.tex:3: LaTeX Error: Lonely \\item--perhaps a missing list environment."
+    text = './main.tex:3: LaTeX Error: Lonely \\item--perhaps a missing list environment.'
     item = LaTeXErrorCatalog.classify(text, text.lines)
     assert item
     assert_equal :lonely_item, item[:id]
   end
 
   def test_classify_cannot_determine_size_of_graphic_extracts_token
-    text = "./main.tex:3: LaTeX Error: Cannot determine size of graphic in mypic.xyz (no BoundingBox)."
+    text = './main.tex:3: LaTeX Error: Cannot determine size of graphic in mypic.xyz (no BoundingBox).'
     item = LaTeXErrorCatalog.classify(text, text.lines)
     assert item
     assert_equal :cannot_determine_size_of_graphic, item[:id]
@@ -362,70 +365,70 @@ class TestErrorCatalog < Minitest::Test
   end
 
   def test_classify_not_in_outer_par_mode
-    text = "./main.tex:3: LaTeX Error: Not in outer par mode."
+    text = './main.tex:3: LaTeX Error: Not in outer par mode.'
     item = LaTeXErrorCatalog.classify(text, text.lines)
     assert item
     assert_equal :not_in_outer_par_mode, item[:id]
   end
 
   def test_classify_missing_delimiter
-    text = "./main.tex:3: Missing delimiter (. inserted)."
+    text = './main.tex:3: Missing delimiter (. inserted).'
     item = LaTeXErrorCatalog.classify(text, text.lines)
     assert item
     assert_equal :missing_delimiter, item[:id]
   end
 
   def test_classify_only_in_preamble
-    text = "./main.tex:3: LaTeX Error: Can be used only in preamble."
+    text = './main.tex:3: LaTeX Error: Can be used only in preamble.'
     item = LaTeXErrorCatalog.classify(text, text.lines)
     assert item
     assert_equal :only_in_preamble, item[:id]
   end
 
   def test_classify_extra_right
-    text = "./main.tex:3: Extra \\right."
+    text = './main.tex:3: Extra \\right.'
     item = LaTeXErrorCatalog.classify(text, text.lines)
     assert item
     assert_equal :extra_right, item[:id]
   end
 
   def test_classify_missing_begin_document
-    text = "./main.tex:3: LaTeX Error: Missing \\begin{document}."
+    text = './main.tex:3: LaTeX Error: Missing \\begin{document}.'
     item = LaTeXErrorCatalog.classify(text, text.lines)
     assert item
     assert_equal :missing_begin_document, item[:id]
   end
 
   def test_classify_dimension_too_large
-    text = "./main.tex:3: Dimension too large."
+    text = './main.tex:3: Dimension too large.'
     item = LaTeXErrorCatalog.classify(text, text.lines)
     assert item
     assert_equal :dimension_too_large, item[:id]
   end
 
   def test_classify_misplaced_noalign
-    text = "./main.tex:3: Misplaced \\noalign."
+    text = './main.tex:3: Misplaced \\noalign.'
     item = LaTeXErrorCatalog.classify(text, text.lines)
     assert item
     assert_equal :misplaced_noalign, item[:id]
   end
 
   def test_classify_bad_math_environment_delimiter
-    text = "./main.tex:3: LaTeX Error: Bad math environment delimiter."
+    text = './main.tex:3: LaTeX Error: Bad math environment delimiter.'
     item = LaTeXErrorCatalog.classify(text, text.lines)
     assert item
     assert_equal :bad_math_environment_delimiter, item[:id]
   end
 
   def test_classify_counter_too_large
-    text = "./main.tex:3: LaTeX Error: Counter too large."
+    text = './main.tex:3: LaTeX Error: Counter too large.'
     item = LaTeXErrorCatalog.classify(text, text.lines)
     assert item
     assert_equal :counter_too_large, item[:id]
   end
 
   def test_classify_amsmath_multiple_tag
-    text = "./main.tex:3: Package amsmath Error: Multiple \\tag."
+    text = './main.tex:3: Package amsmath Error: Multiple \\tag.'
     item = LaTeXErrorCatalog.classify(text, text.lines)
     assert item
     assert_equal :amsmath_multiple_tag, item[:id]
@@ -441,7 +444,7 @@ class TestErrorCatalog < Minitest::Test
   end
 
   def test_classify_mismatched_environment_extracts_token
-    text = "./main.tex:3: LaTeX Error: \\begin{itemize} on input line 3 ended by \\end{enumerate}."
+    text = './main.tex:3: LaTeX Error: \\begin{itemize} on input line 3 ended by \\end{enumerate}.'
     item = LaTeXErrorCatalog.classify(text, text.lines)
     assert item
     assert_equal :mismatched_environment, item[:id]
@@ -450,14 +453,14 @@ class TestErrorCatalog < Minitest::Test
   end
 
   def test_classify_missing_closing_brace
-    text = "./main.tex:3: Missing } inserted."
+    text = './main.tex:3: Missing } inserted.'
     item = LaTeXErrorCatalog.classify(text, text.lines)
     assert item
     assert_equal :missing_closing_brace, item[:id]
   end
 
   def test_classify_missing_endcsname
-    text = "./main.tex:3: Missing \\endcsname inserted."
+    text = './main.tex:3: Missing \\endcsname inserted.'
     item = LaTeXErrorCatalog.classify(text, text.lines)
     assert item
     assert_equal :missing_endcsname, item[:id]
@@ -478,28 +481,28 @@ class TestErrorCatalog < Minitest::Test
   end
 
   def test_classify_illegal_parameter_number
-    text = "./main.tex:3: Illegal parameter number in definition of \\foo."
+    text = './main.tex:3: Illegal parameter number in definition of \\foo.'
     item = LaTeXErrorCatalog.classify(text, text.lines)
     assert item
     assert_equal :illegal_parameter_number, item[:id]
   end
 
   def test_classify_two_documentclass_commands
-    text = "./main.tex:3: LaTeX Error: Two \\documentclass or \\documentstyle commands."
+    text = './main.tex:3: LaTeX Error: Two \\documentclass or \\documentstyle commands.'
     item = LaTeXErrorCatalog.classify(text, text.lines)
     assert item
     assert_equal :two_documentclass_commands, item[:id]
   end
 
   def test_classify_verb_illegal_in_argument
-    text = "./main.tex:3: LaTeX Error: \\verb illegal in argument."
+    text = './main.tex:3: LaTeX Error: \\verb illegal in argument.'
     item = LaTeXErrorCatalog.classify(text, text.lines)
     assert item
     assert_equal :verb_illegal_in_argument, item[:id]
   end
 
   def test_classify_caption_outside_float
-    text = "./main.tex:3: LaTeX Error: \\caption outside float."
+    text = './main.tex:3: LaTeX Error: \\caption outside float.'
     item = LaTeXErrorCatalog.classify(text, text.lines)
     assert item
     assert_equal :caption_outside_float, item[:id]
@@ -513,7 +516,7 @@ class TestErrorCatalog < Minitest::Test
   end
 
   def test_classify_ambiguous_math_fractions
-    text = "./main.tex:3: Ambiguous; you need another { and }."
+    text = './main.tex:3: Ambiguous; you need another { and }.'
     item = LaTeXErrorCatalog.classify(text, text.lines)
     assert item
     assert_equal :ambiguous_math_fractions, item[:id]
@@ -535,14 +538,14 @@ class TestErrorCatalog < Minitest::Test
   end
 
   def test_classify_bad_register_code
-    text = "./main.tex:3: Bad register code (-1)."
+    text = './main.tex:3: Bad register code (-1).'
     item = LaTeXErrorCatalog.classify(text, text.lines)
     assert item
     assert_equal :bad_register_code, item[:id]
   end
 
   def test_classify_nested_include
-    text = "./main.tex:3: LaTeX Error: \\include cannot be nested."
+    text = './main.tex:3: LaTeX Error: \\include cannot be nested.'
     item = LaTeXErrorCatalog.classify(text, text.lines)
     assert item
     assert_equal :nested_include, item[:id]
@@ -557,14 +560,14 @@ class TestErrorCatalog < Minitest::Test
   end
 
   def test_classify_command_undefined
-    text = "./main.tex:3: LaTeX Error: Command \\foo undefined."
+    text = './main.tex:3: LaTeX Error: Command \\foo undefined.'
     item = LaTeXErrorCatalog.classify(text, text.lines)
     assert item
     assert_equal :command_undefined, item[:id]
   end
 
   def test_classify_file_ended_while_scanning
-    text = "! File ended while scanning use of \\foo."
+    text = '! File ended while scanning use of \\foo.'
     item = LaTeXErrorCatalog.classify(text, text.lines)
     assert item
     assert_equal :file_ended_while_scanning, item[:id]
@@ -579,7 +582,7 @@ class TestErrorCatalog < Minitest::Test
   end
 
   def test_classify_package_amsmath_invalid_intertext
-    text = "./main.tex:3: Package amsmath Error: Invalid use of \\intertext."
+    text = './main.tex:3: Package amsmath Error: Invalid use of \\intertext.'
     item = LaTeXErrorCatalog.classify(text, text.lines)
     assert item
     assert_equal :package_amsmath_invalid_intertext, item[:id]
@@ -595,7 +598,7 @@ class TestErrorCatalog < Minitest::Test
   end
 
   def test_classify_package_tikz_missing_semicolon
-    text = "./main.tex:3: Package tikz Error: Giving up on this path. Did you forget a semicolon?"
+    text = './main.tex:3: Package tikz Error: Giving up on this path. Did you forget a semicolon?'
     item = LaTeXErrorCatalog.classify(text, text.lines)
     assert item
     assert_equal :package_tikz_missing_semicolon, item[:id]
@@ -610,14 +613,14 @@ class TestErrorCatalog < Minitest::Test
   end
 
   def test_classify_not_allowed_in_lr_mode
-    text = "./main.tex:3: LaTeX Error: Not allowed in LR mode."
+    text = './main.tex:3: LaTeX Error: Not allowed in LR mode.'
     item = LaTeXErrorCatalog.classify(text, text.lines)
     assert item
     assert_equal :not_allowed_in_lr_mode, item[:id]
   end
 
   def test_classify_package_enumitem_key_undefined
-    text = "./main.tex:3: Package enumitem Error: badkey undefined."
+    text = './main.tex:3: Package enumitem Error: badkey undefined.'
     item = LaTeXErrorCatalog.classify(text, text.lines)
     assert item
     assert_equal :package_enumitem_key_undefined, item[:id]
@@ -633,7 +636,7 @@ class TestErrorCatalog < Minitest::Test
   end
 
   def test_classify_unknown_error_returns_nil
-    text = "./main.tex:10: Some totally unheard of exotic error message."
+    text = './main.tex:10: Some totally unheard of exotic error message.'
     item = LaTeXErrorCatalog.classify(text, text.lines)
     assert_nil item
   end

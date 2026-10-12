@@ -35,7 +35,7 @@ module LatexBuildRuntime
   # the truncating open performed by with_lock.
   def verify_private_dir!(dir)
     stat = File.lstat(dir)
-    return if stat.directory? && !stat.symlink? && stat.uid == Process.uid && (stat.mode & 0o077).zero?
+    return if stat.directory? && !stat.symlink? && stat.uid == Process.uid && stat.mode.nobits?(0o077)
 
     abort "leeni: refusing to use #{dir}: not a private directory owned by uid #{Process.uid}"
   end
@@ -83,7 +83,8 @@ module LatexBuildRuntime
                    ["-output-directory=#{@junk_dir}", '-file-line-error']
     @pdferr = "#{@junk_dir}/err_#{@engine_name}"
     @biberr = "#{@junk_dir}/err_bib"
-    @log, @loga = "#{@junk_dir}/log.txt", "#{@junk_dir}/log.txt.1"
+    @log = "#{@junk_dir}/log.txt"
+    @loga = "#{@junk_dir}/log.txt.1"
   end
 
   def resolve_engine
@@ -307,13 +308,13 @@ module LatexBuildRuntime
 
   def print_pass_time(started)
     elapsed = Process.clock_gettime(Process::CLOCK_MONOTONIC) - started
-    printf(" [%s]", Rainbow(format('%.2fs', elapsed)).green)
+    printf(' [%s]', Rainbow(format('%.2fs', elapsed)).green)
   end
 
   def build_latex_pass_cmd
     latexopts = ENV['LATEXOPTS'] || ''
     latexoptions = ENV['LATEXOPTIONS'] || ''
-    prefix = !latexoptions.empty? ? "#{latexoptions} " : latexopts
+    prefix = latexoptions.empty? ? latexopts : "#{latexoptions} "
     input = "#{prefix}#{self.class::RUNTIME_HOOK}\\input{#{@filename}}"
     [@engine_name] + @latex_flags + [input]
   end

@@ -8,6 +8,7 @@
 # Translates declarative YAML scenarios into animated terminal recordings.
 # ==============================================================================
 
+require 'English'
 require 'fileutils'
 require 'open3'
 require 'optparse'
@@ -84,16 +85,14 @@ module DemoRecorder
     def self.load_file(path, cli_options = {})
       raise ArgumentError, "Scenario file not found: #{path}" unless File.exist?(path)
 
-      data = YAML.safe_load(File.read(path)) || {}
+      data = YAML.safe_load_file(path) || {}
       new(data, File.dirname(File.expand_path(path)), cli_options)
     end
 
     def self.load_default(cli_options = {})
-      if File.exist?(DEFAULT_SCENARIO)
-        load_file(DEFAULT_SCENARIO, cli_options)
-      else
-        raise ArgumentError, "Default scenario not found at #{DEFAULT_SCENARIO}"
-      end
+      raise ArgumentError, "Default scenario not found at #{DEFAULT_SCENARIO}" unless File.exist?(DEFAULT_SCENARIO)
+
+      load_file(DEFAULT_SCENARIO, cli_options)
     end
 
     private
@@ -284,7 +283,7 @@ module DemoRecorder
       puts "==> Running VHS to render: #{@scenario.output_path}"
       env = { 'PATH' => [dir, @env.path_env].join(File::PATH_SEPARATOR) }
       success = system(env, @env.vhs_path, tape_path)
-      status = $?.exitstatus || (success ? 0 : 1)
+      status = $CHILD_STATUS.exitstatus || (success ? 0 : 1)
 
       unless success
         warn "Error: VHS execution failed (exit #{status})"

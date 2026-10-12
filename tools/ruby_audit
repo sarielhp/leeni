@@ -1,0 +1,387 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# ==============================================================================
+# ~/prog/standards/ruby/bin/ruby-audit
+#
+# High-performance AST code metrics and sizing auditor using RubyVM::AbstractSyntaxTree.
+# Enforces:
+# 1. Nesting Depth <= 4 (Hard limit)
+# 2. Cognitive Complexity <= 15 (Hard limit)
+# 3. Method Length <= 80 lines (or <= 120 lines if Cognitive Complexity <= 5)
+# 4. File Sizing: Soft warning at 800 lines, hard limit at 1100 lines
+# 5. Clean Control Flow: Flag 'else' following terminal statements (return/raise)
+# ==============================================================================
+
+require 'optparse'
+require 'fileutils'
+
+module RubyCodeAuditor
+  VERSION = '0.1.0'
+
+  DEFAULT_MAX_DEPTH = 4
+  DEFAULT_MAX_COMPLEXITY = 15
+  DEFAULT_MAX_LOGIC_LINES = 80
+  DEFAULT_MAX_DECLARATIVE_LINES = 120
+  DECLARATIVE_COMPLEXITY_CEILING = 5
+
+  DEFAULT_FILE_SOFT_LIMIT = 800
+  DEFAULT_FILE_HARD_LIMIT = 1100
+
+  RESOURCE_MANAGERS = %i[open chdir synchronize with_lock create mktmpdir capture2 capture3 popen].freeze
+  TERMINAL_KEYWORDS = %w[return raise fail break next].freeze
+
+  MethodViolation = Struct.new(:file, :name, :line, :lines, :depth, :complexity, :reasons)
+  FileViolation   = Struct.new(:file, :lines, :limit, :type)
+  StyleViolation  = Struct.new(:file, :line, :message)
+  TrapViolation   = Struct.new(:file, :line, :trap, :message)
+
+  def self.resource_block_node?(node)
+    return false unless node.is_a?(RubyVM::AbstractSyntaxTree::Node) && node.type == :ITER
+
+    call_node = node.children[0]
+    return false unless call_node.is_a?(RubyVM::AbstractSyntaxTree::Node)
+
+    method_name = case call_node.type
+                  when :CALL, :QCALL then call_node.children[1]
+                  when :FCALL, :VCALL then call_node.children[0]
+                  end
+    RESOURCE_MANAGERS.include?(method_name)
+  end
+
+  def self.calculate_method_metrics(body_node)
+    max_depth = 0
+    cog_complexity = 0
+
+    walker = lambda do |n, depth, is_flat_continuation|
+      return unless n.is_a?(RubyVM::AbstractSyntaxTree::Node)
+
+      is_resource = resource_block_node?(n)
+      branch_type = %i[IF WHILE UNTIL CASE].include?(n.type) || (n.type == :ITER && !is_resource)
+      cur_depth = if is_flat_continuation
+                    depth
+                  else
+                    (depth + (branch_type ? 1 : 0))
+                  end
+      max_depth = [max_depth, cur_depth].max
+
+      case n.type
+      when :IF
+        cog_complexity += is_flat_continuation ? 1 : (1 + [0, cur_depth - 1].max)
+      when :WHILE, :UNTIL, :CASE, :RESCUE
+        cog_complexity += (1 + [0, cur_depth - 1].max)
+      when :AND, :OR
+        cog_complexity += 1
+      end
+
+      n.children.each_with_index do |child, i|
+        next unless child.is_a?(RubyVM::AbstractSyntaxTree::Node)
+
+        flat = (n.type == :IF && i == 2 && child.type == :IF) ||
+               (n.type == :WHEN && i == 2 && child.type == :WHEN)
+        walker.call(child, cur_depth, flat)
+      end
+    end
+
+    walker.call(body_node, 0, false)
+    [max_depth, cog_complexity]
+  end
+
+  def self.extract_method_info(node)
+    if node.type == :DEFN
+      name = node.children[0]
+      scope = node.children[1]
+      [name, node.first_lineno, node.last_lineno, scope.children[2]]
+    elsif node.type == :DEFS
+      name = "self.#{node.children[1]}"
+      scope = node.children[2]
+      [name, node.first_lineno, node.last_lineno, scope.children[2]]
+    end
+  end
+
+  def self.check_method_node(file, node, options, violations, all_methods)
+    name, first_l, last_l, body = extract_method_info(node)
+    lines = last_l - first_l + 1
+    depth, cc = calculate_method_metrics(body)
+
+    all_methods << { file: file, name: name, line: first_l, lines: lines, depth: depth, cc: cc }
+
+    reasons = evaluate_method_violations(lines, depth, cc, options)
+    return if reasons.empty?
+
+    violations << MethodViolation.new(file, name, first_l, lines, depth, cc, reasons)
+  end
+
+  def self.evaluate_method_violations(lines, depth, cc, options)
+    reasons = []
+    reasons << "depth #{depth} > #{options[:max_depth]}" if depth > options[:max_depth]
+    reasons << "complexity #{cc} > #{options[:max_complexity]}" if cc > options[:max_complexity]
+
+    if cc <= DECLARATIVE_COMPLEXITY_CEILING
+      reasons << "lines #{lines} > #{options[:max_declarative_lines]}" if lines > options[:max_declarative_lines]
+    elsif lines > options[:max_logic_lines]
+      reasons << "lines #{lines} > #{options[:max_logic_lines]}"
+    end
+    reasons
+  end
+
+  MUTABLE_HASH_PATTERN = Regexp.new(['Hash', '\.new\(\s*(?:\[\s*\]|\{\s*\})\s*\)'].join)
+
+  def self.check_style_and_traps(file_lines, file, content, style_violations, trap_violations)
+    # Check for missing frozen_string_literal: true
+    unless content.include?('frozen_string_literal: true')
+      style_violations << StyleViolation.new(file, 1, "missing '# frozen_string_literal: true' header comment")
+    end
+
+    file_lines.each_with_index do |line, idx|
+      clean_line = line.sub(/#.*$/, '').strip
+      next if clean_line.empty?
+
+      # 1. Check for 'else' after terminal statement
+      if clean_line =~ /^(?:else|elsif)\b/
+        prev_lines = file_lines[0...idx].reverse
+        prev = prev_lines.find { |l| l !~ /^\s*(?:#|$)/ }
+        if prev =~ /^\s*(?:return\b|raise\b|fail\b|break\b|next\b)/
+          term = Regexp.last_match(0).strip
+          style_violations << StyleViolation.new(file, idx + 1, "unnecessary 'else' after terminal statement '#{term}'")
+        end
+      end
+
+      # 2. Check for bare 'rescue Exception'
+      if clean_line =~ /\brescue\s+(?:::)?Exception\b/ && !line.include?('ruby-audit: allow-rescue-exception')
+        # ruby-audit: allow-rescue-exception
+        message = "unsafe 'rescue " \
+                  "Exception' traps system interrupts and signals; rescue StandardError instead"
+        trap_violations << TrapViolation.new(file, idx + 1, 'rescue_exception', message)
+      end
+
+      # 3. Check for Hash.new([]) or Hash.new({}) mutable default trap
+      if clean_line =~ MUTABLE_HASH_PATTERN
+        trap_violations << TrapViolation.new(file, idx + 1, 'hash_default_mutable',
+                                             'Hash.new with mutable literal shares a single instance; ' \
+                                             'use block form: Hash.new { |h, k| h[k] = [] }')
+      end
+
+      # 4. Check for global core class reopening / monkey patching
+      next unless clean_line =~ /^class\s+(String|Array|Hash|Integer|Float|Symbol|Numeric)\b/
+
+      trap_violations << TrapViolation.new(file, idx + 1, 'core_monkey_patch',
+                                           "global reopening of core class '#{Regexp.last_match(1)}' is prohibited; " \
+                                           'use Refinements or utility modules')
+    end
+  end
+
+  def self.audit_file(file, options, violations, all_methods, file_violations, style_violations, trap_violations)
+    return unless File.file?(file)
+
+    content = begin
+      File.read(file)
+    rescue StandardError
+      nil
+    end
+    return unless content
+
+    file_lines = content.lines
+    line_count = file_lines.size
+
+    # Check File Sizing
+    exempt = content.include?('ruby-audit: allow-long-file') || file =~ /(?:catalog|data|dict|fixtures|diagnostics)/i
+    unless exempt
+      if line_count > options[:max_file_lines]
+        file_violations << FileViolation.new(file, line_count, options[:max_file_lines], :hard)
+      elsif line_count > options[:soft_file_lines]
+        file_violations << FileViolation.new(file, line_count, options[:soft_file_lines], :soft)
+      end
+    end
+
+    # Check Style and Trap Issues
+    check_style_and_traps(file_lines, file, content, style_violations, trap_violations)
+
+    # Check AST Method Metrics
+    ast = begin
+      RubyVM::AbstractSyntaxTree.parse(content)
+    rescue StandardError
+      nil
+    end
+    return unless ast
+
+    walker = lambda do |node|
+      return unless node.is_a?(RubyVM::AbstractSyntaxTree::Node)
+
+      check_method_node(file, node, options, violations, all_methods) if %i[DEFN DEFS].include?(node.type)
+      node.children.each { |child| walker.call(child) if child.is_a?(RubyVM::AbstractSyntaxTree::Node) }
+    end
+
+    walker.call(ast)
+  end
+
+  def self.ruby_executable?(path)
+    first_line = begin
+      File.open(path, &:gets)
+    rescue StandardError
+      nil
+    end
+    first_line&.start_with?('#!/usr/bin/env ruby') || first_line&.start_with?('#!/usr/bin/ruby')
+  end
+
+  def self.test_file?(path)
+    base = File.basename(path)
+    base.start_with?('test_') || base.end_with?('_test.rb') || base.end_with?('_spec.rb') ||
+      path.include?('/test/') || path.include?('/spec/')
+  end
+
+  def self.collect_target_files(paths, include_tests: false)
+    targets = if paths.empty?
+                default_project_files
+              else
+                paths.flat_map do |p|
+                  if File.directory?(p)
+                    Dir.glob(File.join(p, '**', '*.rb'))
+                  elsif File.file?(p)
+                    [p]
+                  else
+                    Dir.glob(p)
+                  end
+                end
+              end
+
+    filtered = targets.uniq.select do |p|
+      File.file?(p) && !File.symlink?(p) && (File.extname(p) == '.rb' || ruby_executable?(p)) && !ignored_path?(p)
+    end
+    filtered.reject! { |p| test_file?(p) } unless include_tests
+    filtered
+  end
+
+  def self.default_project_files
+    git_root = `git rev-parse --show-toplevel 2>/dev/null`.strip
+    root = git_root.empty? ? Dir.pwd : git_root
+
+    files = []
+    pname = File.basename(root)
+    root_bin = File.join(root, pname)
+    files << root_bin if File.file?(root_bin) && ruby_executable?(root_bin)
+
+    files.concat(Dir.glob(File.join(root, 'lib', '**', '*.rb')))
+    files.concat(Dir.glob(File.join(root, 'bin', '*')))
+    files.concat(Dir.glob(File.join(root, 'tools', '*')))
+    files.concat(Dir.glob(File.join(root, '*.rb')))
+    files
+  end
+
+  def self.ignored_path?(path)
+    ignored = %w[/.git/ /vendor/ /target/ /junk/ /.bws/ /node_modules/ /.bundle/]
+    ignored.any? { |ig| path.include?(ig) }
+  end
+
+  def self.parse_cli_options(args)
+    options = {
+      max_depth: DEFAULT_MAX_DEPTH,
+      max_complexity: DEFAULT_MAX_COMPLEXITY,
+      max_logic_lines: DEFAULT_MAX_LOGIC_LINES,
+      max_declarative_lines: DEFAULT_MAX_DECLARATIVE_LINES,
+      soft_file_lines: DEFAULT_FILE_SOFT_LIMIT,
+      max_file_lines: DEFAULT_FILE_HARD_LIMIT,
+      include_tests: false,
+      strict: false,
+      quiet: false,
+      verbose: false
+    }
+
+    parser = OptionParser.new do |opts|
+      opts.banner = 'Usage: ruby-audit [options] [files/directories...]'
+      opts.on('--max-depth N', Integer, "Max nesting depth (default: #{DEFAULT_MAX_DEPTH})") { |v| options[:max_depth] = v }
+      opts.on('--max-complexity N', Integer, "Max cognitive complexity (default: #{DEFAULT_MAX_COMPLEXITY})") { |v| options[:max_complexity] = v }
+      opts.on('--max-logic-lines N', Integer, "Max lines for logic methods (default: #{DEFAULT_MAX_LOGIC_LINES})") { |v| options[:max_logic_lines] = v }
+      opts.on('--max-declarative-lines N', Integer, "Max lines for declarative methods (default: #{DEFAULT_MAX_DECLARATIVE_LINES})") { |v| options[:max_declarative_lines] = v }
+      opts.on('--soft-file-lines N', Integer, "Soft file line warning threshold (default: #{DEFAULT_FILE_SOFT_LIMIT})") { |v| options[:soft_file_lines] = v }
+      opts.on('--max-file-lines N', Integer, "Hard file line limit (default: #{DEFAULT_FILE_HARD_LIMIT})") { |v| options[:max_file_lines] = v }
+      opts.on('--include-tests', 'Include test files in audit') { options[:include_tests] = true }
+      opts.on('--strict', 'Treat warnings as fatal errors') { options[:strict] = true }
+      opts.on('-q', '--quiet', 'Show only violations and warnings') { options[:quiet] = true }
+      opts.on('-v', '--verbose', 'Show all audited methods') { options[:verbose] = true }
+      opts.on('--version', 'Show version and exit') do
+        puts "ruby-audit v#{VERSION}"
+        exit 0
+      end
+      opts.on('-h', '--help', 'Show this help message') do
+        puts opts
+        exit 0
+      end
+    end
+
+    targets = parser.parse!(args)
+    [options, targets]
+  end
+
+  def self.report_results(violations, all_methods, file_violations, style_violations, trap_violations, options)
+    if options[:verbose]
+      puts "Audited #{all_methods.length} methods across files."
+      all_methods.sort_by { |m| -m[:cc] }.first(20).each do |m|
+        puts format('  %<file>-25s %<name>-30s (L%<line>4d): lines=%<lines>3d, depth=%<depth>d, cc=%<cc>2d', **m)
+      end
+      puts ''
+    end
+
+    # Print Soft File Warnings
+    file_violations.select { |f| f.type == :soft }.each do |f|
+      puts "  \e[33m⚠️ Warning: File exceeds soft limit (#{options[:soft_file_lines]} lines): #{f.file} (#{f.lines} lines)\e[0m"
+    end
+
+    # Print Style Violations
+    style_violations.each do |s|
+      puts "  \e[33m⚠️ Style: #{s.file}:#{s.line} - #{s.message}\e[0m"
+    end
+
+    # Print Trap Violations
+    if trap_violations.any?
+      puts "\n\e[31m❌ Critical Ruby trap violations:\e[0m"
+      trap_violations.each do |t|
+        puts "  \e[31m#{t.file}:#{t.line}\e[0m [#{t.trap}]: #{t.message}"
+      end
+    end
+
+    hard_file_violations = file_violations.select { |f| f.type == :hard }
+    has_hard_violations = violations.any? || hard_file_violations.any? || trap_violations.any?
+
+    if has_hard_violations
+      if hard_file_violations.any? || violations.any?
+        puts "\n\e[31m❌ Code metric violations found:\e[0m"
+        hard_file_violations.each do |f|
+          puts "  \e[31m#{f.file}\e[0m: File length #{f.lines} exceeds hard limit of #{f.limit} lines"
+        end
+        violations.each do |v|
+          puts "  \e[31m#{v.file}:#{v.line}\e[0m - \e[1m#{v.name}\e[0m: #{v.reasons.join(', ')} " \
+               "[lines=#{v.lines}, depth=#{v.depth}, cc=#{v.complexity}]"
+        end
+      end
+      return 1
+    end
+
+    if (file_violations.any? || style_violations.any?) && options[:strict]
+      puts "\n\e[31m❌ Strict check failed due to warnings.\e[0m"
+      return 1
+    end
+
+    puts "\e[32m✔ Code metrics check passed: #{all_methods.length} methods compliant.\e[0m" unless options[:quiet]
+    0
+  end
+
+  def self.run(args = ARGV)
+    options, paths = parse_cli_options(args)
+    files = collect_target_files(paths, include_tests: options[:include_tests])
+
+    violations = []
+    all_methods = []
+    file_violations = []
+    style_violations = []
+    trap_violations = []
+
+    files.each do |f|
+      audit_file(f, options, violations, all_methods, file_violations, style_violations, trap_violations)
+    end
+
+    report_results(violations, all_methods, file_violations, style_violations, trap_violations, options)
+  end
+end
+
+exit RubyCodeAuditor.run if $PROGRAM_NAME == __FILE__

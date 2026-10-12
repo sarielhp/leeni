@@ -1,11 +1,13 @@
 #!/usr/bin/env ruby
+# frozen_string_literal: true
+
 require 'minitest/autorun'
 require 'tmpdir'
 require 'fileutils'
 require 'open3'
 
 class TestReviewIntegration < Minitest::Test
-  BIN = File.expand_path("../leeni", __dir__)
+  BIN = File.expand_path('../leeni', __dir__)
   load BIN
 
   def fixture
@@ -15,10 +17,10 @@ class TestReviewIntegration < Minitest::Test
     end
   end
 
-  def run_cli(dir, *args)
+  def run_cli(dir, *)
     cache_dir = File.join(dir, 'junk', 'texmf-cache')
     FileUtils.mkdir_p(cache_dir)
-    Open3.capture2e({ 'TEXMFCACHE' => cache_dir }, BIN, *args, chdir: dir)
+    Open3.capture2e({ 'TEXMFCACHE' => cache_dir }, BIN, *, chdir: dir)
   end
 
   def document(body)
@@ -200,9 +202,9 @@ class TestReviewIntegration < Minitest::Test
     fixture do |dir|
       File.write(File.join(dir, 'local-color'), 'present')
       tex = document("First page.\\newpage\nSecond page.\n" \
-        "{\\IfFileExists{local-color}{\\redink}{\\blueink}\n\\rule{30pt}{30pt}}")
+                     "{\\IfFileExists{local-color}{\\redink}{\\blueink}\n\\rule{30pt}{30pt}}")
       tex.sub!('\\begin{document}', "\\usepackage{xcolor}\n" \
-        "\\def\\redink{\\color{red}}\n\\def\\blueink{\\color{blue}}\n\\begin{document}")
+                                    "\\def\\redink{\\color{red}}\n\\def\\blueink{\\color{blue}}\n\\begin{document}")
       File.write(File.join(dir, 'paper.tex'), tex)
       args = ['-e', 'pdflatex', '--arxiv', '--no-biblatex-shield', 'paper.tex']
       output, status = run_cli(dir, *args)
@@ -319,7 +321,7 @@ class TestReviewIntegration < Minitest::Test
   end
 
   def test_sandbox_cannot_use_ambient_personal_tex_tree
-    original_texmfhome = ENV['TEXMFHOME']
+    original_texmfhome = ENV.fetch('TEXMFHOME', nil)
     fixture do |dir|
       personal_tree = File.join(dir, 'personal-texmf')
       package_dir = File.join(personal_tree, 'tex', 'latex', 'reviewonly')
@@ -327,8 +329,8 @@ class TestReviewIntegration < Minitest::Test
       File.write(File.join(package_dir, 'reviewonly.sty'), "\\ProvidesPackage{reviewonly}\n")
       ENV['TEXMFHOME'] = personal_tree
       File.write(File.join(dir, 'paper.tex'), document('Personal package test').sub(
-        '\\begin{document}', "\\usepackage{reviewonly}\n\\begin{document}"
-      ))
+                                                '\\begin{document}', "\\usepackage{reviewonly}\n\\begin{document}"
+                                              ))
       output, status = run_cli(dir, 'paper.tex')
       assert status.success?, output
       output, status = Open3.capture2e('zip', '-q', 'manual.zip', 'paper.tex', chdir: dir)

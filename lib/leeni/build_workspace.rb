@@ -38,5 +38,4 @@ module LeeniBuildWorkspace
 
     value
   end
-
 end

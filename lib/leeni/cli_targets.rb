@@ -43,7 +43,8 @@ module LatexCLITargets
     fls_path = build_artifact_path(junk_dir, base_name, 'fls')
     log_path = build_artifact_path(junk_dir, base_name, 'log')
 
-    metadata = LaTeXMetaExtractor.extract(target, '.', pdf_path, fls_path, log_path, options[:comments])
+    metadata = LaTeXMetaExtractor.extract(target, pdf_path: pdf_path, fls_path: fls_path, log_path: log_path,
+                                                  extra_comments: options[:comments])
     metadata_text = LaTeXMetaExtractor.format_meta_txt(metadata)
     metadata_file = "arxiv_#{base_name}_meta.txt"
     LaTeXMetaExtractor.write_meta_file(metadata_file, metadata_text)

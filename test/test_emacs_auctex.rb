@@ -125,8 +125,10 @@ class TestEmacsAuctex < Minitest::Test
 
       builder = LatexBuilder.new(tex_file, emacs: true)
       errors = [
-        { file: tex_file, line: 10, line_str: '10', text: "#{tex_file}:10: Undefined control sequence.\nl.10 \\foo", err_block: ["#{tex_file}:10: Undefined control sequence.", 'l.10 \\foo'], catalog: { hint: "Did you mean '\\food'?" } },
-        { file: tex_file, line: 20, line_str: '20', text: "#{tex_file}:20: Undefined control sequence.\nl.20 \\bar", err_block: ["#{tex_file}:20: Undefined control sequence.", 'l.20 \\bar'] }
+        { file: tex_file, line: 10, line_str: '10', text: "#{tex_file}:10: Undefined control sequence.\nl.10 \\foo",
+          err_block: ["#{tex_file}:10: Undefined control sequence.", 'l.10 \\foo'], catalog: { hint: "Did you mean '\\food'?" } },
+        { file: tex_file, line: 20, line_str: '20', text: "#{tex_file}:20: Undefined control sequence.\nl.20 \\bar",
+          err_block: ["#{tex_file}:20: Undefined control sequence.", 'l.20 \\bar'] }
       ]
       warnings = [
         { file: tex_file, line: 30, line_str: '30', text: 'Inverted \\label: \\label{sec:intro} appears before \\section' },

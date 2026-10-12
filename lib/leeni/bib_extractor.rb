@@ -51,7 +51,7 @@ class LaTeXBibExtractor
     stage_file = File.join(junk_dir, "#{@bfilename}_extract_tmp.bib")
     FileUtils.rm_f(stage_file)
 
-    success = is_biblatex? ? extract_biblatex(stage_file) : extract_bibtex(stage_file)
+    success = biblatex? ? extract_biblatex(stage_file) : extract_bibtex(stage_file)
     return false unless success
 
     verify_and_install!(stage_file, target_name)
@@ -68,7 +68,7 @@ class LaTeXBibExtractor
     @builder.run_in_current_directory!
   end
 
-  def is_biblatex?
+  def biblatex?
     bcf_path = File.join(junk_dir, "#{@bfilename}.bcf")
     return false unless File.file?(bcf_path) && File.size(bcf_path).positive?
 
@@ -99,12 +99,12 @@ class LaTeXBibExtractor
     forbidden.each do |fdir|
       next unless File.directory?(fdir)
 
-      if File.identical?(File.dirname(target_abs), fdir) || target_abs.start_with?(fdir + File::SEPARATOR)
-        warn Rainbow("==> Fatal Error: Refusing to write to global bibliography directory:").red.bright
-        warn "    #{target_abs}"
-        warn "    Extracted bibliography must reside in the local document directory."
-        return false
-      end
+      next unless File.identical?(File.dirname(target_abs), fdir) || target_abs.start_with?(fdir + File::SEPARATOR)
+
+      warn Rainbow('==> Fatal Error: Refusing to write to global bibliography directory:').red.bright
+      warn "    #{target_abs}"
+      warn '    Extracted bibliography must reside in the local document directory.'
+      return false
     end
     true
   end
@@ -112,7 +112,7 @@ class LaTeXBibExtractor
   def extract_biblatex(stage_file)
     unless LaTeXUtils.command_available?('biber')
       warn Rainbow("==> Error: 'biber' is required for BibLaTeX bibliography extraction.").red.bright
-      warn "    Please install Biber or ensure it is available in PATH."
+      warn '    Please install Biber or ensure it is available in PATH.'
       return false
     end
 
@@ -122,7 +122,7 @@ class LaTeXBibExtractor
     out, stat = Open3.capture2e(env, *cmd)
 
     unless stat.success? && File.file?(stage_file) && File.size(stage_file).positive?
-      warn Rainbow("==> Error: Biber extraction failed:").red.bright
+      warn Rainbow('==> Error: Biber extraction failed:').red.bright
       warn out.strip unless out.strip.empty?
       return false
     end
@@ -132,9 +132,9 @@ class LaTeXBibExtractor
   def extract_bibtex(stage_file)
     unless LaTeXUtils.command_available?('bibtool')
       warn Rainbow("==> Error: 'bibtool' is required for BibTeX bibliography extraction.").red.bright
-      warn "    Please install it via your package manager:"
-      warn "      sudo apt install bibtool      # Debian / Ubuntu"
-      warn "      brew install bibtool          # macOS"
+      warn '    Please install it via your package manager:'
+      warn '      sudo apt install bibtool      # Debian / Ubuntu'
+      warn '      brew install bibtool          # macOS'
       return false
     end
 
@@ -148,8 +148,8 @@ class LaTeXBibExtractor
     cmd = ['bibtool', '-c', '-x', aux_path, '-o', stage_file]
     out, stat = Open3.capture2e(env, *cmd)
 
-    unless stat.success? && File.file?(stage_file) && File.size(stage_file) > 0
-      warn Rainbow("==> Error: BibTool extraction failed or no citations found:").red.bright
+    unless stat.success? && File.file?(stage_file) && File.size(stage_file).positive?
+      warn Rainbow('==> Error: BibTool extraction failed or no citations found:').red.bright
       warn out.strip unless out.strip.empty?
       return false
     end
@@ -162,11 +162,9 @@ class LaTeXBibExtractor
       p = File.expand_path(d.to_s.strip)
       search_dirs << p if File.directory?(p)
     end
-    if ENV['BIBINPUTS']
-      ENV['BIBINPUTS'].split(File::PATH_SEPARATOR).each do |d|
-        p = File.expand_path(d.strip)
-        search_dirs << p if File.directory?(p)
-      end
+    ENV['BIBINPUTS']&.split(File::PATH_SEPARATOR)&.each do |d|
+      p = File.expand_path(d.strip)
+      search_dirs << p if File.directory?(p)
     end
     bibinputs_str = search_dirs.uniq.join(File::PATH_SEPARATOR) + File::PATH_SEPARATOR
     { 'BIBINPUTS' => bibinputs_str }
@@ -192,15 +190,13 @@ class LaTeXBibExtractor
 
   def backup_existing_target!(target_name)
     bak_file = "#{target_name}.bak"
-    if File.exist?(bak_file)
-      bak_file = "#{target_name}.#{Time.now.strftime('%Y%m%d_%H%M%S')}.bak"
-    end
+    bak_file = "#{target_name}.#{Time.now.strftime('%Y%m%d_%H%M%S')}.bak" if File.exist?(bak_file)
     FileUtils.cp(target_name, bak_file)
     warn Rainbow("==> Notice: Existing '#{target_name}' backed up to: #{bak_file}").yellow
   end
 
   def print_workflow_hint(target_name)
-    if is_biblatex?
+    if biblatex?
       print_biblatex_hint(target_name)
     else
       print_bibtex_hint(target_name)

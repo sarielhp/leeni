@@ -355,7 +355,7 @@ module LaTeXConfig
 
   def self.init_gitignore!(dir = '.')
     target = File.join(dir, '.gitignore')
-    if !File.exist?(target)
+    unless File.exist?(target)
       File.write(target, DEFAULT_GITIGNORE_TEMPLATE)
       puts "      Created #{target} with standard leeni and LaTeX ignore rules."
       return [target, :created]
@@ -381,7 +381,11 @@ module LaTeXConfig
   end
 
   def self.update_jsonc_key(content, key, val)
-    json_val = val.is_a?(String) ? val.to_json : (val.nil? ? 'null' : val.to_s)
+    json_val = if val.is_a?(String)
+                 val.to_json
+               else
+                 (val.nil? ? 'null' : val.to_s)
+               end
     key_pattern = /"#{Regexp.escape(key)}"\s*:\s*(?:"(?:[^"\\]|\\.)*"|true|false|null|-?\d+(?:\.\d+)?)/
 
     return content.sub(key_pattern, "\"#{key}\": #{json_val}") if content =~ key_pattern
@@ -391,7 +395,7 @@ module LaTeXConfig
 
     content.sub(/(?<=\S)(\s*\}\s*\z)/) do |match|
       prev_char = content[0...content.rindex(match)].strip[-1]
-      prefix = (prev_char == '{' || prev_char == ',') ? '' : ",\n"
+      prefix = ['{', ','].include?(prev_char) ? '' : ",\n"
       "#{prefix}  \"#{key}\": #{json_val}\n}"
     end
   end
@@ -470,7 +474,7 @@ module LaTeXConfig
   def self.remove_jsonc_setting(content, key)
     quoted = Regexp.escape(key)
     value = '(?:"(?:[^"\\\\]|\\\\.)*"|true|false|null|-?\\d+(?:\\.\\d+)?)'
-    line = /^[ \t]*"#{quoted}"[ \t]*:[ \t]*#{value}[ \t]*,?[ \t]*(?:\/\/[^\n]*)?\n?/
+    line = %r{^[ \t]*"#{quoted}"[ \t]*:[ \t]*#{value}[ \t]*,?[ \t]*(?://[^\n]*)?\n?}
     return remove_trailing_comma(content.sub(line, '')) if content.match?(line)
 
     after_comma = /,[ \t]*"#{quoted}"[ \t]*:[ \t]*#{value}/
@@ -508,7 +512,7 @@ module LaTeXConfig
     return false unless options[:config_save]
 
     scope = options[:config_scope] || :local
-    target_file = (scope == :global) ? GLOBAL_CONFIG_FILE : File.join(dir, '.l.jsonc')
+    target_file = scope == :global ? GLOBAL_CONFIG_FILE : File.join(dir, '.l.jsonc')
     settings = extract_savable_settings(options)
 
     if settings.empty?
@@ -559,9 +563,7 @@ module LaTeXConfig
     i = 0
     len = content.length
 
-    while i < len
-      i = scan_jsonc_char(content, i, len, out, state)
-    end
+    i = scan_jsonc_char(content, i, len, out, state) while i < len
     out << ',' if state[:pending_comma]
     out.join
   end
@@ -599,7 +601,7 @@ module LaTeXConfig
     return unless state[:pending_comma]
     return if c.match?(/\s/)
 
-    out << ',' unless c == '}' || c == ']'
+    out << ',' unless ['}', ']'].include?(c)
     state[:pending_comma] = nil
   end
 
@@ -675,7 +677,7 @@ module LaTeXConfig
         '# =========================================================================',
         '# Global leeni Configuration',
         '# =========================================================================',
-        format('# Global file: %s (%s)', info[:global_file], info[:global_exists] ? 'loaded' : 'not found'),
+        "# Global file: #{info[:global_file]} (#{info[:global_exists] ? 'loaded' : 'not found'})",
         '',
         info[:global_exists] ? File.read(info[:global_file]) : JSON.pretty_generate(parse_jsonc(DEFAULT_CONFIG_TEMPLATE))
       ].join("\n")
@@ -684,7 +686,7 @@ module LaTeXConfig
         '# =========================================================================',
         '# Local leeni Configuration',
         '# =========================================================================',
-        format('# Local file: %s', info[:local_file] ? "#{info[:local_file]} (loaded)" : 'none (no .l.jsonc found)'),
+        "# Local file: #{info[:local_file] ? "#{info[:local_file]} (loaded)" : 'none (no .l.jsonc found)'}",
         '',
         info[:local_file] ? File.read(info[:local_file]) : "{}\n"
       ].join("\n")
@@ -694,9 +696,9 @@ module LaTeXConfig
       '# =========================================================================',
       '# Active leeni Configuration',
       '# =========================================================================',
-      format('# Global file: %s (%s)', info[:global_file], info[:global_exists] ? 'loaded' : 'not found'),
-      format('#  Local file: %s', info[:local_file] ? "#{info[:local_file]} (loaded)" : 'none'),
-      format('# Build directory: %s', LeeniBuildWorkspace.resolve(dir, info[:merged_config]['junk_dir'])),
+      "# Global file: #{info[:global_file]} (#{info[:global_exists] ? 'loaded' : 'not found'})",
+      "#  Local file: #{info[:local_file] ? "#{info[:local_file]} (loaded)" : 'none'}",
+      "# Build directory: #{LeeniBuildWorkspace.resolve(dir, info[:merged_config]['junk_dir'])}",
       '',
       JSON.pretty_generate(info[:merged_config])
     ]

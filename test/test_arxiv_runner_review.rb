@@ -27,8 +27,8 @@ class TestArxivRunnerReview < Minitest::Test
     end
   end
 
-  def run_tool(dir, *args)
-    Open3.capture2e('ruby', RUNNER, dir, *args)
+  def run_tool(dir, *)
+    Open3.capture2e('ruby', RUNNER, dir, *)
   end
 
   def failed_report(dir, output, status)

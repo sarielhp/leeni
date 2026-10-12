@@ -31,7 +31,8 @@ This document provides architectural guidelines, core invariants, development wo
   - [`tools/gate`](tools/gate): Tiered quality gate (`--fast`, `--medium`, `--full`) verifying syntax, code metrics, and tests.
   - [`tools/setup_ruby_dev`](tools/setup_ruby_dev): Automated environment auditor and installer for Ruby gems, LSPs, and CLI tools.
   - [`tools/install`](tools/install): Bundles `leeni` into a standalone binary at `~/bin/leeni` with `~/bin/l` symlink.
-  - [`tools/bump`](tools/bump): Validates clean git tree, runs `tools/gate --full`, increments version, commits, tags, and pushes.
+  - [`tools/bump`](tools/bump): Increments the version, runs the full gate on that version, commits, and atomically publishes the branch and tag.
+  - [`tools/release`](tools/release): Commits checked changes, runs `tools/bump`, and optionally installs after publication.
   - [`tools/test_error_corpus`](tools/test_error_corpus): Standalone on-demand test runner verifying real-world error fixtures in `docs/errors/`.
 - **Automated Test Suite** (`test/`):
   - `test/test_*.rb`: Fast regression and end-to-end tests using `minitest`.
@@ -164,9 +165,9 @@ Always execute quality workflows through the provided scripts:
 
 ### 5. `tools/bump` (Version Bump, Tag & Push Workflow)
 - Ensures working tree is completely clean (aborts if uncommitted changes exist).
-- Runs [`tools/gate --full`](tools/gate) automatically. (Do not run `--full` manually before bumping to avoid duplicate gate runs).
-- Increments version by +0.0.1 (patch by default, or `--major` / `--minor`) in [`lib/leeni/version.rb`](lib/leeni/version.rb) and bundled `leeni`.
-- Commits changes, creates a release git tag, and pushes to remote with `--follow-tags`.
+- Increments version by +0.0.1 (patch by default, or `--major` / `--minor`) in [`lib/leeni/version.rb`](lib/leeni/version.rb).
+- Runs [`tools/gate --full`](tools/gate) against the new version, commits, and atomically pushes the branch and tag to the configured upstream.
+- Use `--resume` to finish an interrupted release without incrementing the version again.
 - **Trigger**:
   ```bash
   ./tools/bump

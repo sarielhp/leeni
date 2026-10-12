@@ -17,7 +17,7 @@ module LaTeXDiagnostics
     tex sty cls aux bbl bib dtx def ldf cfg clo toc lof lot png pdf jpg eps fd fontspec out idx code\.tex
   ].join('|').freeze
 
-  LOG_FILE_PATTERN = %r{\A\((?:"([^"]+)"|((?:\.{1,2}[\\/][^\s()]+|[a-zA-Z0-9_\-./]+?\.(?:#{LOG_FILE_EXTENSIONS}))\b))}.freeze
+  LOG_FILE_PATTERN = %r{\A\((?:"([^"]+)"|((?:\.{1,2}[\\/][^\s()]+|[a-zA-Z0-9_\-./]+?\.(?:#{LOG_FILE_EXTENSIONS}))\b))}
 
   # One canonical recogniser for a LaTeX/package/class warning header. Five
   # near-but-not-equal variants of this used to be spelled out inline, and the
@@ -27,7 +27,7 @@ module LaTeXDiagnostics
   # text -- and when that predecessor was a Whatever, a real warning vanished
   # into a tier suppressed by default. luatex.def, xetex.def, dvips.def and
   # epstopdf-base all shared the fate.
-  WARNING_LINE_PATTERN = /^(?:LaTeX|Class|Package|\*)(?:\s+[-\w.@*]+)*\s+[Ww]arning:/.freeze
+  WARNING_LINE_PATTERN = /^(?:LaTeX|Class|Package|\*)(?:\s+[-\w.@*]+)*\s+[Ww]arning:/
 
   # Every pattern here must be anchored. TeX echoes the offending paragraph
   # after each Overfull \hbox, so the document's own prose reaches this log
@@ -54,11 +54,11 @@ module LaTeXDiagnostics
   end
 
   def typeset_source_echo?(line)
-    line.match?(/^\s*\\[A-Z][A-Z0-9]*\/\S+\s/)
+    line.match?(%r{^\s*\\[A-Z][A-Z0-9]*/\S+\s})
   end
 
   def extract_error_line(err_text)
-    clean = err_text.gsub(/\([a-zA-Z0-9_\-]+\)\s*/, '')
+    clean = err_text.gsub(/\([a-zA-Z0-9_-]+\)\s*/, '')
     if clean =~ /:(\d+):/ || clean =~ /\bl\.(\d+)\b/ || clean =~ /(?:at|on|in)?\s*(?:input\s+)?lines?\s*(\d+)/i
       Regexp.last_match(1).to_i
     else
@@ -67,7 +67,7 @@ module LaTeXDiagnostics
   end
 
   def extract_box_severity(box_line)
-    if box_line =~ /(?:\(?\b|)([\d\.]+)pt too (?:wide|high)\)?/i || box_line =~ /\(badness (\d+)\)/i
+    if box_line =~ /(?:\(?\b|)([\d.]+)pt too (?:wide|high)\)?/i || box_line =~ /\(badness (\d+)\)/i
       Regexp.last_match(1).to_f
     else
       0.0
@@ -126,7 +126,7 @@ module LaTeXDiagnostics
     "\e]8;;#{url}\e\\#{styled}\e]8;;\e\\"
   end
 
-  OSC8_LINK_PATTERN = /(\e\]8;;[^\e]*\e\\.*?\e\]8;;\e\\)/.freeze
+  OSC8_LINK_PATTERN = /(\e\]8;;[^\e]*\e\\.*?\e\]8;;\e\\)/
 
   def highlight_line_numbers(text, base_color, bright: false)
     return text if @options[:emacs]
@@ -192,7 +192,7 @@ module LaTeXDiagnostics
     sep_str = bright_sep ? sep.bright.to_s : sep.to_s
 
     if str.empty?
-      tag = (file == 'bibliography' || file == './bibliography') ? 'bib' : ''
+      tag = ['bibliography', './bibliography'].include?(file) ? 'bib' : ''
       return "#{' ' * width}#{sep_str}" if tag.empty?
 
       padding = ' ' * [width - tag.length, 0].max
@@ -296,7 +296,7 @@ module LaTeXDiagnostics
     header = format_error_header(err_block.first, file_path, line_no, root_line, root_col, width)
     lines = [header]
 
-    active_line = (root_line && root_line.positive?) ? root_line : line_no
+    active_line = root_line&.positive? ? root_line : line_no
     source_frame = format_source_frame(file_path, active_line, root_col, item, cat)
     if source_frame
       lines.concat(source_frame)
@@ -306,9 +306,7 @@ module LaTeXDiagnostics
 
     append_repeat_note(lines, repeat_count, line_no, indent) if repeat_count > 1
 
-    if @options[:verbose]
-      append_verbose_error_context(lines, err_block, indent)
-    end
+    append_verbose_error_context(lines, err_block, indent) if @options[:verbose]
 
     lines.join("\n")
   end
@@ -325,14 +323,14 @@ module LaTeXDiagnostics
   def format_error_header(first_raw_line, file_path, line_no, root_line, root_col, _width = nil)
     first_clean = first_raw_line.to_s.strip
     msg = extract_clean_error_message(first_clean)
-    active_line = (root_line && root_line.positive?) ? root_line : line_no
-    reported_line = (root_line && root_line.positive? && root_line != line_no) ? line_no : nil
+    active_line = root_line&.positive? ? root_line : line_no
+    reported_line = root_line&.positive? && root_line != line_no ? line_no : nil
 
     disp_file = format_display_path(file_path)
     badge = diagnostic_tier_badge('errors', :red)
     clean_msg = badge ? clean_diagnostic_badge_message(msg) : msg
 
-    header_text = if active_line && active_line.positive?
+    header_text = if active_line&.positive?
                     col_str = root_col ? ":#{root_col}" : ''
                     rep_str = reported_line ? " (reported on line #{reported_line})" : ''
                     "#{disp_file}:#{active_line}#{col_str}: #{badge}#{clean_msg}#{rep_str}"
@@ -358,7 +356,7 @@ module LaTeXDiagnostics
 
     lines = LaTeXUtils.safe_read(real_file).lines
     idx = line_no - 1
-    return nil if idx < 0 || idx >= lines.size
+    return nil if idx.negative? || idx >= lines.size
 
     lines[idx].to_s.chomp
   rescue StandardError
@@ -367,9 +365,9 @@ module LaTeXDiagnostics
 
   def locate_token_column(source_line, col_no, token, catalog)
     cat_id = catalog&.[](:id)
-    clean_token = (token && !token.to_s.match?(/\s/)) ? token.to_s : nil
+    clean_token = token && !token.to_s.match?(/\s/) ? token.to_s : nil
 
-    if col_no && col_no.positive?
+    if col_no&.positive?
       col_idx = col_no - 1
       is_single_char_cat = %i[missing_dollar misplaced_alignment_tab extra_closing_brace].include?(cat_id)
       len = if !is_single_char_cat && (source_line[col_idx..] =~ /\A(\\[a-zA-Z@]+|\\[^\s])/)
@@ -397,7 +395,7 @@ module LaTeXDiagnostics
       start_char = [col_pos - 25, 0].max
       prefix = start_char.positive? ? '...' : ''
       sub = source_line[start_char, 65] || ''
-      suffix = (start_char + 65 < source_line.length) ? '...' : ''
+      suffix = start_char + 65 < source_line.length ? '...' : ''
       adj_col = col_pos - start_char + prefix.length
       ["#{prefix}#{sub}#{suffix}", adj_col]
     else
@@ -407,16 +405,16 @@ module LaTeXDiagnostics
 
   def render_source_code_line(line_no, display_line, col_pos = nil, token_len = nil)
     gutter_num = line_no.to_s.rjust(3)
-    num_colored = (@options && @options[:color] == false) ? gutter_num : Rainbow(gutter_num).cyan
-    gutter_bar = (@options && @options[:color] == false) ? '|' : Rainbow('|').cyan
+    num_colored = @options && @options[:color] == false ? gutter_num : Rainbow(gutter_num).cyan
+    gutter_bar = @options && @options[:color] == false ? '|' : Rainbow('|').cyan
     code_text = highlight_error_token(display_line, col_pos, token_len)
     "  #{num_colored} #{gutter_bar} #{code_text}"
   end
 
   def highlight_error_token(line, col_pos, token_len)
     return line if @options && @options[:color] == false
-    return line unless col_pos && token_len && token_len.positive?
-    return line if col_pos < 0 || col_pos + token_len > line.length
+    return line unless col_pos && token_len&.positive?
+    return line if col_pos.negative? || col_pos + token_len > line.length
 
     prefix = line[0...col_pos]
     target = line[col_pos, token_len]
@@ -428,37 +426,45 @@ module LaTeXDiagnostics
     return nil unless catalog && catalog[:hint]
 
     hint_colored = colorize_inline_hint(catalog[:hint]).strip
-    arrow = (@options && @options[:color] == false) ? '▸' : Rainbow('▸').cyan.bright
-    label = (@options && @options[:color] == false) ? 'Hint: ' : Rainbow('Hint: ').cyan
+    arrow = @options && @options[:color] == false ? '▸' : Rainbow('▸').cyan.bright
+    label = @options && @options[:color] == false ? 'Hint: ' : Rainbow('Hint: ').cyan
     "  #{' ' * (gutter_num_len + 2)}#{arrow} #{label}#{hint_colored}"
   end
 
-  def render_context_snippet(file_path, target_line, context_lines, col_pos: nil, token_len: nil, catalog: nil, root_col: nil, target_line_end: nil, force: false)
-    return [] unless file_path && target_line && target_line.positive? && context_lines && context_lines.positive?
+  def render_context_snippet(file_path, target_line, context_lines, col_pos: nil, token_len: nil, catalog: nil, root_col: nil,
+                             target_line_end: nil, force: false)
+    return [] unless file_path && target_line&.positive? && context_lines&.positive?
 
     real_file = LaTeXErrorCatalog.find_source_file(file_path) || file_path
     return [] unless real_file && File.file?(real_file)
 
-    all_raw_lines = File.readlines(real_file) rescue nil
+    all_raw_lines = begin
+      File.readlines(real_file)
+    rescue StandardError
+      nil
+    end
     return [] unless all_raw_lines && !all_raw_lines.empty?
 
-    target_end = (target_line_end && target_line_end.to_i >= target_line) ? target_line_end.to_i : target_line
+    target_end = target_line_end && target_line_end.to_i >= target_line ? target_line_end.to_i : target_line
     return [] if context_range_covered?(real_file, target_line, target_end, force)
 
     start_line = [target_line - context_lines, 1].max
     end_line = [target_end + context_lines, all_raw_lines.size].min
     return [] if start_line > end_line
 
-    color_enabled = (@options && @options[:color] != false) && !@options[:emacs]
+    color_enabled = @options && @options[:color] != false && !@options[:emacs]
     code_lines = fetch_snippet_code_lines(real_file, start_line, end_line, all_raw_lines, color_enabled)
-    build_snippet_lines(code_lines, start_line, target_line, target_end, end_line, real_file, color_enabled, col_pos, token_len, catalog, root_col)
+    build_snippet_lines(
+      code_lines, start_line, target_line, target_end, end_line,
+      real_file: real_file, color_enabled: color_enabled, col_pos: col_pos,
+      token_len: token_len, catalog: catalog, root_col: root_col
+    )
   end
 
   def context_range_covered?(real_file, target_line, target_end, force)
     return false if force
 
-    @last_context_file == real_file && @last_context_range &&
-      @last_context_range.cover?(target_line) && @last_context_range.cover?(target_end)
+    @last_context_file == real_file && @last_context_range&.cover?(target_line) && @last_context_range.cover?(target_end)
   end
 
   def fetch_snippet_code_lines(real_file, start_line, end_line, all_raw_lines, color_enabled)
@@ -474,8 +480,12 @@ module LaTeXDiagnostics
     return nil unless bat_cmd
 
     cmd = [bat_cmd, '--color=always', '--paging=never', '--style=plain', '-l', 'tex', "-r=#{start_line}:#{end_line}", real_file]
-    out, _, st = Open3.capture3(*cmd) rescue nil
-    (st&.success? && out && !out.empty?) ? out.lines : nil
+    out, _, st = begin
+      Open3.capture3(*cmd)
+    rescue StandardError
+      nil
+    end
+    st&.success? && out && !out.empty? ? out.lines : nil
   end
 
   def resolve_bat_command
@@ -486,7 +496,11 @@ module LaTeXDiagnostics
   end
 
   def format_snippet_line_gutter(cur_line, g_len, is_target, color_enabled, links_active, abs_path)
-    marker = is_target ? (color_enabled ? Rainbow('>').red.bright.to_s : '>') : ' '
+    marker = if is_target
+               color_enabled ? Rainbow('>').red.bright.to_s : '>'
+             else
+               ' '
+             end
     num_str = cur_line.to_s.rjust(g_len)
     link_num = if color_enabled
                  styled = is_target ? Rainbow(num_str).red.bright.to_s : Rainbow(num_str).cyan.to_s
@@ -494,7 +508,11 @@ module LaTeXDiagnostics
                else
                  num_str
                end
-    bar = color_enabled ? (is_target ? Rainbow('│').red.bright.to_s : Rainbow('│').cyan.to_s) : '|'
+    bar = if color_enabled
+            is_target ? Rainbow('│').red.bright.to_s : Rainbow('│').cyan.to_s
+          else
+            '|'
+          end
     "#{marker} #{link_num} #{bar}"
   end
 
@@ -507,7 +525,8 @@ module LaTeXDiagnostics
     end
   end
 
-  def build_snippet_lines(code_lines, start_line, target_line, target_end, end_line, real_file, color_enabled, col_pos, token_len, catalog, root_col)
+  def build_snippet_lines(code_lines, start_line, target_line, target_end, end_line, real_file:, color_enabled:, col_pos:, token_len:,
+                          catalog:, root_col:)
     abs_path = ::URI::DEFAULT_PARSER.escape(File.expand_path(real_file.to_s))
     g_len = [end_line.to_s.length, 3].max
     links_active = color_enabled && (@options.nil? || @options[:link] != false)
@@ -515,7 +534,7 @@ module LaTeXDiagnostics
 
     code_lines.each_with_index do |cline, idx|
       cur_line = start_line + idx
-      is_target = (cur_line >= target_line && cur_line <= target_end)
+      is_target = cur_line.between?(target_line, target_end)
       gutter = format_snippet_line_gutter(cur_line, g_len, is_target, color_enabled, links_active, abs_path)
       lines << "#{gutter} #{cline.chomp}"
       append_snippet_pointer_or_hint(lines, g_len, col_pos, token_len, catalog, root_col) if cur_line == target_line
@@ -527,9 +546,9 @@ module LaTeXDiagnostics
   end
 
   def format_source_frame(file_path, line_no, col_no, item, catalog)
-    return nil unless line_no && line_no.positive?
+    return nil unless line_no&.positive?
 
-    if @options && @options[:context_lines] && @options[:context_lines].to_i > 0
+    if @options && @options[:context_lines]&.to_i&.positive?
       token = item&.[](:token) || catalog&.[](:token)
       source_line = read_source_line(file_path, line_no)
       col_pos, token_len = source_line ? locate_token_column(source_line, col_no, token, catalog) : [nil, 1]
@@ -559,14 +578,14 @@ module LaTeXDiagnostics
   def render_pointer_line(gutter_num_len, col_pos, token_len, catalog, root_col: nil)
     caret_len = [token_len || 1, 1].max
     caret = '^' * caret_len
-    caret_colored = (@options && @options[:color] == false) ? caret : Rainbow(caret).red.bright.bold
+    caret_colored = @options && @options[:color] == false ? caret : Rainbow(caret).red.bright.bold
 
     hint_msg = inline_hint_text(catalog, root_col)
     hint_colored = colorize_inline_hint(hint_msg)
 
     indent = ' ' * 2
     gutter_pad = ' ' * gutter_num_len
-    gutter_bar = (@options && @options[:color] == false) ? '|' : Rainbow('│').cyan
+    gutter_bar = @options && @options[:color] == false ? '|' : Rainbow('│').cyan
     col_pad = ' ' * [col_pos, 0].max
 
     "#{indent}#{gutter_pad} #{gutter_bar} #{col_pad}#{caret_colored}#{hint_colored}"
@@ -605,7 +624,7 @@ module LaTeXDiagnostics
     raw_lines = err_block[1..] || []
     return if raw_lines.empty?
 
-    tag = (@options && @options[:color] == false) ? '[TeX context]' : Rainbow('[TeX context]').yellow.faint
+    tag = @options && @options[:color] == false ? '[TeX context]' : Rainbow('[TeX context]').yellow.faint
     lines << "#{indent}#{tag}"
     raw_lines.each do |l|
       next if l.strip.empty?
@@ -643,7 +662,10 @@ module LaTeXDiagnostics
   end
 
   def render_diagnostic_item(item, width: 0)
-    return format_error_block(item[:err_block], item[:line] || 0, width: width, catalog: item[:catalog], repeat_count: item[:repeat_count] || 1, item: item) if item[:err_block]
+    if item[:err_block]
+      return format_error_block(item[:err_block], item[:line] || 0, width: width, catalog: item[:catalog],
+                                                                    repeat_count: item[:repeat_count] || 1, item: item)
+    end
 
     base_color = item[:base_color] || :yellow
     tier = tier_label_for(item)
@@ -667,6 +689,7 @@ module LaTeXDiagnostics
 
   def append_diagnostic_item_context(item)
     return '' unless @options && @options[:context_lines].to_i.positive?
+
     line = item[:line].to_i
     return '' unless line.positive?
 
@@ -713,7 +736,7 @@ module LaTeXDiagnostics
                    line =~ /^(?:Overfull|Underfull)/ || line =~ /^\[\d+\]/ ||
                    line =~ /^!\s+/ || line =~ /^.+:\d+:/ ||
                    line =~ /^Runaway argument\?/ || line =~ /^\s*\)/ ||
-                   line =~ /^\s*\((?:\.[\\\/]|[a-zA-Z0-9_\-\.\/]+?\.(?:tex|sty|cls|aux|bbl|bib))/
+                   line =~ %r{^\s*\((?:\.[\\/]|[a-zA-Z0-9_\-./]+?\.(?:tex|sty|cls|aux|bbl|bib))}
 
     false
   end
@@ -728,17 +751,18 @@ module LaTeXDiagnostics
 
     is_alignment = box_line.include?('in alignment')
 
-    body = if box_line =~ /(?:\(|\b)([\d\.]+)pt too (wide|high)\)?/i
+    body = if box_line =~ /(?:\(|\b)([\d.]+)pt too (wide|high)\)?/i
              pt_val = Regexp.last_match(1).to_f.round(2)
              dimension = Regexp.last_match(2)
              suffix = is_alignment ? ' (alignment)' : ''
-             format('%.2fpt too %s%s', pt_val, dimension, suffix)
+             format('%<value>.2fpt too %<dimension>s%<suffix>s', value: pt_val, dimension: dimension, suffix: suffix)
            elsif box_line =~ /\(badness (\d+)\)/i
              badness = Regexp.last_match(1)
-             box_kind = (box_line =~ /\\(vbox)\b/i) ? '\vbox' : '\hbox'
+             box_kind = box_line =~ /\\(vbox)\b/i ? '\vbox' : '\hbox'
              "underfull #{box_kind} (badness #{badness})"
            else
-             clean = box_line.sub(/\s*(?:detected at line \d+|in paragraph at lines \d+(?:--\d+)?|in alignment at lines \d+(?:--\d+)?)\.?/, '')
+             clean = box_line.sub(/\s*(?:detected at line \d+|in paragraph at lines \d+(?:--\d+)?|in alignment at lines \d+(?:--\d+)?)\.?/,
+                                  '')
                              .strip
              clean.empty? ? box_line : clean
            end
@@ -753,18 +777,13 @@ module LaTeXDiagnostics
     return clean_ref_warning(str) if str =~ /LaTeX Warning: (?:Hyper reference|Reference)/i
     return clean_cite_warning(str) if str =~ /LaTeX Warning: Citation/i
 
-    if str =~ /LaTeX Warning: Empty bibliography(?:\s+on input line \d+)?\.?/i
-      return 'Warning: empty bibliography'
-    end
+    return 'Warning: empty bibliography' if str =~ /LaTeX Warning: Empty bibliography(?:\s+on input line \d+)?\.?/i
     if str =~ /LaTeX Warning: Command\s+(.+?)\s+invalid in math mode(?:\s+on input line \d+)?\.?/i
       return "Warning: command #{Regexp.last_match(1)} invalid in math mode"
     end
-    if str =~ /Missing database entry:\s*['"]([^`'"]+)['"]/i
-      return "Warning: Missing database entry: '#{Regexp.last_match(1)}'"
-    end
-    if str =~ /^Missing database entries/i
-      return "Warning: #{str}"
-    end
+    return "Warning: Missing database entry: '#{Regexp.last_match(1)}'" if str =~ /Missing database entry:\s*['"]([^`'"]+)['"]/i
+    return "Warning: #{str}" if str =~ /^Missing database entries/i
+
     if str =~ /^(?:\*?\s*(?:Package|Class))\s+([-\w.@*]+)\s+[Ww]arning:\s*(.+)$/m
       pkg = Regexp.last_match(1)
       body = Regexp.last_match(2).gsub(/\(#{Regexp.escape(pkg)}\)/, ' ').gsub(/\s+/, ' ').strip
@@ -780,8 +799,10 @@ module LaTeXDiagnostics
     end
     if str =~ /^LaTeX Warning:\s*(.+)$/i
       body = Regexp.last_match(1).gsub(/\s+/, ' ').strip
-      if body =~ /Float too large for page by ([\d\.]+)pt/i
-        body = body.sub(/Float too large for page by ([\d\.]+)pt/i) { "Float too large for page by #{format('%.2f', Regexp.last_match(1).to_f)}pt" }
+      if body =~ /Float too large for page by ([\d.]+)pt/i
+        body = body.sub(/Float too large for page by ([\d.]+)pt/i) do
+          "Float too large for page by #{format('%.2f', Regexp.last_match(1).to_f)}pt"
+        end
       end
       body = strip_input_line_noise(body)
       return "Warning: #{body}"
@@ -859,7 +880,7 @@ module LaTeXDiagnostics
   end
 
   def extract_warning_location(warn_text, file_stack)
-    clean = warn_text.gsub(/\([a-zA-Z0-9_\-]+\)\s*/, '').gsub(/line (\d+)\s+(\d+)\b/, 'line \1\2')
+    clean = warn_text.gsub(/\([a-zA-Z0-9_-]+\)\s*/, '').gsub(/line (\d+)\s+(\d+)\b/, 'line \1\2')
     file_name = current_log_file(file_stack)
     line_no = 0
     line_str = ''
@@ -876,7 +897,7 @@ module LaTeXDiagnostics
   end
 
   def parse_box_line_span(box_line)
-    match = (box_line =~ /lines?\s+(\d+(?:--\d+)?)/i) ? Regexp.last_match(1) : ''
+    match = box_line =~ /lines?\s+(\d+(?:--\d+)?)/i ? Regexp.last_match(1) : ''
     if match =~ /\A(\d+)--(\d+)\z/
       start_l = Regexp.last_match(1).to_i
       end_l = Regexp.last_match(2).to_i
@@ -892,7 +913,7 @@ module LaTeXDiagnostics
   def parse_box_warning(lines, i, file_stack, verbose)
     l = lines[i]
     start_idx = i
-    box_type = (l =~ /^(Overfull|Underfull) \\(hbox|vbox)/) ? "#{Regexp.last_match(1)} \\#{Regexp.last_match(2)}" : 'Overfull \\hbox'
+    box_type = l =~ /^(Overfull|Underfull) \\(hbox|vbox)/ ? "#{Regexp.last_match(1)} \\#{Regexp.last_match(2)}" : 'Overfull \\hbox'
     box_line = l.strip
     is_overfull = box_line.start_with?('Overfull')
     i += 1
@@ -907,7 +928,11 @@ module LaTeXDiagnostics
     severity = extract_box_severity(box_line)
 
     base_color = :yellow
-    clean_text = @options[:emacs] ? box_line : clean_box_diagnostic(box_line, is_overfull ? :warning : :note)
+    clean_text = if @options[:emacs]
+                   box_line
+                 else
+                   clean_box_diagnostic(box_line, is_overfull ? :warning : :note)
+                 end
     formatted = format_diagnostic_line(line_str, clean_text, base_color, file: file_name)
     if verbose && !extra_lines.empty?
       formatted += "\n" + extra_lines.map { |line| @options[:emacs] ? line : highlight_line_numbers(line, base_color) }.join("\n")
@@ -934,11 +959,11 @@ module LaTeXDiagnostics
       end
     end
 
-    box_groups.each { |_key, items| filtered_warnings << items.max_by { |item| item[:severity] } }
+    box_groups.each_value { |items| filtered_warnings << items.max_by { |item| item[:severity] } }
     filtered_warnings
   end
 
-  def extract_warnings(content, verbose = false)
+  def extract_warnings(content, verbose: false)
     raw_warnings = []
     seen_warnings = {}
     lines = content.lines
@@ -953,7 +978,7 @@ module LaTeXDiagnostics
         item, i = parse_package_warning(lines, i, file_stack)
         if item
           d_key = warning_dedup_key(item)
-          if !seen_warnings[d_key]
+          unless seen_warnings[d_key]
             seen_warnings[d_key] = true
             raw_warnings << item
           end
@@ -993,7 +1018,7 @@ module LaTeXDiagnostics
                curr =~ /^!\s+\S+/ || curr =~ /^Runaway argument\?/ ||
                curr =~ WARNING_LINE_PATTERN ||
                curr =~ /^(?:Overfull|Underfull) \\(?:hbox|vbox)/ ||
-               curr =~ /^\s*\)/ || curr =~ /^\s*\((?:\.[\\\/]|[a-zA-Z0-9_\-\.\/]+?\.(?:tex|sty|cls|aux|bbl|bib))/
+               curr =~ /^\s*\)/ || curr =~ %r{^\s*\((?:\.[\\/]|[a-zA-Z0-9_\-./]+?\.(?:tex|sty|cls|aux|bbl|bib))}
 
       err_block << curr
       i += 1
@@ -1053,7 +1078,7 @@ module LaTeXDiagnostics
       is_err, err_file = error_line_match(line)
       if is_err
         cur_file = err_file || current_log_file(file_stack)
-        bib_key = (last_bib_entry_file == cur_file) ? last_bib_entry_key : nil
+        bib_key = last_bib_entry_file == cur_file ? last_bib_entry_key : nil
         err_item, i = build_error_entry(lines, i, err_file, file_stack, bib_entry: bib_key)
         errors << err_item
       else
@@ -1082,13 +1107,17 @@ module LaTeXDiagnostics
       end
     end
     cat_id = classification ? classification[:id] : :generic
-    token = (cat_id == :undefined_control_sequence && classification&.[](:token)) ? classification[:token] : (extract_argument_token(err_block) || classification&.[](:token))
+    token = if cat_id == :undefined_control_sequence && classification&.[](:token)
+              classification[:token]
+            else
+              extract_argument_token(err_block) || classification&.[](:token)
+            end
     token = nil if token.to_s.match?(/\s/)
     root_l = classification ? classification[:root_line] : nil
     root_c = classification ? classification[:root_col] : nil
 
     item = {
-      file: file_name, line: line_no, line_str: (line_no > 0 ? line_no.to_s : ''),
+      file: file_name, line: line_no, line_str: (line_no.positive? ? line_no.to_s : ''),
       root_line: root_l, root_col: root_c,
       text: err_text, err_block: err_block, base_color: :red, index: next_idx,
       catalog: classification, catalog_id: cat_id,
@@ -1103,7 +1132,10 @@ module LaTeXDiagnostics
     stem = resource.to_s.sub(/\.(?:tex|sty|cls|bib)\z/i, '')
     return nil if stem.empty?
 
-    pattern = /\\(?:input|include|usepackage|RequirePackage|includegraphics|bibliography|addbibresource)\s*(?:\[[^\]]*\])?\s*\{[^}]*#{Regexp.escape(stem)}[^}]*\}/
+    pattern = /
+      \\(?:input|include|usepackage|RequirePackage|includegraphics|bibliography|addbibresource)\s*
+      (?:\[[^\]]*\])?\s*\{[^}]*#{Regexp.escape(stem)}[^}]*\}
+    /x
     collect_source_candidates.each do |file|
       LaTeXUtils.safe_read(file).each_line.with_index(1) do |line, line_no|
         return [file, line_no] if line.sub(/(?<!\\)%.*\z/, '').match?(pattern)
@@ -1160,7 +1192,7 @@ module LaTeXDiagnostics
     lines = [first_line]
     lines << (field_text ? "l.#{line_no} #{field_text}" : "l.#{line_no}")
 
-    hint = token ? "Offending token '#{token}' found on this line." : "Entry typeset here when compilation failed."
+    hint = token ? "Offending token '#{token}' found on this line." : 'Entry typeset here when compilation failed.'
     item = {
       file: file_name,
       line: line_no,
@@ -1199,9 +1231,7 @@ module LaTeXDiagnostics
           catalog: first[:catalog], repeat_count: group.size,
           item: first
         )
-        if @options[:emacs]
-          item[:err_block] = first[:err_block] + ["  (Repeated #{group.size} times on line #{first[:line]})"]
-        end
+        item[:err_block] = first[:err_block] + ["  (Repeated #{group.size} times on line #{first[:line]})"] if @options[:emacs]
         clustered << item
       else
         clustered << first
@@ -1249,13 +1279,13 @@ module LaTeXDiagnostics
 
   def diagnostic_item_sort_key(item)
     idx = item[:index] || 0
-    target = item[:companion_to] ? format_display_path(item[:companion_to]) : format_display_path(item[:file])
+    target = format_display_path(item[:companion_to] || item[:file])
     rank = item[:companion_to] ? 1 : 0
     t_rank = TIER_RANK[tier_label_for(item)] || 2
     line_num = if item[:line].is_a?(Integer) && item[:line].positive?
                  item[:line]
                elsif item[:line_str].to_s =~ /\A(\d+)/
-                 $1.to_i
+                 ::Regexp.last_match(1).to_i
                else
                  item[:line] || 0
                end
@@ -1291,7 +1321,7 @@ module LaTeXDiagnostics
     all_sorted.each do |item|
       f = format_display_path(item[:file])
       lbl = tier_label_for(item, tier_label)
-      counts[f][lbl] += (item[:count] || 1)
+      counts[f][lbl] += item[:count] || 1
     end
     counts
   end
@@ -1353,9 +1383,9 @@ module LaTeXDiagnostics
 
   def normalized_line(item)
     root_line = item[:root_line] || item.dig(:catalog, :root_line)
-    if root_line && root_line.to_i.positive?
+    if root_line&.to_i&.positive?
       root_line.to_i
-    elsif item[:line] && item[:line].to_i.positive?
+    elsif item[:line]&.to_i&.positive?
       item[:line].to_i
     else
       item[:line_str].to_s =~ /\A\d+\z/ ? item[:line_str].to_i : 0
@@ -1364,7 +1394,7 @@ module LaTeXDiagnostics
 
   def normalized_col(item)
     c = item[:col] || item[:root_col] || item.dig(:catalog, :root_col)
-    c && c.to_i.positive? ? c.to_i : nil
+    c&.to_i&.positive? ? c.to_i : nil
   end
 
   def normalized_message(item)
@@ -1423,11 +1453,12 @@ module LaTeXDiagnostics
 
   def emit_compile_record_context(record, io)
     return unless @options && @options[:context_lines].to_i.positive?
+
     line = record[:line].to_i
     return unless line.positive?
 
-    col_pos = (record[:col] && record[:col].to_i.positive?) ? record[:col].to_i - 1 : nil
-    token_len = (record[:token] && !record[:token].to_s.empty?) ? record[:token].to_s.length : 1
+    col_pos = record[:col]&.to_i&.positive? ? record[:col].to_i - 1 : nil
+    token_len = record[:token] && !record[:token].to_s.empty? ? record[:token].to_s.length : 1
     snippet = render_context_snippet(record[:file], line, @options[:context_lines].to_i,
                                      col_pos: col_pos, token_len: token_len, root_col: record[:col])
     io.puts snippet.join("\n") unless snippet.empty?
@@ -1442,10 +1473,10 @@ module LaTeXDiagnostics
 
   def emit_single_vscode_record(record, root_base:)
     file = format_vscode_record_file(record[:file])
-    line = (record[:line] && record[:line].to_i.positive?) ? record[:line].to_i : 1
+    line = record[:line]&.to_i&.positive? ? record[:line].to_i : 1
     msg = LaTeXCompileFormat.format_message(record, color: false)
     cat = record[:category] || (respond_to?(:diagnostic_category, true) ? diagnostic_category(record) : nil)
-    expl = (cat && cat != :generic) ? (DIAGNOSTIC_EXPLANATIONS[cat] || LaTeXErrorCatalog.find_by_id(cat)) : nil
+    expl = cat && cat != :generic ? (DIAGNOSTIC_EXPLANATIONS[cat] || LaTeXErrorCatalog.find_by_id(cat)) : nil
     is_root = (File.basename(file, '.tex') == root_base)
 
     case record[:tier]
@@ -1496,7 +1527,7 @@ module LaTeXDiagnostics
     { 'errors' => errors, 'alerts' => alerts,
       'warnings' => warnings, 'whatevers' => whatevers }
       .reject { |tier, _| tier_suppressed?(tier.to_sym) }
-      .flat_map { |tier, items| (items || []).map { |it| normalize_diagnostic(it, tier) } }
+      .flat_map { |tier, items| (items || []).map { |entry| normalize_diagnostic(entry, tier) } }
   end
 
   def tier_label_for(item, tier_label = nil)
@@ -1515,7 +1546,7 @@ module LaTeXDiagnostics
     counts = if tier_or_counts.is_a?(Hash)
                tier_or_counts
              else
-               { tier_or_counts.to_s => (count || 1) }
+               { tier_or_counts.to_s => count || 1 }
              end
 
     top_tier = TIER_SEVERITY_ORDER.find { |t| counts[t]&.positive? } || 'warnings'
@@ -1525,7 +1556,7 @@ module LaTeXDiagnostics
     uncolored_parts = []
     TIER_SEVERITY_ORDER.each do |tier|
       cnt = counts[tier]
-      next unless cnt && cnt.positive?
+      next unless cnt&.positive?
 
       str = format_tier_count_label(cnt, tier)
       uncolored_parts << str
@@ -1692,7 +1723,7 @@ module LaTeXDiagnostics
     sev = (item[:severity] || extract_box_severity(item[:text].to_s)).to_f
     if sev >= alert_overfull_pt
       :overfull_hbox_alert
-    elsif sev > 0 && sev <= whatever_overfull_pt
+    elsif sev.positive? && sev <= whatever_overfull_pt
       :overfull_hbox_whatever
     else
       :overfull_hbox_warning
@@ -1716,6 +1747,7 @@ module LaTeXDiagnostics
     return classify_overfull_category(item) if overfull_hbox?(item)
     return :underfull_vbox if underfull_vbox?(item)
     return :underfull_hbox if underfull_hbox?(item)
+
     ref_cat = reference_or_cite_category(txt)
     return ref_cat if ref_cat
 
@@ -1777,16 +1809,14 @@ module LaTeXDiagnostics
       if @options[:emacs]
         suffix = uniq_locs.size > 1 ? " (location #{idx + 1} of #{uniq_locs.size})" : ''
         msg = "LaTeX Warning: Label `#{label_key}' multiply defined#{suffix}"
+      elsif other_locs.empty?
+        msg = "Alert: label '#{label_key}' duplicate"
       else
-        if other_locs.empty?
-          msg = "Alert: label '#{label_key}' duplicate"
-        else
-          linked_others = other_locs.map do |ol|
-            disp = "#{format_display_path(ol[:file])}:#{ol[:line]}"
-            link_enabled? ? format_terminal_link(ol[:file], ol[:line].to_s, disp, underline: false, color: :cyan) : disp
-          end.join(', ')
-          msg = "Alert: label '#{label_key}' duplicate (also at #{linked_others})"
-        end
+        linked_others = other_locs.map do |ol|
+          disp = "#{format_display_path(ol[:file])}:#{ol[:line]}"
+          link_enabled? ? format_terminal_link(ol[:file], ol[:line].to_s, disp, underline: false, color: :cyan) : disp
+        end.join(', ')
+        msg = "Alert: label '#{label_key}' duplicate (also at #{linked_others})"
       end
 
       formatted = format_diagnostic_line(loc[:line].to_s, msg, :red, file: loc[:file])
@@ -1868,9 +1898,7 @@ module LaTeXDiagnostics
         next unless clean.include?(label_key)
 
         stripped = clean.gsub(ref_pattern, '')
-        if stripped.include?(label_key)
-          locs << { file: file, line: idx + 1 }
-        end
+        locs << { file: file, line: idx + 1 } if stripped.include?(label_key)
       end
     end
     locs
@@ -1878,7 +1906,7 @@ module LaTeXDiagnostics
 
   def extract_alerts(content, warn_items = nil)
     clean_content = LaTeXUtils.filter_subcommand_noise(content)
-    warn_items ||= extract_warnings(clean_content, @options[:verbose])
+    warn_items ||= extract_warnings(clean_content, verbose: @options[:verbose])
     threshold = alert_overfull_pt
     alert_boxes = warn_items.select do |w|
       overfull_hbox?(w) && (w[:severity] || 0.0) >= threshold
@@ -1947,7 +1975,7 @@ module LaTeXDiagnostics
       alert_type: :type3_font,
       tier: color == :yellow ? 'warnings' : 'alerts',
       base_color: color,
-      index: 60000
+      index: 60_000
     }]
   end
 
@@ -1960,7 +1988,7 @@ module LaTeXDiagnostics
   def whatever_diagnostic?(item)
     if overfull_hbox?(item)
       sev = (item[:severity] || extract_box_severity(item[:text].to_s)).to_f
-      return true if sev > 0 && sev <= whatever_overfull_pt
+      return true if sev.positive? && sev <= whatever_overfull_pt
     end
 
     txt = item[:text].to_s
@@ -2015,8 +2043,8 @@ module LaTeXDiagnostics
     item[:formatted] = format_diagnostic_line(item[:line_str], item[:text], :yellow, file: item[:file])
   end
 
-  def format_tier_count(label, count, color, _suppressed = false)
-    if count == 0
+  def format_tier_count(label, count, color)
+    if count.zero?
       Rainbow("#{label}: 0").green.bright
     else
       Rainbow("#{label}: #{count}").color(color).bright
@@ -2030,13 +2058,13 @@ module LaTeXDiagnostics
     wht_label = use_badges ? '☕' : 'Whatevers'
 
     suppressed = []
-    suppressed << alt_label if suppressed_alerts && alerts > 0
-    suppressed << wrn_label if suppressed_warnings && warnings > 0
-    suppressed << wht_label if suppressed_whatevers && whatevers > 0
+    suppressed << alt_label if suppressed_alerts && alerts.positive?
+    suppressed << wrn_label if suppressed_warnings && warnings.positive?
+    suppressed << wht_label if suppressed_whatevers && whatevers.positive?
 
     return '' if suppressed.empty?
 
-    all_non_errors = [alerts > 0, warnings > 0, whatevers > 0].count(true)
+    all_non_errors = [alerts.positive?, warnings.positive?, whatevers.positive?].count(true)
     if suppressed.size == all_non_errors && all_non_errors > 1
       "  #{Rainbow('(non-errors suppressed)').faint}"
     else
@@ -2048,7 +2076,7 @@ module LaTeXDiagnostics
                          suppressed_warnings: false, suppressed_whatevers: false, suppressed_alerts: false, io: nil)
     return if @options && compile_mode?
 
-    target_io = io || ((@options && @options[:score]) ? (@orig_stdout || $stdout) : $stdout)
+    target_io = io || (@options && @options[:score] ? (@orig_stdout || $stdout) : $stdout)
     active = active_tiers(suppressed_alerts, suppressed_warnings, suppressed_whatevers)
 
     target_io.puts ''
@@ -2062,9 +2090,9 @@ module LaTeXDiagnostics
 
   def active_tiers(supp_alerts, supp_warns, supp_whats)
     {
-      alerts: !tier_suppressed?(:alerts, supp_alerts),
-      warnings: !tier_suppressed?(:warnings, supp_warns),
-      whatevers: !tier_suppressed?(:whatevers, supp_whats)
+      alerts: !tier_suppressed?(:alerts, explicit_suppressed: supp_alerts),
+      warnings: !tier_suppressed?(:warnings, explicit_suppressed: supp_warns),
+      whatevers: !tier_suppressed?(:whatevers, explicit_suppressed: supp_whats)
     }
   end
 
@@ -2104,7 +2132,7 @@ module LaTeXDiagnostics
     "#{v_symbol} #{msg}"
   end
 
-  def tier_suppressed?(tier, explicit_suppressed = false)
+  def tier_suppressed?(tier, explicit_suppressed: false)
     return true if explicit_suppressed
     return false unless @options
 
@@ -2153,13 +2181,14 @@ module LaTeXDiagnostics
   def print_cascade_notice(cascade_info, io: $stderr)
     cols = terminal_columns
     io.puts Rainbow("\n═══════════════════════════════════════════════════════════════════════════════").yellow
-    if cascade_info[:remaining_in_first] > 0
+    if cascade_info[:remaining_in_first].positive?
       msg = "▸ #{cascade_info[:remaining_in_first]} more errors in #{cascade_info[:first_file]} were truncated (likely cascades)."
       io.puts Rainbow(LaTeXUtils.wrap_text(msg, width: cols)).yellow
     end
-    if cascade_info[:other_errors_count] > 0
+    if cascade_info[:other_errors_count].positive?
       files_str = format_other_files_list(cascade_info[:other_files])
-      msg1 = "▸ #{cascade_info[:other_errors_count]} more errors were detected across #{cascade_info[:other_files].size} other files (#{files_str})."
+      msg1 = "▸ #{cascade_info[:other_errors_count]} more errors were detected across " \
+             "#{cascade_info[:other_files].size} other files (#{files_str})."
       io.puts Rainbow(LaTeXUtils.wrap_text(msg1, width: cols)).yellow
       msg2 = '  Handle above errors first to ensure these errors are not cascades.'
       io.puts Rainbow(LaTeXUtils.wrap_text(msg2, width: cols)).yellow
@@ -2172,19 +2201,19 @@ module LaTeXDiagnostics
   def emit_compile_cascade_notice(cascade_info, io: $stderr)
     return unless cascade_info
 
-    note_label = (@options && @options[:color] == false) ? 'note:' : Rainbow('note:').cyan.bright.bold.to_s
-    if cascade_info[:remaining_in_first].to_i > 0
+    note_label = @options && @options[:color] == false ? 'note:' : Rainbow('note:').cyan.bright.bold.to_s
+    if cascade_info[:remaining_in_first].to_i.positive?
       msg = "#{cascade_info[:remaining_in_first]} more errors in #{cascade_info[:first_file]} were truncated"
       io.puts "leeni: #{note_label} #{msg} (run with 'l -a' to display all)"
     end
-    if cascade_info[:other_errors_count].to_i > 0
-      files_str = format_other_files_list(cascade_info[:other_files])
-      msg = "#{cascade_info[:other_errors_count]} more errors detected across #{cascade_info[:other_files].size} other files (#{files_str})"
-      io.puts "leeni: #{note_label} #{msg} (run with 'l -a' to display all)"
-    end
+    return unless cascade_info[:other_errors_count].to_i.positive?
+
+    files_str = format_other_files_list(cascade_info[:other_files])
+    msg = "#{cascade_info[:other_errors_count]} more errors detected across #{cascade_info[:other_files].size} other files (#{files_str})"
+    io.puts "leeni: #{note_label} #{msg} (run with 'l -a' to display all)"
   end
 
-  COMPILER_BRACE_ERROR_PATTERN = /(?:Runaway argument\?|File ended while scanning use of|Extra \}, or forgotten \\endgroup|Extra \\endgroup|Too many \}'s|Missing \} inserted|Paragraph ended before .* was complete|\\begin\{.*\} ended by \\end\{.*\})/i.freeze
+  COMPILER_BRACE_ERROR_PATTERN = /(?:Runaway argument\?|File ended while scanning use of|Extra \}, or forgotten \\endgroup|Extra \\endgroup|Too many \}'s|Missing \} inserted|Paragraph ended before .* was complete|\\begin\{.*\} ended by \\end\{.*\})/i
   COMPILER_BRACE_CASCADE_IDS = %i[
     paragraph_ended_before_complete file_ended_while_scanning
   ].freeze
@@ -2239,7 +2268,7 @@ module LaTeXDiagnostics
     warns = []
     whats = []
     if @options[:all] || @options[:vscode_lw]
-      raw_warns = extract_warnings(content, false)
+      raw_warns = extract_warnings(content, verbose: false)
       alerts, warns, whats = partition_diagnostics(content, raw_warns)
     end
 
@@ -2295,7 +2324,7 @@ module LaTeXDiagnostics
     fallback = errors.empty? ? content.lines.last(15) : []
     displayed_errors, cascade_info = throttle_errors(errors)
     if @options[:emacs] || @options[:all]
-      raw_warns = extract_warnings(content, false)
+      raw_warns = extract_warnings(content, verbose: false)
       alert_items, regular_warns, whatever_items = partition_diagnostics(content, raw_warns)
       render_grouped_tiers(displayed_errors, alert_items, regular_warns, whatever_items, fallback_lines: fallback, io: io)
     else
@@ -2303,15 +2332,13 @@ module LaTeXDiagnostics
     end
     print_cascade_notice(cascade_info, io: io) if cascade_info
 
-    if @options[:verbose] || fallback.any? || errors.empty?
-      io.puts "See #{loga} for full error details."
-    end
+    io.puts "See #{loga} for full error details." if @options[:verbose] || fallback.any? || errors.empty?
     report_error_summary(content, raw, brace_errors, errors.size, io: io)
     exit 1
   end
 
   def report_error_summary(content, raw, brace_errors, num_errors, io: $stdout)
-    raw_warns = extract_warnings(content, false)
+    raw_warns = extract_warnings(content, verbose: false)
     alert_items, regular_warns, whatever_items = partition_diagnostics(content, raw_warns)
 
     brace_alerts_count = brace_errors.count { |e| e[:has_alert] }
@@ -2322,9 +2349,9 @@ module LaTeXDiagnostics
     suppressed = !@options[:emacs] && !@options[:all]
     print_summary_line(
       errors_count, alerts_count, warnings_count, whatevers_count,
-      suppressed_alerts: suppressed && alerts_count > 0,
-      suppressed_warnings: suppressed && warnings_count > 0,
-      suppressed_whatevers: suppressed && whatevers_count > 0,
+      suppressed_alerts: suppressed && alerts_count.positive?,
+      suppressed_warnings: suppressed && warnings_count.positive?,
+      suppressed_whatevers: suppressed && whatevers_count.positive?,
       io: io
     )
   end
@@ -2357,7 +2384,7 @@ module LaTeXDiagnostics
     /\(There (?:was|were) \d+ error message/i
   ).freeze
 
-  BIB_WARNING_PATTERN = /^Warning--|^Repeated entry---|^WARN\s+-\s/i.freeze
+  BIB_WARNING_PATTERN = /^Warning--|^Repeated entry---|^WARN\s+-\s/i
 
   def count_bib_messages
     return { warns: 0, errors: 0 } unless @biberr && File.exist?(@biberr)
@@ -2368,9 +2395,9 @@ module LaTeXDiagnostics
     { warns: warns, errors: errors }
   end
 
-  UNDEF_CITE_PATTERN = /^(?:LaTeX|Package\s+[-\w.@*]+)\s+Warning:\s+Citation\s+[`'"]?.*?['"]?\s+.*undefined/i.freeze
-  UNDEF_REF_PATTERN  = /^(?:LaTeX|Package\s+[-\w.@*]+)\s+Warning:\s+Reference\s+[`'"]?.*?['"]?\s+.*undefined/i.freeze
-  MULT_DEF_PATTERN   = /^(?:LaTeX|Package\s+[-\w.@*]+)\s+Warning:\s+Label\s+[`'"]?.*?['"]?\s+multiply defined/i.freeze
+  UNDEF_CITE_PATTERN = /^(?:LaTeX|Package\s+[-\w.@*]+)\s+Warning:\s+Citation\s+[`'"]?.*?['"]?\s+.*undefined/i
+  UNDEF_REF_PATTERN  = /^(?:LaTeX|Package\s+[-\w.@*]+)\s+Warning:\s+Reference\s+[`'"]?.*?['"]?\s+.*undefined/i
+  MULT_DEF_PATTERN   = /^(?:LaTeX|Package\s+[-\w.@*]+)\s+Warning:\s+Label\s+[`'"]?.*?['"]?\s+multiply defined/i
 
   def count_reference_messages(new_content)
     content = LaTeXUtils.filter_subcommand_noise(new_content)
@@ -2380,18 +2407,18 @@ module LaTeXDiagnostics
     [undef_cite, undef_ref, mult_def]
   end
 
-
   def append_bib_diagnostics!(warn_items, err_items)
     return unless @biberr && File.exist?(@biberr)
 
     LaTeXUtils.safe_read(@biberr).each_line.with_index do |bl, bidx|
       if bl =~ BIB_WARNING_PATTERN
-        line_str = (bl =~ /line\s+(\d+)/i) ? Regexp.last_match(1) : ''
+        line_str = bl =~ /line\s+(\d+)/i ? Regexp.last_match(1) : ''
         formatted = format_diagnostic_line(line_str, bl.strip, :yellow)
-        warn_items << { file: './bibliography', line: line_str.to_i, line_str: line_str, text: bl.strip, formatted: formatted, index: 100000 + bidx }
+        warn_items << { file: './bibliography', line: line_str.to_i, line_str: line_str, text: bl.strip, formatted: formatted,
+                        index: 100_000 + bidx }
       elsif bl =~ BIB_ERROR_PATTERN
         formatted = @options[:emacs] ? bl.strip : highlight_line_numbers(bl.strip, :red, bright: true)
-        err_items << { file: './bibliography', line: 0, text: bl.strip, formatted: formatted, index: 100000 + bidx }
+        err_items << { file: './bibliography', line: 0, text: bl.strip, formatted: formatted, index: 100_000 + bidx }
       end
     end
   end
@@ -2410,12 +2437,12 @@ module LaTeXDiagnostics
       txt = w[:text].to_s
       matched = false
       MISSING_DB_ENTRY_PATTERNS.each do |pat|
-        if (m = txt.match(pat))
-          raw_keys = m[1].split(/[,\s]+/).map { |k| k.gsub(/['"]/, '').strip }.reject(&:empty?)
-          missing_keys.concat(raw_keys)
-          matched = true
-          break
-        end
+        next unless (m = txt.match(pat))
+
+        raw_keys = m[1].split(/[,\s]+/).map { |k| k.gsub(/['"]/, '').strip }.reject(&:empty?)
+        missing_keys.concat(raw_keys)
+        matched = true
+        break
       end
       if !matched && w[:file].to_s.end_with?('.bbl') && txt =~ /Entry '([^']+)' not found in database/i
         missing_keys << Regexp.last_match(1)
@@ -2439,7 +2466,7 @@ module LaTeXDiagnostics
       base_color: :yellow,
       count: missing_keys.size,
       formatted: format_diagnostic_line('bib', warn_text, :yellow, file: './bibliography'),
-      index: 100000
+      index: 100_000
     }
   end
 
@@ -2474,9 +2501,9 @@ module LaTeXDiagnostics
     new_content = LaTeXUtils.safe_read(pdferr)
     counts = collect_diagnostic_counts(new_content)
     clean_content = LaTeXUtils.filter_subcommand_noise(new_content)
-    raw_warns = extract_warnings(clean_content, @options[:verbose])
+    raw_warns = extract_warnings(clean_content, verbose: @options[:verbose])
     err_items = extract_errors(clean_content)
-    append_bib_diagnostics!(raw_warns, err_items) if counts[:cbib] > 0
+    append_bib_diagnostics!(raw_warns, err_items) if counts[:cbib].positive?
     consolidate_missing_bib_entries!(raw_warns)
 
     alert_items, reg_warns, what_items = partition_diagnostics(clean_content, raw_warns)
@@ -2492,7 +2519,7 @@ module LaTeXDiagnostics
 
     if json_mode?
       errors = render_json_mode_tiers(err_items, alert_items, reg_warns, what_items, errors)
-    elsif errors > 0 || alerts > 0 || warnings > 0 || whatevers > 0
+    elsif errors.positive? || alerts.positive? || warnings.positive? || whatevers.positive?
       errors = render_diagnostics_tiers(err_items, alert_items, reg_warns, what_items, errors)
     end
 
@@ -2500,17 +2527,13 @@ module LaTeXDiagnostics
   end
 
   def render_compile_mode_tiers(err_items, alert_items, reg_warns, what_items, errors)
-    if json_mode?
-      return render_json_mode_tiers(err_items, alert_items, reg_warns, what_items, errors)
-    end
+    return render_json_mode_tiers(err_items, alert_items, reg_warns, what_items, errors) if json_mode?
 
-    if llm_mode?
-      return render_llm_mode_tiers(err_items, alert_items, reg_warns, what_items, errors)
-    end
+    return render_llm_mode_tiers(err_items, alert_items, reg_warns, what_items, errors) if llm_mode?
 
     prepared_errors = prepare_error_items(err_items)
     displayed_errors, cascade_info = throttle_errors(prepared_errors)
-    has_errors = errors > 0 || !prepared_errors.empty?
+    has_errors = errors.positive? || !prepared_errors.empty?
     show_non_errors = @options[:all] || !has_errors || @options[:vscode_lw]
 
     out_io = @options[:vscode_lw] ? $stdout : $stderr
@@ -2546,7 +2569,7 @@ module LaTeXDiagnostics
 
   def render_json_mode_tiers(err_items, alert_items, reg_warns, what_items, errors)
     prepared_errors = prepare_error_items(err_items)
-    has_errors = errors > 0 || !prepared_errors.empty?
+    has_errors = errors.positive? || !prepared_errors.empty?
     has_werrors = @options[:werror] && (alert_items.any? || reg_warns.any?)
     failed = has_errors || has_werrors
 
@@ -2563,7 +2586,7 @@ module LaTeXDiagnostics
     result = LaTeXDiagnosticResult.new(
       success: !failed,
       exit_code: failed ? 1 : 0,
-      pdf_path: (!failed && File.exist?(pdf_file)) ? pdf_file : nil,
+      pdf_path: !failed && File.exist?(pdf_file) ? pdf_file : nil,
       records: all_records,
       summary: {
         errors: err_records.size,
@@ -2580,7 +2603,7 @@ module LaTeXDiagnostics
   def render_diagnostics_tiers(err_items, alert_items, reg_warns, what_items, errors)
     return render_compile_mode_tiers(err_items, alert_items, reg_warns, what_items, errors) if compile_mode?
 
-    if errors > 0 || !err_items.empty?
+    if errors.positive? || !err_items.empty?
       prepared_errors = prepare_error_items(err_items)
       displayed_errors, cascade_info = throttle_errors(prepared_errors)
       if @options[:emacs] || @options[:all]
@@ -2606,20 +2629,35 @@ module LaTeXDiagnostics
     suppress_whatevers = @options[:suppress_whatevers] != false
 
     items_to_display = []
-    error_items.each { |e| (it = e.dup)[:tier] = 'errors'; it[:base_color] ||= :red; items_to_display << it }
+    error_items.each do |e|
+      entry = e.dup
+      entry[:tier] = 'errors'
+      entry[:base_color] ||= :red
+      items_to_display << entry
+    end
     unless suppress_alerts
-      alert_items.each { |a| (it = a.dup)[:tier] = 'alerts'; it[:base_color] ||= :red; items_to_display << it }
+      alert_items.each do |a|
+        entry = a.dup
+        entry[:tier] = 'alerts'
+        entry[:base_color] ||= :red
+        items_to_display << entry
+      end
     end
     unless suppress_warnings
-      reg_warns.each { |w| (it = w.dup)[:tier] = 'warnings'; w[:base_color] ||= :yellow; items_to_display << it }
+      reg_warns.each do |w|
+        entry = w.dup
+        entry[:tier] = 'warnings'
+        entry[:base_color] ||= :yellow
+        items_to_display << entry
+      end
     end
     unless suppress_whatevers
       what_items.each do |wh|
-        it = wh.dup
-        it[:base_color] = :cyan
-        it[:tier] = 'whatevers'
-        it[:formatted] = format_diagnostic_line(wh[:line_str], wh[:text], :cyan, file: wh[:file])
-        items_to_display << it
+        entry = wh.dup
+        entry[:base_color] = :cyan
+        entry[:tier] = 'whatevers'
+        entry[:formatted] = format_diagnostic_line(wh[:line_str], wh[:text], :cyan, file: wh[:file])
+        items_to_display << entry
       end
     end
 
@@ -2633,23 +2671,23 @@ module LaTeXDiagnostics
     return unless errors.zero? && !llm_mode? && !json_mode?
     return if @options[:werror] && (alerts.positive? || warnings.positive?)
 
-    msg = (@options && @options[:color] == false) ? 'Compilation succeeded.' : Rainbow('Compilation succeeded.').green.bright
+    msg = @options && @options[:color] == false ? 'Compilation succeeded.' : Rainbow('Compilation succeeded.').green.bright
     puts msg
   end
 
   def summarize_and_check_werror(errors, alerts, warnings, whatevers)
-    suppressed_alt = (errors > 0 && !@options[:emacs] && !@options[:all]) || (@options[:suppress_alerts] == true)
-    suppressed_wrn = (errors > 0 && !@options[:emacs] && !@options[:all]) || (@options[:suppress_warnings] == true)
-    suppressed_wht = (errors > 0 && !@options[:emacs] && !@options[:all]) || (@options[:suppress_whatevers] != false)
+    suppressed_alt = (errors.positive? && !@options[:emacs] && !@options[:all]) || (@options[:suppress_alerts] == true)
+    suppressed_wrn = (errors.positive? && !@options[:emacs] && !@options[:all]) || (@options[:suppress_warnings] == true)
+    suppressed_wht = (errors.positive? && !@options[:emacs] && !@options[:all]) || (@options[:suppress_whatevers] != false)
 
     if compile_mode?
       print_compile_success_if_clean(errors, alerts, warnings)
     else
       print_summary_line(
         errors, alerts, warnings, whatevers,
-        suppressed_alerts: suppressed_alt && alerts > 0,
-        suppressed_warnings: suppressed_wrn && warnings > 0,
-        suppressed_whatevers: suppressed_wht && whatevers > 0
+        suppressed_alerts: suppressed_alt && alerts.positive?,
+        suppressed_warnings: suppressed_wrn && warnings.positive?,
+        suppressed_whatevers: suppressed_wht && whatevers.positive?
       )
     end
 
@@ -2683,7 +2721,7 @@ module LaTeXDiagnostics
     pattern = /\A#{Regexp.escape(base)}_(\d+)\z/
     return [] unless File.directory?(dir)
 
-    Dir.children(dir).select { |f| f.match?(pattern) }.sort_by { |f| f[pattern, 1].to_i }.map { |f| File.join(dir, f) }
+    Dir.children(dir).grep(pattern).sort_by { |f| f[pattern, 1].to_i }.map { |f| File.join(dir, f) }
   end
 
   def find_last_latex_log = pass_log_files.last || @pdferr
@@ -2695,13 +2733,13 @@ module LaTeXDiagnostics
       next if line =~ /^!\s*(?:==>\s*)?(?:Emergency stop|Fatal error occurred)/i
       next if typeset_source_echo?(line)
 
-      if line =~ /^!\s+\S+/ ||
-         line =~ /^.+:\d+:\s+(?:(?:LaTeX|Package|Class)\s+Error:|Undefined control sequence|Error:|Runaway argument\?|Missing\s|Extra\s|You can't use)/i ||
-         line =~ /^.+:\d+:\s+.*error/i || line =~ /^Error:\s+/i
-        errors += 1
-      end
+      next unless line =~ /^!\s+\S+/ ||
+                  line =~ /^.+:\d+:\s+(?:(?:LaTeX|Package|Class)\s+Error:|Undefined control sequence|Error:|Runaway argument\?|Missing\s|Extra\s|You can't use)/i || # rubocop:disable Layout/LineLength
+                  line =~ /^.+:\d+:\s+.*error/i || line =~ /^Error:\s+/i
+
+      errors += 1
     end
-    errors = 1 if errors == 0 && status.to_i > 0
+    errors = 1 if errors.zero? && status.to_i.positive?
     errors
   end
 
@@ -2710,11 +2748,11 @@ module LaTeXDiagnostics
     content.each_line do |line|
       next if line.include?('multiply defined') && line.include?('LaTeX Warning')
 
-      if line =~ WARNING_LINE_PATTERN ||
-         line =~ /^.+:\d+:\s+warning:/i || line =~ /^Warning:\s+/i ||
-         line =~ /^(?:Overfull|Underfull) \\(?:hbox|vbox)/
-        warnings += 1
-      end
+      next unless line =~ WARNING_LINE_PATTERN ||
+                  line =~ /^.+:\d+:\s+warning:/i || line =~ /^Warning:\s+/i ||
+                  line =~ /^(?:Overfull|Underfull) \\(?:hbox|vbox)/
+
+      warnings += 1
     end
     warnings
   end
@@ -2723,7 +2761,7 @@ module LaTeXDiagnostics
     last_log_path ||= find_last_latex_log
     content = LaTeXUtils.safe_read(last_log_path)
     clean_content = LaTeXUtils.filter_subcommand_noise(content)
-    raw_warns = extract_warnings(clean_content, false)
+    raw_warns = extract_warnings(clean_content, verbose: false)
     alert_items, regular_warns, whatever_items = partition_diagnostics(clean_content, raw_warns)
 
     errors = count_latex_errors(content, status)
@@ -2736,9 +2774,9 @@ module LaTeXDiagnostics
 
     print_summary_line(
       errors, alerts, warnings, whatevers,
-      suppressed_alerts: suppress_alerts && alerts > 0,
-      suppressed_warnings: suppress_warnings && warnings > 0,
-      suppressed_whatevers: suppress_whatevers && whatevers > 0
+      suppressed_alerts: suppress_alerts && alerts.positive?,
+      suppressed_warnings: suppress_warnings && warnings.positive?,
+      suppressed_whatevers: suppress_whatevers && whatevers.positive?
     )
 
     # analyze_output returns early for :score, so without this `l -s -W` could

@@ -33,22 +33,22 @@ module Leeni
 
     def error?
       t = tier.to_s
-      t == 'error' || t == 'errors'
+      %w[error errors].include?(t)
     end
 
     def alert?
       t = tier.to_s
-      t == 'alert' || t == 'alerts'
+      %w[alert alerts].include?(t)
     end
 
     def warning?
       t = tier.to_s
-      t == 'warning' || t == 'warnings'
+      %w[warning warnings].include?(t)
     end
 
     def whatever?
       t = tier.to_s
-      t == 'whatever' || t == 'whatevers'
+      %w[whatever whatevers].include?(t)
     end
   end
 

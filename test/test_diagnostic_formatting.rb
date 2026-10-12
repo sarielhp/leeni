@@ -15,7 +15,7 @@ class TestDiagnosticFormatting < Minitest::Test
 
   def test_box_warning_cleaning
     builder = LatexBuilder.new('main.tex', {})
-    
+
     # 1. Floating point rounding and redundancy stripping
     cleaned = builder.send(:clean_box_diagnostic, 'Overfull \hbox (54.46506pt too wide) detected at line 125', :alert)
     assert_equal 'Alert: 54.47pt too wide', cleaned
@@ -92,16 +92,20 @@ class TestDiagnosticFormatting < Minitest::Test
     assert_equal 'Warning: command \L invalid in math mode', builder.send(:clean_diagnostic_warning, raw_math)
 
     # Font warning cleaning
-    raw_font = "LaTeX Font Warning: Font shape `TU/lmss/m/sc' in size <10.95> not available\n(Font)              Font shape `TU/lmr/m/sc' tried instead on input line 116."
-    assert_equal "Warning: [font] Font shape `TU/lmss/m/sc' in size <10.95> not available, Font shape `TU/lmr/m/sc' tried instead", builder.send(:clean_diagnostic_warning, raw_font)
+    raw_font = "LaTeX Font Warning: Font shape `TU/lmss/m/sc' in size <10.95> not available\n" \
+               "(Font)              Font shape `TU/lmr/m/sc' tried instead on input line 116."
+    assert_equal "Warning: [font] Font shape `TU/lmss/m/sc' in size <10.95> not available, Font shape `TU/lmr/m/sc' tried instead",
+                 builder.send(:clean_diagnostic_warning, raw_font)
 
     # Inline package request location cleaning
-    raw_pkg = "LaTeX Warning: You have requested, on input line 13, version `2099/01/01' of package amsmath, but only version `2026/05/19' is available."
-    assert_equal "Warning: You have requested version `2099/01/01' of package amsmath, but only version `2026/05/19' is available.", builder.send(:clean_diagnostic_warning, raw_pkg)
+    raw_pkg = "LaTeX Warning: You have requested, on input line 13, version `2099/01/01' of package amsmath, " \
+              "but only version `2026/05/19' is available."
+    assert_equal "Warning: You have requested version `2099/01/01' of package amsmath, but only version `2026/05/19' is available.",
+                 builder.send(:clean_diagnostic_warning, raw_pkg)
 
     # Float too large float rounding
-    raw_float = "LaTeX Warning: Float too large for page by 176.81013pt on input line 105."
-    assert_equal "Warning: Float too large for page by 176.81pt", builder.send(:clean_diagnostic_warning, raw_float)
+    raw_float = 'LaTeX Warning: Float too large for page by 176.81013pt on input line 105.'
+    assert_equal 'Warning: Float too large for page by 176.81pt', builder.send(:clean_diagnostic_warning, raw_float)
 
     # Deduplication of Hyper reference and Reference
     log = <<~LOG
@@ -154,7 +158,7 @@ class TestDiagnosticFormatting < Minitest::Test
       File.write(test_file, "line 1\nline 2\n")
 
       builder = LatexBuilder.new(test_file, link: true)
-      
+
       # Line number prefix
       line_formatted = builder.send(:format_diagnostic_line, '455', 'Warning: test warning', :yellow, file: test_file)
       assert_includes line_formatted, "\e]8;;file://"
@@ -305,7 +309,7 @@ class TestDiagnosticFormatting < Minitest::Test
 
       combined = lines.join("\n")
       assert_includes combined, "\e]8;;file://"
-      assert_includes combined, "test.tex#5"
+      assert_includes combined, 'test.tex#5'
       assert_includes combined, '^^^^'
     end
   end
@@ -314,11 +318,11 @@ class TestDiagnosticFormatting < Minitest::Test
     orig = Rainbow.enabled
     begin
       Rainbow.enabled = true
-      line = "\\begin{align*} \\DotProd{ \\nu_h }{ q } = 0 % note"
+      line = '\\begin{align*} \\DotProd{ \\nu_h }{ q } = 0 % note'
       colored = LatexColor.highlight_latex(line, color_enabled: true)
       assert_match(/\e\[(?:35|\d+;2;\d+;\d+;\d+)m/, colored)
-      assert_includes colored, "align*"
-      assert_includes colored, "\\DotProd"
+      assert_includes colored, 'align*'
+      assert_includes colored, '\\DotProd'
       assert_includes colored, "\e[2m% note"
     ensure
       Rainbow.enabled = orig
@@ -391,7 +395,8 @@ class TestDiagnosticFormatting < Minitest::Test
     builder = LatexBuilder.new('main.tex', color: false, link: false, all: true)
     ENV['COLUMNS'] = '70'
     begin
-      long_msg = 'You have requested version `2099/01/01` of package amsmath, but only version `2026/05/19 v2.18d AMS math features` is available.'
+      long_msg = 'You have requested version `2099/01/01` of package amsmath, ' \
+                 'but only version `2026/05/19 v2.18d AMS math features` is available.'
       item = { file: 'main.tex', line_str: '13', text: long_msg, tier: 'warnings' }
       rendered = builder.send(:render_diagnostic_item, item, width: 3)
       lines = rendered.lines.map(&:chomp)

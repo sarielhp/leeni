@@ -133,19 +133,19 @@ module LatexColor
       out = String.new(capacity: line.bytesize * 2)
 
       until s.eos?
-        if s.scan(/(?<!\\)%.*$/)
-          out << Rainbow(s.matched).faint.to_s
-        elsif s.scan(/\\(?:begin|end)\b/)
-          out << Rainbow(s.matched).magenta.bright.to_s
-        elsif s.scan(/\\[a-zA-Z@]+|\\[^a-zA-Z@\s]/)
-          out << Rainbow(s.matched).cyan.to_s
-        elsif s.scan(/\$\$|\$|\\\(|\\\)|\\[\[\]]/)
-          out << Rainbow(s.matched).yellow.to_s
-        elsif s.scan(/[^\\%$]+/)
-          out << s.matched
-        else
-          out << s.getch
-        end
+        out << if s.scan(/(?<!\\)%.*$/)
+                 Rainbow(s.matched).faint.to_s
+               elsif s.scan(/\\(?:begin|end)\b/)
+                 Rainbow(s.matched).magenta.bright.to_s
+               elsif s.scan(/\\[a-zA-Z@]+|\\[^a-zA-Z@\s]/)
+                 Rainbow(s.matched).cyan.to_s
+               elsif s.scan(/\$\$|\$|\\\(|\\\)|\\[\[\]]/)
+                 Rainbow(s.matched).yellow.to_s
+               elsif s.scan(/[^\\%$]+/)
+                 s.matched
+               else
+                 s.getch
+               end
       end
       out
     end
@@ -202,10 +202,10 @@ module LatexColor
       curr = active_theme
       ORDERED_THEMES.each do |key|
         meta = THEMES[key]
-        marker = (key == curr) ? '* ' : '  '
+        marker = key == curr ? '* ' : '  '
         swatch = meta[:red] ? " (#{meta[:red]})" : ''
-        current_tag = (key == curr) ? '  [current]' : ''
-        lines << format('%s%-12s - %-32s%s%s', marker, key, meta[:desc], swatch, current_tag)
+        current_tag = key == curr ? '  [current]' : ''
+        lines << "#{marker}#{key.to_s.ljust(12)} - #{meta[:desc].ljust(32)}#{swatch}#{current_tag}"
       end
       lines << "\nCycle through themes with: l --theme +1"
       lines.join("\n")
@@ -232,9 +232,7 @@ begin
   module RainbowThemeOverride
     def build(ground, values)
       if values.size == 1 && values.first.is_a?(Symbol)
-        if !LatexColor.true_color_supported? && !LatexColor.color_256_supported?
-          return super
-        end
+        return super if !LatexColor.true_color_supported? && !LatexColor.color_256_supported?
 
         colors = LatexColor.theme_colors
         hex = colors[values.first]

@@ -55,6 +55,21 @@ cd leeni
 
 To create a single-file executable without installing it, run `./tools/bundle -o leeni-standalone` from the cloned repository.
 
+### Development and releases
+
+`tools/build` generates the ignored `build/leeni` standalone artifact. `tools/lint`,
+`tools/test`, and `tools/gate --fast|--medium|--full` check source and tests.
+`tools/check` is an alias for the gate. `tools/snapshot` creates an ungated local
+checkpoint, while `tools/commit MESSAGE` commits checked changes locally.
+
+`tools/release MESSAGE` commits the current changes, increments the patch version,
+runs the full gate against that version, and atomically pushes the branch and tag
+to the configured upstream. The tag push triggers GitHub Actions to attach the
+standalone executable to a GitHub Release. Pass `--install` to install after the
+remote tag is verified. For a version-only release, use `tools/bump` (`--minor`, `--major`, or
+`--resume` after an interruption). Installation can also be run independently
+with `tools/install`.
+
 ### Requirements
 
 - **Operating System**: **Linux** (primary target; macOS is supported/functional via Homebrew/MacTeX; Windows requires WSL).

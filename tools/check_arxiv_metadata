@@ -36,8 +36,8 @@ module ArxivMetadataReport
                   abstract: LaTeXMetaExtractor.extract_abstract(content) }
     comparisons = compare_metadata(reference, extracted)
     pdf_result = pdf ? check_pdf(pdf, reference[:authors]) : { status: 'skipped' }
-    report = build_report(dir, source_name, metadata, main_name, reference, extracted,
-                          comparisons, pdf_result, bytes)
+    report = build_report(dir, source_name, metadata, main_name, reference: reference, extracted: extracted,
+                                                                 comparisons: comparisons, pdf: pdf_result, bytes: bytes)
     report_path = File.join(dir, 'metadata-report.json')
     Tempfile.create(['metadata-report-', '.json'], dir) do |temporary|
       temporary.write(JSON.pretty_generate(report) + "\n")
@@ -231,7 +231,7 @@ module ArxivMetadataReport
     missing.filter_map do |wanted|
       next if wanted.length < 5
 
-      bound = [2, [1, wanted.length / 8].max].min
+      bound = (wanted.length / 8).clamp(1, 2)
       candidate = available.select { |item| (wanted.length - item.length).abs <= bound }
                            .min_by { |item| edit_distance(wanted, item) }
       next unless candidate && edit_distance(wanted, candidate) <= bound
@@ -262,7 +262,7 @@ module ArxivMetadataReport
     text.match?(Regexp.new("(?<![\\p{L}\\p{N}])#{pattern}(?!\\p{L})"))
   end
 
-  def self.build_report(dir, source_name, metadata, main_name, reference, extracted, comparisons, pdf, bytes)
+  def self.build_report(dir, source_name, metadata, main_name, reference:, extracted:, comparisons:, pdf:, bytes:)
     warnings = ['arXiv source metadata and TeX/PDF metadata can legitimately differ; review mismatches.']
     abstract_warning = comparisons[:abstract][:warning]
     warnings << abstract_warning[:message] if abstract_warning
@@ -275,12 +275,11 @@ module ArxivMetadataReport
   def self.print_summary(main, comparisons, pdf)
     abstract = comparisons[:abstract]
     abstract_status = abstract[:warning] ? 'warning' : abstract[:availability]
-    puts "Metadata report: main=#{main}, title=#{comparisons[:title][:status]}, authors=#{comparisons[:authors][:status]}, abstract=#{abstract_status}"
+    puts "Metadata report: main=#{main}, title=#{comparisons[:title][:status]}, " \
+         "authors=#{comparisons[:authors][:status]}, abstract=#{abstract_status}"
     puts "  WARNING: #{abstract[:warning][:message]}" if abstract[:warning]
     puts "PDF authors: #{pdf[:status]}" unless pdf[:status] == 'skipped'
-    unless comparisons[:authors][:missing].empty?
-      puts "  missing authors: #{comparisons[:authors][:missing].join(', ')}"
-    end
+    puts "  missing authors: #{comparisons[:authors][:missing].join(', ')}" unless comparisons[:authors][:missing].empty?
     puts "  extra authors: #{comparisons[:authors][:extra].join(', ')}" unless comparisons[:authors][:extra].empty?
     puts '  author order differs' if comparisons[:authors][:order_mismatch]
     if comparisons[:title][:status] == 'mismatch'

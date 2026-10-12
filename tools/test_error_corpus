@@ -53,7 +53,11 @@ class ErrorCorpusRunner
 
   def process_queue(queue, results, mutex, total)
     loop do
-      item = (queue.pop(true) rescue nil)
+      item = begin
+        queue.pop(true)
+      rescue StandardError
+        nil
+      end
       break unless item
 
       run_single_test(item, results, mutex, total)

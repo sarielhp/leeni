@@ -24,7 +24,7 @@ module LaTeXCompatibility
   end
 
   def self.candidate_texmf_dirs(options = {})
-    return [] if (ENV['LEENI_DISABLE_BUNDLED_REVTeX'] || ENV['LATEX_IT_DISABLE_BUNDLED_REVTeX']) == '1'
+    return [] if (ENV['LEENI_DISABLE_BUNDLED_REVTeX'] || ENV.fetch('LATEX_IT_DISABLE_BUNDLED_REVTeX', nil)) == '1'
 
     cfg = options[:revtex4].is_a?(Hash) ? options[:revtex4] : {}
     return [] if cfg['enabled'] == false

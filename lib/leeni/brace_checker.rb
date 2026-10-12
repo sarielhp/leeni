@@ -27,19 +27,19 @@ class LaTeXBraceChecker
   # choices such as = : - . ; ( < were not recognised and braces inside the
   # verbatim text were counted. Listing '*' as a delimiter also broke the
   # starred form \verb*|...|, which hunted for a second '*'.
-  INLINE_VERBATIM_PATTERN = /\A\\(?:verb|lstinline|mintinline)\*?(?:\[[^\]]*\])?(?:\{[a-zA-Z]+\})?([^a-zA-Z0-9\s])(.*?)\1/.freeze
+  INLINE_VERBATIM_PATTERN = /\A\\(?:verb|lstinline|mintinline)\*?(?:\[[^\]]*\])?(?:\{[a-zA-Z]+\})?([^a-zA-Z0-9\s])(.*?)\1/
 
   # A '%' inside a URL argument is a percent-escape, not a comment. Consuming
   # the whole argument here keeps scan_line's comment handling from truncating
   # the line and reporting the macro's own brace as unclosed. \href takes only
   # its first argument; the second is ordinary text and is scanned normally.
-  URL_ARGUMENT_PATTERN = /\A\\(?:url|nolinkurl|path|href)\{[^{}]*\}/.freeze
+  URL_ARGUMENT_PATTERN = /\A\\(?:url|nolinkurl|path|href)\{[^{}]*\}/
 
   MACRO_DEFINITION_PATTERN = /\\(?:(?:re)?new(?:command|environment)|providecommand|
-                               DeclareRobustCommand|(?:e|g|x)?def)\b/x.freeze
+                               DeclareRobustCommand|(?:e|g|x)?def)\b/x
 
-  LABEL_TOKEN_PATTERN = /\\(?:begin\{(figure\*?|table\*?|algorithm|listing|subfigure|subtable|equation\*|align\*|gather\*|multline\*|flalign\*)\}|end\{(figure\*?|table\*?|algorithm|listing|subfigure|subtable|equation\*|align\*|gather\*|multline\*|flalign\*)\}|caption\b|subcaption\b|label\{([^}]+)\})/.freeze
-  VERBATIM_START_PATTERN = /\\begin\{(#{Regexp.union(VERBATIM_ENVS).source})\}/.freeze
+  LABEL_TOKEN_PATTERN = /\\(?:begin\{(figure\*?|table\*?|algorithm|listing|subfigure|subtable|equation\*|align\*|gather\*|multline\*|flalign\*)\}|end\{(figure\*?|table\*?|algorithm|listing|subfigure|subtable|equation\*|align\*|gather\*|multline\*|flalign\*)\}|caption\b|subcaption\b|label\{([^}]+)\})/
+  VERBATIM_START_PATTERN = /\\begin\{(#{Regexp.union(VERBATIM_ENVS).source})\}/
 
   def self.check_file(path)
     return [] unless File.file?(path)
@@ -136,7 +136,7 @@ class LaTeXBraceChecker
       text: msg,
       alert_type: alert_type,
       base_color: :red,
-      index: 50000 + line_no
+      index: 50_000 + line_no
     }
   end
 
@@ -212,9 +212,9 @@ class LaTeXBraceChecker
   end
 
   def match_env_or_macro(rest, line_no, bs_start)
-    if !@in_macro_definition && rest =~ /\A\\begin\{([a-zA-Z0-9_\*]+)\}/
+    if !@in_macro_definition && rest =~ /\A\\begin\{([a-zA-Z0-9_*]+)\}/
       handle_begin_env(Regexp.last_match(1), line_no, bs_start, Regexp.last_match(0).length)
-    elsif !@in_macro_definition && rest =~ /\A\\end\{([a-zA-Z0-9_\*]+)\}/
+    elsif !@in_macro_definition && rest =~ /\A\\end\{([a-zA-Z0-9_*]+)\}/
       process_env_end(Regexp.last_match(1), line_no)
       bs_start + Regexp.last_match(0).length
     elsif rest =~ /\A\\\[/
@@ -239,9 +239,9 @@ class LaTeXBraceChecker
   end
 
   def process_bracket_open
-    if @brace_stack.any?
-      @brace_stack.last[:bracket_depth] = (@brace_stack.last[:bracket_depth] || 0) + 1
-    end
+    return unless @brace_stack.any?
+
+    @brace_stack.last[:bracket_depth] = (@brace_stack.last[:bracket_depth] || 0) + 1
   end
 
   def process_bracket_close(line_no, col)
@@ -249,7 +249,7 @@ class LaTeXBraceChecker
 
     curr = @brace_stack.last
     depth = curr[:bracket_depth] || 0
-    if depth > 0
+    if depth.positive?
       curr[:bracket_depth] = depth - 1
     else
       curr[:mismatch] ||= {
@@ -295,7 +295,8 @@ class LaTeXBraceChecker
       target_env = unclosed[:env]
       msg = if target_env
               end_str = target_env[:end_line] ? " (ended at line #{target_env[:end_line]})" : ''
-              "Unclosed open brace '{' (opened on line #{unclosed[:line]}, col #{unclosed[:col]}) inside environment '#{target_env[:name]}'#{end_str}"
+              "Unclosed open brace '{' (opened on line #{unclosed[:line]}, col #{unclosed[:col]}) " \
+                "inside environment '#{target_env[:name]}'#{end_str}"
             else
               "Unclosed open brace '{' (opened on line #{unclosed[:line]}, col #{unclosed[:col]}) reached end of file"
             end

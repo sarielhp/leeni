@@ -10,7 +10,7 @@ class TestVisualVerification < Minitest::Test
   load File.expand_path('../leeni', __dir__)
   Status = Struct.new(:exitstatus) do
     def success?
-      exitstatus == 0
+      exitstatus.zero?
     end
   end
 
@@ -151,7 +151,7 @@ class TestVisualVerification < Minitest::Test
       zip = File.join(Dir.pwd, 'archive.zip')
       File.write(zip, 'archive')
       compile = build_short_circuit_compile
-      visual = lambda { flunk 'visual check should be short-circuited' }
+      visual = -> { flunk 'visual check should be short-circuited' }
       run_short_circuit_verification(packager, zip, compile, visual)
     end
   end

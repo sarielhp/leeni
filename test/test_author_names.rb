@@ -26,21 +26,21 @@ class TestAuthorNames < Minitest::Test
       "\\author{Ren\\'e Descartes}" => 'Rene Descartes',
       "\\author{Erd\\H{o}s P\\'al}" => 'Erdos Pal',
       "\\author{\\v{S}imon Nov\\'{a}k}" => 'Simon Novak',
-      "\\author{Anna \\u{G}orski}" => 'Anna Gorski',
-      "\\author{Jan \\r{A}berg}" => 'Jan Aberg',
-      "\\author{Ola \\k{E}ski}" => 'Ola Eski',
-      "\\author{Ivan \\.Zukov}" => 'Ivan Zukov'
+      '\\author{Anna \\u{G}orski}' => 'Anna Gorski',
+      '\\author{Jan \\r{A}berg}' => 'Jan Aberg',
+      '\\author{Ola \\k{E}ski}' => 'Ola Eski',
+      '\\author{Ivan \\.Zukov}' => 'Ivan Zukov'
     }.each { |src, expected| assert_clean_name(src, expected) }
   end
 
   def test_ligature_macros_are_resolved
     {
-      "\\author{Lars J\\o rgensen}" => 'Lars Jorgensen',
-      "\\author{Stanis\\l{}aw Ulam}" => 'Stanislaw Ulam',
-      "\\author{Nils \\AA berg}" => 'AA berg',
-      "\\author{Hans Wei\\ss mann}" => 'Hans Weissmann',
-      "\\author{Ren\\ae Dubois}" => 'Renae Dubois'
-    }.each do |src, _expected|
+      '\\author{Lars J\\o rgensen}' => 'Lars Jorgensen',
+      '\\author{Stanis\\l{}aw Ulam}' => 'Stanislaw Ulam',
+      '\\author{Nils \\AA berg}' => 'AA berg',
+      '\\author{Hans Wei\\ss mann}' => 'Hans Weissmann',
+      '\\author{Ren\\ae Dubois}' => 'Renae Dubois'
+    }.each_key do |src|
       names = names_for(src)
       refute_empty names
       refute_includes names.first, '\\',
@@ -59,7 +59,7 @@ class TestAuthorNames < Minitest::Test
 
   def test_trailing_double_backslash_before_closing_brace
     names = names_for("\\author{Alice \\\\\nBob \\\\}")
-    assert_equal ['Alice', 'Bob'], names
+    assert_equal %w[Alice Bob], names
 
     title = LaTeXMetaExtractor.extract_title("\\title{First Line \\\\\nSecond Line \\\\}")
     assert_includes title, 'First Line'

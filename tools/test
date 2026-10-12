@@ -1,0 +1,103 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Tiered leeni test runner. The full tier includes every test file.
+require 'open3'
+require 'optparse'
+require 'etc'
+
+module LeeniTestSuite
+  COLORS = { green: "\e[32m", red: "\e[31m", cyan: "\e[36m", bold: "\e[1m", reset: "\e[0m" }.freeze
+  FAST_TESTS = %w[
+    test_error_catalog.rb test_flattener.rb test_jsonc_parser.rb
+    test_brace_checker.rb test_author_names.rb test_compile_format.rb
+    test_diagnostic_record.rb test_presenters.rb
+    test_log_recognisers.rb test_deep_diagnostics.rb test_diagnostic_formatting.rb
+    test_repair_failures.rb test_config.rb test_color_theme.rb test_cli_spellings.rb
+    test_author_verification.rb test_visual_verification.rb test_compatibility.rb
+    test_arxiv_worker.rb test_arxiv_fixups.rb test_sample_arxiv.rb test_bump.rb
+  ].freeze
+  MEDIUM_TESTS = %w[
+    test_compile_mode.rb test_pathological_latex.rb test_llm_mode.rb test_json_mode.rb
+    test_bib_integration.rb test_bws_review.rb test_bib_extractor.rb
+    test_raw_mode.rb test_metadata_report_review.rb test_arxiv_runner_review.rb
+    test_build_cache.rb test_vim_integration.rb test_destructive_paths.rb test_zip_alone.rb
+    test_arxiv.rb test_config_save.rb test_code_metrics.rb test_convergence_loop.rb
+    test_sample_arxiv_review.rb test_arxiv_cycle.rb test_emacs_auctex.rb
+  ].freeze
+  FULL_TESTS = Dir.glob(File.expand_path('../test/test_*.rb', __dir__)).map { |path| File.basename(path) }.freeze
+  TIERS = { fast: FAST_TESTS, medium: MEDIUM_TESTS + FAST_TESTS,
+            full: FULL_TESTS }.freeze
+
+  def self.run!(tier)
+    started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+    root = File.expand_path('..', __dir__)
+    Dir.chdir(root) { run_tests!(TIERS.fetch(tier)) }
+    elapsed = (Process.clock_gettime(Process::CLOCK_MONOTONIC) - started).round(2)
+    puts color(:green, "#{color(:bold, 'All')} #{tier} tests passed in #{elapsed}s!")
+  rescue KeyError
+    abort 'test: unknown tier'
+  end
+
+  def self.run_tests!(files)
+    puts "--> #{color(:cyan, '[tests]')} #{files.length} test files (with -w)..."
+    queue = Queue.new
+    # Queue longest-running tests first to optimize thread pool utilization
+    files.each { |name| queue << name }
+    failures = []
+    mutex = Mutex.new
+    max_workers = begin
+      Etc.nprocessors
+    rescue StandardError
+      4
+    end
+    worker_count = [max_workers, files.length].min
+    threads = worker_count.times.map do
+      Thread.new do
+        while (name = begin
+          queue.pop(true)
+        rescue StandardError
+          nil
+        end)
+          file = File.join('test', name)
+          output, status = run_test(file)
+          has_warning = output.lines.any? { |line| line.include?('warning:') }
+          mutex.synchronize { failures << [file, output] } if !status.success? || has_warning
+        end
+      end
+    end
+    threads.each(&:join)
+    return if failures.empty?
+
+    failures.each { |file, output| warn color(:red, "❌ Failure or warning in #{file}:\n") + output }
+    exit 1
+  end
+
+  def self.run_test(file)
+    Open3.capture2e('ruby', '-w', '-I.', file)
+  end
+
+  def self.abort_failure(label, output)
+    warn color(:red, "❌ #{label}:")
+    warn output
+    exit 1
+  end
+
+  def self.color(name, text)
+    "#{COLORS.fetch(name)}#{text}#{COLORS[:reset]}"
+  end
+end
+
+options = { tier: :fast }
+OptionParser.new do |opts|
+  opts.banner = 'Usage: tools/test [--fast|--medium|--full]'
+  opts.on('--fast', 'syntax and deterministic unit tests (default)') { options[:tier] = :fast }
+  opts.on('--medium', 'fast checks plus practical real-LaTeX integration tests') { options[:tier] = :medium }
+  opts.on('--full', 'medium checks plus long integration, BWS, visual, and corpus checks') { options[:tier] = :full }
+  opts.on('-h', '--help', 'show this help') do
+    puts opts
+    exit
+  end
+end.parse!
+abort "test: unexpected arguments: #{ARGV.join(' ')}" unless ARGV.empty?
+LeeniTestSuite.run!(options[:tier])

@@ -10,7 +10,7 @@ class TestRepairFailures < Minitest::Test
   load File.expand_path('../leeni', __dir__)
   Status = Struct.new(:exitstatus) do
     def success?
-      exitstatus == 0
+      exitstatus.zero?
     end
   end
 
@@ -182,18 +182,22 @@ class TestRepairFailures < Minitest::Test
   end
 
   def test_pdf_mismatch_and_failed_extraction_are_not_matches
-    [["different text", 0], ["same text", 1]].each do |text, code|
-      with_project do |builder|
-        command = lambda do |*_args|
-          @extract_calls += 1
-          [@extract_calls == 1 ? 'same text' : text, Status.new(code)]
-        end
-        @extract_calls = 0
-        capture_io do
-          LaTeXUtils.stub(:command_available?, true) do
-            Open3.stub(:capture2e, command) do
-              refute LatexPackager.new(builder).send(:verify_pdf_diff, 'paper.pdf', 'junk/paper.pdf')
-            end
+    [['different text', 0], ['same text', 1]].each do |text, code|
+      assert_pdf_diff_mismatch(text, code)
+    end
+  end
+
+  def assert_pdf_diff_mismatch(text, code)
+    with_project do |builder|
+      command = lambda do |*_args|
+        @extract_calls += 1
+        [@extract_calls == 1 ? 'same text' : text, Status.new(code)]
+      end
+      @extract_calls = 0
+      capture_io do
+        LaTeXUtils.stub(:command_available?, true) do
+          Open3.stub(:capture2e, command) do
+            refute LatexPackager.new(builder).send(:verify_pdf_diff, 'paper.pdf', 'junk/paper.pdf')
           end
         end
       end
@@ -260,15 +264,17 @@ class TestRepairFailures < Minitest::Test
         signaled_stat = Struct.new(:exitstatus, :termsig, :signaled?, :success?).new(nil, 11, true, false)
         builder.stub(:capture_pass_output, ['', signaled_stat]) do
           builder.stub(:report_errors, ->(_lgx) { @reported = true }) do
-            _out, err = capture_io do
-              refute builder.send(:run_latex_pass, '_1')
-            end
-            assert @reported, 'report_errors was not called on fatal signal'
-            assert_includes err, 'LaTeX engine terminated by signal 11 (fatal crash).'
+            assert_signaled_latex_pass(builder)
           end
         end
       end
     end
+  end
+
+  def assert_signaled_latex_pass(builder)
+    _out, err = capture_io { refute builder.send(:run_latex_pass, '_1') }
+    assert @reported, 'report_errors was not called on fatal signal'
+    assert_includes err, 'LaTeX engine terminated by signal 11 (fatal crash).'
   end
 
   def test_bibliography_timeout_aborts_cleanly_and_preserves_previous
@@ -361,7 +367,10 @@ class TestRepairFailures < Minitest::Test
         fake_wait_thr.define_singleton_method(:join) { |_t = nil| raise Interrupt, 'interrupted' }
 
         fake_stdout = Object.new
-        fake_stdout.define_singleton_method(:read) { sleep 0.01; '' }
+        fake_stdout.define_singleton_method(:read) do
+          sleep 0.01
+          ''
+        end
 
         popen_stub = lambda do |_env, *_cmd, **_opts, &blk|
           blk.call(StringIO.new, fake_stdout, fake_wait_thr)
@@ -414,14 +423,16 @@ class TestRepairFailures < Minitest::Test
       builder.options[:verify] = true
       File.write('paper.zip', 'known-good archive')
       packager = LatexPackager.new(builder)
-      def packager.collect_fls_dependencies(_fls); { figures: [], styles: [], tex_inputs: [] }; end
-      def packager.discover_figure_sources(_figs); []; end
+      def packager.collect_fls_dependencies(_fls) = { figures: [], styles: [], tex_inputs: [] }
+      def packager.discover_figure_sources(_figs) = []
+
       def packager.stage_and_create_zip(zip_name, *_args)
         candidate = send(:archive_candidate_path, zip_name)
         File.write(candidate, 'unverified candidate')
         candidate
       end
-      def packager.verify_archive!(_zip); false; end
+
+      def packager.verify_archive!(_zip) = false
 
       _out, err = capture_io { refute packager.send(:do_package) }
       assert_equal 'known-good archive', File.read('paper.zip')
@@ -470,7 +481,10 @@ class TestRepairFailures < Minitest::Test
     with_project do
       File.write('paper.pdf', '%PDF-1.4')
       checked_commands = []
-      cmd_check = ->(cmd) { checked_commands << cmd; true }
+      cmd_check = lambda { |cmd|
+        checked_commands << cmd
+        true
+      }
       fake_capture = ->(*_cmd) { ["Pages: 17\n", '', Status.new(0)] }
 
       LaTeXUtils.stub(:command_available?, cmd_check) do
@@ -488,7 +502,10 @@ class TestRepairFailures < Minitest::Test
       packager = LatexPackager.new(builder)
       arxiv_packager = LatexArxivPackager.new(builder)
       captured_cmds = []
-      stub_capture = ->(_env, *cmd, **_opts) { captured_cmds << cmd; ['', Status.new(0)] }
+      stub_capture = lambda { |_env, *cmd, **_opts|
+        captured_cmds << cmd
+        ['', Status.new(0)]
+      }
 
       Open3.stub(:capture2e, stub_capture) do
         capture_io do

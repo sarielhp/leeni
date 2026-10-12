@@ -33,17 +33,17 @@ class TestLaTeXConfigAndConventions < Minitest::Test
       FileUtils.mkdir_p(vscode)
       File.write(File.join(vscode, 'tasks.json'), JSON.generate('tasks' => [{ 'label' => 'Build LaTeX (latex_it)' }]))
       File.write(File.join(vscode, 'settings.json'), JSON.generate(
-        'latex-workshop.latex.tools' => [{ 'name' => 'latex_it' }],
-        'latex-workshop.latex.recipes' => [{ 'name' => 'latex_it' }]
-      ))
+                                                       'latex-workshop.latex.tools' => [{ 'name' => 'latex_it' }],
+                                                       'latex-workshop.latex.recipes' => [{ 'name' => 'latex_it' }]
+                                                     ))
 
       LaTeXConfig.create_vscode_template!(dir)
 
       tasks = JSON.parse(File.read(File.join(vscode, 'tasks.json'))).fetch('tasks')
       settings = JSON.parse(File.read(File.join(vscode, 'settings.json')))
-      assert_equal ['Build LaTeX (leeni)'], tasks.map { |task| task.fetch('label') }
-      assert_equal ['leeni'], settings.fetch('latex-workshop.latex.tools').map { |tool| tool.fetch('name') }
-      assert_equal ['leeni'], settings.fetch('latex-workshop.latex.recipes').map { |recipe| recipe.fetch('name') }
+      assert_equal(['Build LaTeX (leeni)'], tasks.map { |task| task.fetch('label') })
+      assert_equal(['leeni'], settings.fetch('latex-workshop.latex.tools').map { |tool| tool.fetch('name') })
+      assert_equal(['leeni'], settings.fetch('latex-workshop.latex.recipes').map { |recipe| recipe.fetch('name') })
     end
   end
 
@@ -136,7 +136,7 @@ class TestLaTeXConfigAndConventions < Minitest::Test
 
       Dir.chdir(dir) do
         builder = LatexBuilder.allocate
-        builder.instance_variable_set(:@options, { junk_dir: 'junk', auto_mirror_subdirs: true, junk_subdirs: ['figs', 'fragment'] })
+        builder.instance_variable_set(:@options, { junk_dir: 'junk', auto_mirror_subdirs: true, junk_subdirs: %w[figs fragment] })
         builder.send(:junk_dir_create)
 
         assert File.directory?('junk/junk')
@@ -184,8 +184,8 @@ class TestLaTeXConfigAndConventions < Minitest::Test
       settings_data = JSON.parse(File.read(settings_path))
       assert_equal 'leeni', settings_data['latex-workshop.latex.recipe.default']
       assert_equal '%DIR%/junk', settings_data['latex-workshop.latex.outDir']
-      assert settings_data['latex-workshop.latex.tools'].any? { |t| t['name'] == 'leeni' }
-      assert settings_data['latex-workshop.latex.recipes'].any? { |r| r['name'] == 'leeni' }
+      assert(settings_data['latex-workshop.latex.tools'].any? { |t| t['name'] == 'leeni' })
+      assert(settings_data['latex-workshop.latex.recipes'].any? { |r| r['name'] == 'leeni' })
     end
   end
 
@@ -319,7 +319,7 @@ class TestLaTeXConfigAndConventions < Minitest::Test
       alias_path = File.join(base, 'alias')
       FileUtils.mkdir_p(project)
       File.symlink(project, alias_path)
-      old_cache = ENV['XDG_CACHE_HOME']
+      old_cache = ENV.fetch('XDG_CACHE_HOME', nil)
       ENV['XDG_CACHE_HOME'] = File.join(base, 'cache')
 
       assert_equal LeeniBuildWorkspace.cache_dir(project), LeeniBuildWorkspace.cache_dir(alias_path)
@@ -330,7 +330,7 @@ class TestLaTeXConfigAndConventions < Minitest::Test
   end
 
   def test_relative_xdg_cache_home_is_ignored
-    previous = ENV['XDG_CACHE_HOME']
+    previous = ENV.fetch('XDG_CACHE_HOME', nil)
     ENV['XDG_CACHE_HOME'] = 'relative-cache'
     assert_equal File.join(Dir.home, '.cache'), LeeniBuildWorkspace.cache_home
   ensure

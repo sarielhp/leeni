@@ -67,7 +67,11 @@ class LaTeXBibLocator
   end
 
   def search_file_for_entry(bib_file, citekey, token)
-    lines = File.readlines(bib_file, encoding: 'UTF-8', chomp: false) rescue []
+    lines = begin
+      File.readlines(bib_file, encoding: 'UTF-8', chomp: false)
+    rescue StandardError
+      []
+    end
     pattern = /^@\w+\s*\{\s*#{Regexp.escape(citekey)}\s*,/i
 
     lines.each_with_index do |line, idx|

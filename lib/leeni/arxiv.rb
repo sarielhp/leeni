@@ -11,6 +11,7 @@ require 'fileutils'
 require 'open3'
 require 'rbconfig'
 require 'tmpdir'
+require_relative 'packaging_shared'
 
 class LatexArxivPackager
   attr_reader :builder, :filename, :bfilename, :bdir, :options
@@ -45,6 +46,7 @@ class LatexArxivPackager
 
     Dir.mktmpdir('leeni_arxiv_stage_') do |stage_dir|
       return false unless stage_arxiv_files(stage_dir)
+
       candidate = build_arxiv_zip(stage_dir, zip_filename)
       return false unless candidate
 
@@ -172,8 +174,8 @@ class LatexArxivPackager
       next unless p =~ /\.(sty|cls|def)$/i
 
       exp = File.expand_path(p)
-      if exp.start_with?(cwd + '/') || exp == cwd || !p.start_with?('/')
-        FileUtils.cp(p, File.join(stage_dir, File.basename(p))) if File.file?(p)
+      if (exp.start_with?(cwd + '/') || exp == cwd || !p.start_with?('/')) && File.file?(p)
+        FileUtils.cp(p, File.join(stage_dir, File.basename(p)))
       end
     end
   end
@@ -186,7 +188,7 @@ class LatexArxivPackager
     fls_path = build_artifact('fls')
     if File.file?(fls_path)
       content = LaTeXUtils.safe_read(fls_path)
-      content.scan(/^INPUT\s+(\S*\/biblatex\/\S+\.(?:sty|cfg|bbx|cbx|lbx|def))$/).flatten.each do |f|
+      content.scan(%r{^INPUT\s+(\S*/biblatex/\S+\.(?:sty|cfg|bbx|cbx|lbx|def))$}).flatten.each do |f|
         harvested << f if File.file?(f)
       end
     end
@@ -222,33 +224,7 @@ class LatexArxivPackager
   end
 
   def copy_preserving_path(src, dest_root)
-    return unless File.exist?(src)
-
-    cwd = Dir.pwd
-    real_cwd = begin
-      File.realpath(cwd)
-    rescue StandardError
-      cwd
-    end
-    real_src = begin
-      File.realpath(src)
-    rescue StandardError
-      nil
-    end
-    return unless real_src && (real_src == real_cwd || real_src.start_with?(real_cwd + File::SEPARATOR))
-
-    expanded = File.expand_path(src)
-    rel_path = if expanded.start_with?(cwd + File::SEPARATOR)
-                 expanded.sub(cwd + File::SEPARATOR, '')
-               elsif real_src.start_with?(real_cwd + File::SEPARATOR)
-                 real_src.sub(real_cwd + File::SEPARATOR, '')
-               else
-                 return
-               end
-
-    dest = File.join(dest_root, rel_path)
-    FileUtils.mkdir_p(File.dirname(dest))
-    FileUtils.cp(src, dest)
+    LaTeXPackagingShared.copy_preserving_path(src, dest_root)
   end
 
   def build_arxiv_zip(stage_dir, zip_filename)
@@ -287,14 +263,15 @@ class LatexArxivPackager
     log_path = build_artifact('log')
     comments = @options[:comments]
 
-    meta = LaTeXMetaExtractor.extract(@filename, '.', pdf_path, fls_path, log_path, comments)
+    meta = LaTeXMetaExtractor.extract(@filename, pdf_path: pdf_path, fls_path: fls_path, log_path: log_path,
+                                                 extra_comments: comments)
     meta_txt = LaTeXMetaExtractor.format_meta_txt(meta)
     LaTeXMetaExtractor.write_meta_file(meta_filename, meta_txt)
   end
 
   def verify_arxiv_sandbox!(zip_filename, reference_pdf = arxiv_reference_pdf)
     zip_abs = File.expand_path(zip_filename)
-    puts Rainbow("==> Verifying arXiv archive in isolated /tmp sandbox...").cyan.bright
+    puts Rainbow('==> Verifying arXiv archive in isolated /tmp sandbox...').cyan.bright
 
     unless LaTeXUtils.command_available?('unzip')
       warn Rainbow("[ERROR] 'unzip' command not found in PATH! Cannot verify archive.").red.bright
@@ -335,7 +312,7 @@ class LatexArxivPackager
       end
       true
     else
-      warn Rainbow("[FAIL] Sandbox verification failed for arXiv package!").red.bright
+      warn Rainbow('[FAIL] Sandbox verification failed for arXiv package!').red.bright
       warn compile_out
       false
     end
@@ -387,13 +364,17 @@ class LatexArxivPackager
     source = LaTeXUtils.safe_read(@filename)
     authors = LaTeXMetaExtractor.extract_author_names(source)
     if authors.empty?
-      warn Rainbow('[FAIL] arXiv verification could not extract any authors from the original source. Add a non-empty \\author declaration.').red.bright
+      message = '[FAIL] arXiv verification could not extract any authors from the original source. ' \
+                'Add a non-empty \\author declaration.'
+      warn Rainbow(message).red.bright
       return false
     end
 
     placeholders = authors.select { |name| arxiv_placeholder_author?(name) }
     unless placeholders.empty?
-      warn Rainbow("[FAIL] arXiv verification found placeholder author name(s): #{placeholders.join(', ')}. Replace Unknown/Anonymous with real names.").red.bright
+      message = "[FAIL] arXiv verification found placeholder author name(s): #{placeholders.join(', ')}. " \
+                'Replace Unknown/Anonymous with real names.'
+      warn Rainbow(message).red.bright
       return false
     end
 
@@ -404,7 +385,9 @@ class LatexArxivPackager
     unless unresolved.empty?
       macros = unresolved.flat_map { |name| name.scan(/\\[a-zA-Z]+|\\./) }.uniq
       warn Rainbow("[FAIL] arXiv verification could not resolve author name(s): #{unresolved.join(', ')}.").red.bright
-      warn Rainbow("        Unrecognised macro(s): #{macros.join(' ')}. Add them to LaTeXMetaExtractor::SYMBOL_ACCENTS, LETTER_ACCENTS or LIGATURE_MACROS.").red
+      message = "        Unrecognised macro(s): #{macros.join(' ')}. " \
+                'Add them to LaTeXMetaExtractor::SYMBOL_ACCENTS, LETTER_ACCENTS or LIGATURE_MACROS.'
+      warn Rainbow(message).red
       return false
     end
 
@@ -454,7 +437,7 @@ class LatexArxivPackager
     expected = arxiv_normalize_name(name)
     return nil if expected.empty? || expected.length < 5
 
-    bound = [2, [1, expected.length / 8].max].min
+    bound = (expected.length / 8).clamp(1, 2)
     words = arxiv_normalize_name(text).split
     count = expected.split.size
     return nil if count.zero?
@@ -528,7 +511,7 @@ class LatexArxivPackager
 
     pages = Dir.glob("#{prefix}-*.ppm").select { |path| File.file?(path) }
     pages.sort_by! { |path| path[/-(\d+)\.ppm\z/, 1].to_i }
-    if pages.empty? || pages.any? { |path| File.size(path).zero? }
+    if pages.empty? || pages.any? { |path| File.empty?(path) }
       warn Rainbow("[FAIL] arXiv visual verification rendered no pages for #{File.basename(pdf)}.").red.bright
       return nil
     end
@@ -551,24 +534,7 @@ class LatexArxivPackager
   end
 
   def sandbox_environment(tmpdir)
-    home = File.join(tmpdir, 'home')
-    texmf_home = File.join(tmpdir, 'texmf-home')
-    texmf_var = File.join(tmpdir, 'texmf-var')
-    texmf_config = File.join(tmpdir, 'texmf-config')
-    texmf_cache = File.join(tmpdir, 'texmf-cache')
-    xdg_config = File.join(tmpdir, 'config')
-    xdg_cache = File.join(tmpdir, 'cache')
-    [home, texmf_home, texmf_var, texmf_config, texmf_cache, xdg_config, xdg_cache].each { |dir| FileUtils.mkdir_p(dir) }
-    ENV.to_h.merge(
-      'HOME' => home,
-      'TEXMFHOME' => texmf_home,
-      'TEXMFVAR' => texmf_var,
-      'TEXMFCONFIG' => texmf_config,
-      'TEXMFCACHE' => texmf_cache,
-      'XDG_CONFIG_HOME' => xdg_config,
-      'XDG_CACHE_HOME' => xdg_cache,
-      'LEENI_DISABLE_BUNDLED_REVTeX' => '1'
-    )
+    LaTeXPackagingShared.sandbox_environment(tmpdir)
   end
 
   def announce_arxiv_completion(zip_filename, meta_filename, file_count)

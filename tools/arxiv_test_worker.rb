@@ -77,7 +77,7 @@ module ArxivTestWorker
     end
 
     def restore_all
-      @restores.keys.each do |p|
+      @restores.each_key do |p|
         restore_one(p)
       rescue SystemCallError
         nil
@@ -115,15 +115,13 @@ module ArxivTestWorker
       @report[:status] = @report[:checks].all? { |c| c[:status] == 'PASS' } ? 'PASS' : 'FAIL'
       save
       @report[:status] == 'PASS' ? 0 : 1
-    rescue Exception => e # ruby-audit: allow-rescue-exception (re-raises SignalException after recording report)
+    rescue StandardError => e
       @report[:status] = 'ERROR'
       @report[:completed] = true
       @report[:error] = "#{e.class}: #{e.message}"
       @report[:backtrace] = e.backtrace&.first(15)
       save
       warn "#{e.class}: #{e.message}"
-      raise if e.is_a?(SignalException)
-
       2
     end
 
@@ -317,10 +315,10 @@ module ArxivTestWorker
       before = File.file?(@counter) ? File.foreach(@counter).count : 0
       started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
       @command_index = (@command_index || 0) + 1
-      log = File.join(@logs, format('%02d-%s.log', @command_index, @active_check))
+      log = File.join(@logs, format('%<index>02d-%<check>s.log', index: @command_index, check: @active_check))
       @last_command = { command: argv, log: log }
       pid = Process.spawn(*argv, chdir: @project, in: File::NULL,
-                          out: log, err: %i[child out], pgroup: true)
+                                 out: log, err: %i[child out], pgroup: true)
       status = wait_bounded(pid, timeout, log)
       after = File.file?(@counter) ? File.foreach(@counter).count : 0
       @last_command.merge!(exit_status: status.exitstatus || (128 + status.termsig),
@@ -331,19 +329,20 @@ module ArxivTestWorker
 
     def wait_bounded(pid, timeout, log)
       deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + timeout
+      completed = false
       loop do
         _, status = Process.waitpid2(pid, Process::WNOHANG)
-        return status if status
-
-        if Process.clock_gettime(Process::CLOCK_MONOTONIC) > deadline
-          reap(pid)
-          raise CheckError, "timed out after #{timeout}s; see #{log}"
+        if status
+          completed = true
+          return status
         end
+
+        raise CheckError, "timed out after #{timeout}s; see #{log}" if Process.clock_gettime(Process::CLOCK_MONOTONIC) > deadline
+
         sleep 0.05
       end
-    rescue Exception # ruby-audit: allow-rescue-exception (reaps child process before re-raising)
-      reap(pid)
-      raise
+    ensure
+      reap(pid) unless completed
     end
 
     def reap(pid)
@@ -385,7 +384,7 @@ module ArxivTestWorker
       @report[:checks] << details.merge(name: name, status: status)
       @report.delete(:running_check)
       save
-      puts "#{status}: #{name}#{details[:detail] ? ' — ' + details[:detail] : ''}"
+      puts "#{status}: #{name}#{' — ' + details[:detail] if details[:detail]}"
       $stdout.flush
     end
 
@@ -396,7 +395,11 @@ module ArxivTestWorker
       File.write(tmp, JSON.pretty_generate(@report) + "\n")
       File.rename(tmp, path)
     rescue SystemCallError => e
-      FileUtils.rm_f(tmp) rescue nil
+      begin
+        FileUtils.rm_f(tmp)
+      rescue StandardError
+        nil
+      end
       warn "arxiv_test_worker: could not persist report: #{e.message}"
     end
   end

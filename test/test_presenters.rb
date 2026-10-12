@@ -26,7 +26,7 @@ class TestPresenters < Minitest::Test
     assert_includes lines[0], "undefined citation 'cite1'"
     assert_includes lines[1], "undefined citation 'cite2'"
     # Fold note for remaining 4
-    assert_equal "leeni: note: 4 more undefined citations in main.tex (pass -a to show all)", lines[2]
+    assert_equal 'leeni: note: 4 more undefined citations in main.tex (pass -a to show all)', lines[2]
     assert_equal 3, lines.size
     # No ANSI escapes
     refute_match(/\e\[/, io.string)
@@ -37,10 +37,10 @@ class TestPresenters < Minitest::Test
     io = StringIO.new
     presenter.render_diagnostics(errors: [], log_tail: "! Emergency stop.\nFatal error\n", file: 'paper.tex', io: io)
     out = io.string
-    assert_includes out, "paper.tex:1: error: compilation failed with unclassified error"
-    assert_includes out, "paper.tex:1: note: compiler log tail:"
-    assert_includes out, "> ! Emergency stop."
-    assert_includes out, "> Fatal error"
+    assert_includes out, 'paper.tex:1: error: compilation failed with unclassified error'
+    assert_includes out, 'paper.tex:1: note: compiler log tail:'
+    assert_includes out, '> ! Emergency stop.'
+    assert_includes out, '> Fatal error'
   end
 
   def test_agent_presenter_suppresses_warnings_when_errors_exist

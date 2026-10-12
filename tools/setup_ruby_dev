@@ -169,14 +169,21 @@ module RubyDevSetup
       installed = false
 
       if RubyDevSetup.command_available?('uv')
-        installed = RubyDevSetup.run_cmd(['uv', 'tool', 'install', 'ast-grep-cli'], verbose: verbose)
+        installed = RubyDevSetup.run_cmd(%w[uv tool install ast-grep-cli], verbose: verbose)
       elsif RubyDevSetup.command_available?('cargo')
         installed = RubyDevSetup.run_cmd(['cargo', 'install', 'ast-grep', '--locked'], verbose: verbose)
       elsif RubyDevSetup.command_available?('npm')
-        installed = RubyDevSetup.run_cmd(['npm', 'install', '-g', '--prefix', RubyDevSetup.local_bindir.sub(%r{/bin\z}, ''), '@ast-grep/cli'], verbose: verbose)
+        installed = RubyDevSetup.run_cmd(
+          ['npm', 'install', '-g', '--prefix', RubyDevSetup.local_bindir.sub(%r{/bin\z}, ''), '@ast-grep/cli'], verbose: verbose
+        )
       end
 
-      puts installed ? "#{GREEN}DONE#{RESET}" : "#{RED}FAILED (Install via 'uv tool install ast-grep-cli' or 'cargo install ast-grep')#{RESET}"
+      status = if installed
+                 "#{GREEN}DONE#{RESET}"
+               else
+                 "#{RED}FAILED (Install via 'uv tool install ast-grep-cli' or 'cargo install ast-grep')#{RESET}"
+               end
+      puts status
     end
 
     def self.check_repomix(check_only, verbose)
@@ -216,9 +223,7 @@ module RubyDevSetup
       else
         print "  [..] Installing #{BOLD}#{name}#{RESET}... "
         installed = false
-        if RubyDevSetup.command_available?('cargo')
-          installed = RubyDevSetup.run_cmd(['cargo', 'install', 'rtk-cli'], verbose: verbose)
-        end
+        installed = RubyDevSetup.run_cmd(%w[cargo install rtk-cli], verbose: verbose) if RubyDevSetup.command_available?('cargo')
         puts installed ? "#{GREEN}DONE#{RESET}" : "#{YELLOW}SKIPPED (Install via 'cargo install rtk-cli' or place in PATH)#{RESET}"
       end
     end

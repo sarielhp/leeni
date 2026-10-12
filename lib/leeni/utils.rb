@@ -117,18 +117,14 @@ module LaTeXUtils
 
   def self.detect_engine_from_magic_comments(content)
     (content.lines.first(50) || []).each do |line|
-      if line =~ /^\s*%\s*!T[eE]X\s+(?:TS-)?(?:program|engine)\s*=\s*(\S+)/i
-        return normalize_engine(Regexp.last_match(1).strip)
-      end
+      return normalize_engine(Regexp.last_match(1).strip) if line =~ /^\s*%\s*!T[eE]X\s+(?:TS-)?(?:program|engine)\s*=\s*(\S+)/i
     end
     nil
   end
 
   def self.detect_engine_from_auctex(content)
     (content.lines.last(40) || []).each do |line|
-      if line =~ /TeX-engine:\s*([a-zA-Z0-9_-]+)/i
-        return normalize_engine(Regexp.last_match(1).strip)
-      end
+      return normalize_engine(Regexp.last_match(1).strip) if line =~ /TeX-engine:\s*([a-zA-Z0-9_-]+)/i
     end
     nil
   end
@@ -166,7 +162,11 @@ module LaTeXUtils
 
     content.gsub(/\r\n?/, "\n").lines.map do |line|
       comment_at = latex_comment_start(line)
-      comment_at ? line[0...comment_at] + (line.end_with?("\n") ? "\n" : '') : line
+      if comment_at
+        line[0...comment_at] + (line.end_with?("\n") ? "\n" : '')
+      else
+        line
+      end
     end.join
   end
 
@@ -274,7 +274,9 @@ module LaTeXUtils
   def self.filter_subcommand_noise(text)
     return '' if text.nil? || text.empty?
 
-    filtered = text.gsub(/(?:kpathsea: Running mktex\S+|mktex\S+: Running mf).*?(?:failed to make \S+|Transcript written on mfput\.log\.)\n?/m, '')
+    filtered = text.gsub(
+      /(?:kpathsea: Running mktex\S+|mktex\S+: Running mf).*?(?:failed to make \S+|Transcript written on mfput\.log\.)\n?/m, ''
+    )
     unwrap_log_lines(filtered)
   end
 
@@ -308,7 +310,7 @@ module LaTeXUtils
   end
 
   def self.bbl_has_entries?(path)
-    return false unless path && File.file?(path) && File.size(path) > 0
+    return false unless path && File.file?(path) && File.size(path).positive?
 
     content = safe_read(path)
     content.include?('\bibitem') || content.include?('\entry{')
@@ -316,9 +318,7 @@ module LaTeXUtils
 
   def self.extract_citation_keys(aux_str, bcf_content = nil)
     keys = aux_str.to_s.scan(/\\citation\{([^}]+)\}/).flatten.flat_map { |s| s.split(',') }.map(&:strip)
-    if bcf_content
-      keys.concat(bcf_content.to_s.scan(/<bcf:citekey[^>]*>([^<]+)<\/bcf:citekey>/).flatten.map(&:strip))
-    end
+    keys.concat(bcf_content.to_s.scan(%r{<bcf:citekey[^>]*>([^<]+)</bcf:citekey>}).flatten.map(&:strip)) if bcf_content
     keys.reject(&:empty?).sort.uniq
   end
 
@@ -327,10 +327,12 @@ module LaTeXUtils
     if tool == :bibtex
       return false if status_ok
       return false if out =~ /I found no \\citation commands/i && out !~ /Illegal end of database|syntax error|I couldn't open/i
+
       true
     elsif tool == :biber
       return false if status_ok && out !~ /> (?:FATAL|ERROR) -/i && out !~ /INFO - ERRORS: [1-9]/i
       return false if out =~ /does not contain any citations/i && out !~ /syntax error/i
+
       true
     else
       !status_ok
@@ -398,7 +400,7 @@ module LaTeXUtils
     exit 1
   end
 
-  def self.relative_path_to_pwd(dir, base = (initial_pwd || Dir.pwd))
+  def self.relative_path_to_pwd(dir, base = initial_pwd || Dir.pwd)
     target_abs = File.expand_path(dir)
     base_abs   = File.expand_path(base)
     rel = Pathname.new(target_abs).relative_path_from(Pathname.new(base_abs)).to_s
@@ -439,7 +441,7 @@ module LaTeXUtils
 
   def self.reset_latex_environment!
     TEX_ENV_VARS.each { |var| ENV.delete(var) }
-    ENV.keys.each do |key|
+    ENV.each_key do |key|
       ENV.delete(key) if key =~ /\A(?:TEX|BIB|BST|LUA|MF|MP)INPUTS/i
     end
   end
@@ -503,7 +505,7 @@ module LaTeXUtils
   end
 
   def self.check_type3_fonts(pdf_path)
-    return nil unless command_available?('pdffonts') && File.file?(pdf_path) && File.size(pdf_path) > 0
+    return nil unless command_available?('pdffonts') && File.file?(pdf_path) && File.size(pdf_path).positive?
 
     stdout, status = Open3.capture2e('pdffonts', pdf_path)
     return nil unless status.success? && stdout.include?('Type 3')
@@ -534,7 +536,7 @@ module LaTeXUtils
   # and unfamiliar syntax remain unknown rather than being assumed scalable.
   TYPE3_VECTOR_OPERATORS = %w[d0 d1 q Q cm m l c v y h re S s f F f* B B* b b* n W W*
                               w J j M d G g RG rg K k].freeze
-  TYPE3_NUMBER = /\A[+-]?(?:\d+(?:\.\d*)?|\.\d+)\z/.freeze
+  TYPE3_NUMBER = /\A[+-]?(?:\d+(?:\.\d*)?|\.\d+)\z/
 
   def self.classify_type3_fonts(pdf_path, objects)
     return :unavailable unless command_available?('mutool')
@@ -595,11 +597,11 @@ module LaTeXUtils
     return message if kind == :vector
 
     message + ' Type 3 does not necessarily mean bitmap. Install MuPDF (the package providing mutool) ' \
-      'and ensure mutool is on PATH to enable automatic vector checks. ' \
-      'Bitmap fonts may look pixelated; check the publisher\'s requirements. ' \
-      'Regenerate affected figures with scalable fonts (for Matplotlib, set pdf.fonttype = 42); ' \
-      'for LaTeX text, consider lmodern. To keep this diagnostic as a warning, ' \
-      'set "alert_as_warning": ["type3_font"] in .l.jsonc or ~/.config/leeni/config.jsonc.'
+              'and ensure mutool is on PATH to enable automatic vector checks. ' \
+              'Bitmap fonts may look pixelated; check the publisher\'s requirements. ' \
+              'Regenerate affected figures with scalable fonts (for Matplotlib, set pdf.fonttype = 42); ' \
+              'for LaTeX text, consider lmodern. To keep this diagnostic as a warning, ' \
+              'set "alert_as_warning": ["type3_font"] in .l.jsonc or ~/.config/leeni/config.jsonc.'
   end
 
   def self.find_type3_font_pages(pdf_path)
@@ -633,11 +635,23 @@ module LaTeXUtils
   end
 
   def self.terminal_width(default: 80, max: nil)
-    w = if ENV['COLUMNS'] =~ /^\d+$/
+    w = if ENV.fetch('COLUMNS', nil) =~ /^\d+$/
           ENV['COLUMNS'].to_i
         else
-          (IO.console&.winsize&.last rescue nil) ||
-            ($stdout.tty? ? ($stdout.winsize[1] rescue nil) : nil)
+          begin
+            IO.console&.winsize&.last
+          rescue StandardError
+            nil
+          end ||
+            (if $stdout.tty?
+               begin
+                 $stdout.winsize[1]
+               rescue StandardError
+                 nil
+               end
+             else
+               nil
+             end)
         end
     return default unless w && w > 30
 
@@ -723,7 +737,7 @@ module LaTeXUtils
 
   def self.shell_quote(str)
     s = str.to_s
-    return s if s.match?(%r{\A[a-zA-Z0-9_.\-\/=:]+\z})
+    return s if s.match?(%r{\A[a-zA-Z0-9_.\-/=:]+\z})
 
     "'#{s.gsub("'", "'\\\\''")}'"
   end
@@ -765,56 +779,4 @@ module LaTeXUtils
   end
 end
 
-class LaTeXIndicator
-  @thr = nil
-  @t0 = nil
-  @active = false
-
-  def self.start(label, enabled: true, delay: 0.2)
-    return unless enabled
-
-    stop(clear: false, enabled: true)
-    already_active = @active
-    @t0 ||= Process.clock_gettime(Process::CLOCK_MONOTONIC)
-
-    if already_active
-      print "\r\e[2K#{Rainbow('  ▸ ').cyan}#{label}"
-      $stdout.flush
-    end
-
-    @thr = Thread.new do
-      unless already_active
-        sleep delay
-        @active = true
-        print "\r\e[2K#{Rainbow('  ▸ ').cyan}#{label}"
-        $stdout.flush
-      end
-
-      loop do
-        sleep 1.0
-        elapsed = (Process.clock_gettime(Process::CLOCK_MONOTONIC) - @t0).round
-        print "\r\e[2K#{Rainbow('  ▸ ').cyan}#{label} [#{elapsed}s]"
-        $stdout.flush
-      end
-    rescue StandardError
-      nil
-    end
-  end
-
-  def self.stop(clear: false, enabled: true)
-    return unless enabled
-
-    if @thr
-      @thr.kill rescue nil
-      @thr.join(0.05) rescue nil
-      @thr = nil
-    end
-
-    if clear
-      print "\r\e[2K" if @active
-      $stdout.flush
-      @active = false
-      @t0 = nil
-    end
-  end
-end
+require_relative 'indicator'

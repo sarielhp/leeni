@@ -24,34 +24,24 @@ class TestRawMode < Minitest::Test
   end
 
   def test_clean_build_dumps_raw_compiler_output_short_flag
-    Dir.mktmpdir('raw_clean_short') do |dir|
-      tex = File.join(dir, 'clean.tex')
-      File.write(tex, <<~TEX)
-        \\documentclass{article}
-        \\begin{document}
-        Testing raw output short flag.
-        \\end{document}
-      TEX
-
-      out, status = Open3.capture2e(@bin_path, '-r', 'clean.tex', chdir: dir)
-      assert_equal 0, status.exitstatus, "Expected exit 0. Output:\n#{out}"
-      assert_match(/Transcript written on|Output written on/i, out, 'Expected raw TeX log output in stdout')
-      assert_includes out, 'clean.pdf', 'Expected reference to clean.pdf in build output'
-      assert File.exist?(File.join(dir, 'clean.pdf')), 'Expected clean.pdf to be generated'
-    end
+    assert_clean_raw_build('-r')
   end
 
   def test_clean_build_dumps_raw_compiler_output_long_flag
-    Dir.mktmpdir('raw_clean_long') do |dir|
+    assert_clean_raw_build('--raw')
+  end
+
+  def assert_clean_raw_build(flag)
+    Dir.mktmpdir('raw_clean') do |dir|
       tex = File.join(dir, 'clean.tex')
       File.write(tex, <<~TEX)
         \\documentclass{article}
         \\begin{document}
-        Testing raw output long flag.
+        Testing raw output.
         \\end{document}
       TEX
 
-      out, status = Open3.capture2e(@bin_path, '--raw', 'clean.tex', chdir: dir)
+      out, status = Open3.capture2e(@bin_path, flag, 'clean.tex', chdir: dir)
       assert_equal 0, status.exitstatus, "Expected exit 0. Output:\n#{out}"
       assert_match(/Transcript written on|Output written on/i, out, 'Expected raw TeX log output in stdout')
       assert_includes out, 'clean.pdf', 'Expected reference to clean.pdf in build output'

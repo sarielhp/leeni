@@ -10,8 +10,8 @@ require_relative '../tools/arxiv_test_worker'
 
 class TestArxivWorker < Minitest::Test
   def worker
-    old_lang = ENV['LANG']
-    old_locale = ENV['LC_ALL']
+    old_lang = ENV.fetch('LANG', nil)
+    old_locale = ENV.fetch('LC_ALL', nil)
     old_encoding = Encoding.default_external
     Dir.mktmpdir('arxiv_worker_review_') do |root|
       File.write(File.join(root, 'test-config.json'), JSON.generate(main: 'paper.tex', engine: 'xelatex'))
@@ -28,7 +28,7 @@ class TestArxivWorker < Minitest::Test
 
   def test_successful_exit_is_insufficient_for_noop_build
     worker do |runner, _|
-      runner.stub(:pdf_state, ['same', 'time']) do
+      runner.stub(:pdf_state, %w[same time]) do
         runner.stub(:compile, { exit_status: 0, passes: 1 }) do
           assert_raises(ArxivTestWorker::CheckError) { runner.unchanged }
         end
@@ -59,7 +59,7 @@ class TestArxivWorker < Minitest::Test
       capture_io { runner.stub(:compile, compiler) { runner.failure_recovery } }
       assert_equal original, File.binread(path)
       report = JSON.parse(File.read(File.join(root, 'test-worker-report.json')))
-      assert_equal %w[FAIL PASS], report.fetch('checks').map { |check| check.fetch('status') }
+      assert_equal(%w[FAIL PASS], report.fetch('checks').map { |check| check.fetch('status') })
     end
   end
 
@@ -101,7 +101,7 @@ class TestArxivWorker < Minitest::Test
 
       Process.stub(:spawn, mock_spawn) do
         runner.stub(:wait_bounded, mock_wait) do
-          runner.command(['echo', 'hello'])
+          runner.command(%w[echo hello])
         end
       end
 
@@ -142,8 +142,8 @@ class TestArxivWorker < Minitest::Test
 
   def test_run_recovers_from_unhandled_exception
     worker do |runner, root|
-      runner.stub(:check, ->(name) { name == 'fresh_build' || name == 'environment' }) do
-        runner.stub(:exercise_build, -> { raise RuntimeError, 'crash in exercise_build' }) do
+      runner.stub(:check, ->(name) { %w[fresh_build environment].include?(name) }) do
+        runner.stub(:exercise_build, -> { raise 'crash in exercise_build' }) do
           exit_code = 0
           capture_io { exit_code = runner.run }
           assert_equal 2, exit_code
@@ -173,7 +173,7 @@ class TestArxivWorker < Minitest::Test
       assert_raises(RuntimeError) do
         runner.with_original(path) do
           File.binwrite(path, 'corrupted')
-          raise RuntimeError, 'boom'
+          raise 'boom'
         end
       end
       assert_equal original, File.binread(path)
@@ -217,8 +217,8 @@ class TestArxivWorker < Minitest::Test
 
   def test_prepare_fails_when_engine_or_leeni_version_probe_fails
     worker do |runner, _root|
-      def runner.executable(_name); '/usr/bin/xelatex'; end
-      def runner.install_engine_wrappers(_candidates); nil; end
+      def runner.executable(_name) = '/usr/bin/xelatex'
+      def runner.install_engine_wrappers(_candidates) = nil
       mock_fail = Minitest::Mock.new
       mock_fail.expect(:success?, false)
       mock_fail.expect(:exitstatus, 1)
@@ -285,7 +285,7 @@ class TestArxivWorker < Minitest::Test
         env_check = report['checks'].find { |c| c['name'] == 'environment' }
         assert_equal 'FAIL', env_check['status']
         skips = report['checks'].reject { |c| c['name'] == 'environment' }
-        assert skips.all? { |c| c['status'] == 'SKIP' }
+        assert(skips.all? { |c| c['status'] == 'SKIP' })
       end
     end
   end

@@ -33,7 +33,10 @@ module ArxivTestCycle
       opts.on('--timeout SECONDS', Float, 'tester timeout (default: 600)') { |v| options[:timeout] = v }
       opts.on('--downloader PATH', 'downloader executable (for testing or alternate samplers)') { |v| options[:downloader] = v }
       opts.on('--tester PATH', 'tester executable (for testing or alternate runners)') { |v| options[:tester] = v }
-      opts.on('-h', '--help', 'show help') { puts opts; exit }
+      opts.on('-h', '--help', 'show help') do
+        puts opts
+        exit
+      end
     end
     parser.parse!(argv)
     raise Error, "unexpected arguments: #{argv.join(' ')}" unless argv.empty?
@@ -93,7 +96,7 @@ module ArxivTestCycle
       return 0
     end
 
-    checks = Array(report && report['checks']).select { |check| check['status'] != 'PASS' }
+    checks = Array(report && report['checks']).reject { |check| check['status'] == 'PASS' }
     puts "POTENTIAL BUGS FOUND: test_arxiv failed for #{sample}."
     checks.each { |check| puts "  #{check['name']}: #{check['detail'] || check['status']}" }
     puts "  Test report: #{File.join(sample, 'test-report.md')}"

@@ -9,7 +9,7 @@ class TestCompileFormat < Minitest::Test
   def test_clean_message_stripping_headers
     # Package warning
     msg1 = 'Package hyperref Warning: Token not allowed in PDF string on input line 42.'
-    assert_equal "[hyperref] Token not allowed in PDF string", LaTeXCompileFormat.clean_message(msg1)
+    assert_equal '[hyperref] Token not allowed in PDF string', LaTeXCompileFormat.clean_message(msg1)
 
     # Package warning with dot in name (pdftex.def regression)
     msg2 = 'Package pdftex.def Warning: Option `pdftex\' not used on input line 15.'
@@ -24,12 +24,16 @@ class TestCompileFormat < Minitest::Test
     assert_equal 'overfull \hbox (15.2pt too wide) in paragraph', LaTeXCompileFormat.clean_message(msg4)
 
     # Font warning with continuation line
-    msg5 = "LaTeX Font Warning: Font shape `TU/lmss/m/sc' in size <10.95> not available\n(Font)              Font shape `TU/lmr/m/sc' tried instead on input line 116."
-    assert_equal "[font] Font shape `TU/lmss/m/sc' in size <10.95> not available, Font shape `TU/lmr/m/sc' tried instead", LaTeXCompileFormat.clean_message(msg5)
+    msg5 = "LaTeX Font Warning: Font shape `TU/lmss/m/sc' in size <10.95> not available\n" \
+           "(Font)              Font shape `TU/lmr/m/sc' tried instead on input line 116."
+    assert_equal "[font] Font shape `TU/lmss/m/sc' in size <10.95> not available, Font shape `TU/lmr/m/sc' tried instead",
+                 LaTeXCompileFormat.clean_message(msg5)
 
     # Inline location noise stripping
-    msg6 = "LaTeX Warning: You have requested, on input line 13, version `2099/01/01' of package amsmath, but only version `2026/05/19' is available."
-    assert_equal "you have requested version `2099/01/01' of package amsmath, but only version `2026/05/19' is available", LaTeXCompileFormat.clean_message(msg6)
+    msg6 = "LaTeX Warning: You have requested, on input line 13, version `2099/01/01' of package amsmath, " \
+           "but only version `2026/05/19' is available."
+    assert_equal "you have requested version `2099/01/01' of package amsmath, but only version `2026/05/19' is available",
+                 LaTeXCompileFormat.clean_message(msg6)
   end
 
   def test_clean_message_trailing_period_and_ellipsis
@@ -49,7 +53,7 @@ class TestCompileFormat < Minitest::Test
     }
 
     rendered = LaTeXCompileFormat.render(rec, color: false)
-    expected = "paper.tex:42:5: error: undefined control sequence \\unknowncmd (hint: Did you mean \\knowncmd?)"
+    expected = 'paper.tex:42:5: error: undefined control sequence \\unknowncmd (hint: Did you mean \\knowncmd?)'
     assert_equal expected, rendered
     assert_match(/\A[^:\n]+:\d+:\d+: error: [^A-Z\n].+[^.\n]\z/, rendered)
   end
@@ -153,7 +157,7 @@ class TestCompileFormat < Minitest::Test
       assert_includes rendered, "\e]8;;file://"
       assert_includes rendered, "\e[1mchap1.tex:42:\e[0m"
       plain = rendered.gsub(/\e\]8;;[^\e]*\e\\/, '').gsub(/\e\[[0-9;]*m/, '')
-      assert_equal "chap1.tex:42: error: undefined control sequence", plain
+      assert_equal 'chap1.tex:42: error: undefined control sequence', plain
     ensure
       Rainbow.enabled = orig
     end

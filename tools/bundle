@@ -28,7 +28,9 @@ module LatexBundler
     config.rb
     build_workspace.rb
     utils.rb
+    indicator.rb
     help_manual.rb
+    cli_help.rb
     brace_checker.rb
     flattener.rb
     meta_extractor.rb
@@ -43,6 +45,7 @@ module LatexBundler
     build_runtime.rb
     builder.rb
     bib_extractor.rb
+    packaging_shared.rb
     packager.rb
     arxiv.rb
     cli_targets.rb

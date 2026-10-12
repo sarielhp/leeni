@@ -31,7 +31,7 @@ module Leeni
         :overfull_box
       elsif msg =~ /underfull \\hbox|underfull \\vbox|too narrow/i
         :underfull_box
-      elsif record[:tier].to_s == 'errors' || record[:tier].to_s == 'error'
+      elsif %w[errors error].include?(record[:tier].to_s)
         :compiler_error
       else
         cat || :general_warning
@@ -107,10 +107,10 @@ module Leeni
       end
 
       remaining = errors.size - primary_errors.size
-      if remaining > 0
-        primary_file = primary_errors.first[:file] || file || 'document'
-        io.puts "leeni: note: #{remaining} more errors in #{primary_file} truncated (resolve initial errors first)"
-      end
+      return unless remaining.positive?
+
+      primary_file = primary_errors.first[:file] || file || 'document'
+      io.puts "leeni: note: #{remaining} more errors in #{primary_file} truncated (resolve initial errors first)"
     end
 
     def render_unparsed_failure(log_tail, file: nil, io: $stderr)
@@ -133,7 +133,7 @@ module Leeni
           visible = items.first(@fold_threshold)
           remainder = items.size - visible.size
           visible.each { |rec| io.puts LaTeXCompileFormat.render(rec, color: false, link: false) }
-          if remainder > 0
+          if remainder.positive?
             file_name = items.first[:file] || 'document.tex'
             name = Presenters.category_name(cat)
             io.puts "leeni: note: #{remainder} more #{name} in #{file_name} (pass -a to show all)"
@@ -145,9 +145,7 @@ module Leeni
       end
 
       # Whatevers (underfull boxes) are emitted only if show_all is true
-      if show_all
-        whatevers.each { |rec| io.puts LaTeXCompileFormat.render(rec, color: false, link: false) }
-      end
+      whatevers.each { |rec| io.puts LaTeXCompileFormat.render(rec, color: false, link: false) } if show_all
 
       folds
     end

@@ -1,99 +1,73 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
-# ==============================================================================
-# tools/install
-#
-# Copies leeni to ~/bin/ and creates symbolic link ~/bin/l -> leeni.
-# Usage: ./tools/install
-# ==============================================================================
-
 require 'fileutils'
-require 'open3'
 require 'optparse'
-load File.expand_path('bundle', __dir__)
+require_relative 'tooling'
 
-module Installer
-  REPO_ROOT   = File.expand_path('..', __dir__)
-  SRC_BIN     = File.join(REPO_ROOT, 'leeni')
-  TARGET_DIR  = File.expand_path('~/bin')
-  TARGET_BIN  = File.join(TARGET_DIR, 'leeni')
-  SHORTCUTS   = %w[l lw ll lp clean_latex latex_file_in_dir].freeze
-  TARGET_LINK = File.join(TARGET_DIR, 'l')
-  TEXMF_SOURCE = File.join(REPO_ROOT, 'vendor', 'revtex4')
+module LeeniInstaller
+  SHORTCUTS = %w[l lw ll lp clean_latex latex_file_in_dir].freeze
+  TEXMF_SOURCE = File.expand_path('../vendor/revtex4', __dir__)
   TEXMF_TARGET = File.expand_path('~/.local/share/leeni/texmf')
 
-  def self.run!(verbose: false)
-    verify_source!
-    FileUtils.mkdir_p(TARGET_DIR)
+  module_function
 
-    puts "==> Installing standalone leeni bundle to #{TARGET_DIR}..." if verbose
-    LatexBundler.write_bundle(TARGET_BIN, verbose: verbose)
+  def run(verbose: false)
+    check_shortcuts
+    raise "compatibility files missing: #{TEXMF_SOURCE}/tex" unless File.directory?(File.join(TEXMF_SOURCE, 'tex'))
 
-    create_symlinks!
-    install_texmf!
+    Tooling.install
+    install_shortcuts
+    install_texmf
+    puts "Program installed: #{ToolSettings::INSTALL_TARGETS.fetch('build/leeni')}"
+    puts "Shortcuts: #{SHORTCUTS.join(', ')}" if verbose
+  end
 
-    if verbose
-      verify_verbose!
-    else
-      puts "Program installed: ~/bin/leeni, ~/bin/l (shortcuts: #{SHORTCUTS[1..].join(', ')})."
+  def install_shortcuts
+    binary = ToolSettings::INSTALL_TARGETS.fetch('build/leeni')
+    SHORTCUTS.each do |name|
+      path = File.join(File.dirname(binary), name)
+      FileUtils.ln_s('leeni', path) unless File.symlink?(path)
+      raise "shortcut verification failed: #{path}" unless File.realpath(path) == File.realpath(binary)
     end
   end
 
-  def self.create_symlinks!
-    Dir.chdir(TARGET_DIR) do
-      SHORTCUTS.each do |name|
-        FileUtils.rm_f(name) if File.exist?(name) || File.symlink?(name)
-        FileUtils.ln_s('leeni', name)
-      end
+  def check_shortcuts
+    binary = ToolSettings::INSTALL_TARGETS.fetch('build/leeni')
+    SHORTCUTS.each do |name|
+      path = File.join(File.dirname(binary), name)
+      raise "shortcut points elsewhere: #{path}" if File.symlink?(path) && File.readlink(path) != 'leeni'
+      raise "shortcut is an unrelated file: #{path}" if File.exist?(path) && !File.symlink?(path)
     end
   end
 
-  def self.install_texmf!
+  def install_texmf
     source = File.join(TEXMF_SOURCE, 'tex')
-    unless File.directory?(source)
-      warn "Error: Compatibility files not found at: #{source}"
-      exit 1
-    end
+    raise "compatibility files missing: #{source}" unless File.directory?(source)
 
     FileUtils.mkdir_p(TEXMF_TARGET)
     FileUtils.cp_r(source, TEXMF_TARGET)
     FileUtils.cp(File.join(TEXMF_SOURCE, 'README.md'), TEXMF_TARGET)
-  end
-
-  def self.verify_source!
-    return if File.file?(SRC_BIN)
-
-    warn "Error: Source executable not found at: #{SRC_BIN}"
-    exit 1
-  end
-
-  def self.verify_verbose!
-    in_path = ENV['PATH'].to_s.split(File::PATH_SEPARATOR).include?(TARGET_DIR)
-    if in_path
-      puts "  [OK] #{TARGET_DIR} is in PATH."
-    else
-      warn "  [WARN] #{TARGET_DIR} is NOT in PATH. Add export PATH=\"$HOME/bin:$PATH\" to your shell profile."
+    Dir.glob(File.join(TEXMF_SOURCE, '**', '*')).select { |path| File.file?(path) }.each do |path|
+      target = File.join(TEXMF_TARGET, path.delete_prefix("#{TEXMF_SOURCE}/"))
+      raise "compatibility file mismatch: #{target}" unless File.binread(path) == File.binread(target)
     end
-
-    version_out, status = Open3.capture2(TARGET_LINK, '-V')
-    if status.success?
-      puts "  [OK] Verified executable: #{version_out.strip}"
-    else
-      warn "  [FAIL] Failed to execute #{TARGET_LINK}"
-    end
-    puts 'Program installed: ~/bin/leeni, ~/bin/l.'
   end
 end
 
-options = { verbose: false }
-OptionParser.new do |opts|
-  opts.banner = 'Usage: ./tools/install [options]'
-  opts.on('-v', '--verbose', 'Show detailed installation and path status') { options[:verbose] = true }
-  opts.on('-h', '--help', 'Show this help message') do
-    puts opts
-    exit 0
-  end
-end.parse!
+if __FILE__ == $PROGRAM_NAME
+  Tooling.entry do
+    options = { verbose: false }
+    OptionParser.new do |parser|
+      parser.banner = 'Usage: tools/install [-v]'
+      parser.on('-v', '--verbose', 'Show installed shortcuts') { options[:verbose] = true }
+      parser.on('-h', '--help', 'Show this help') do
+        puts parser
+        exit 0
+      end
+    end.parse!
+    abort 'Usage: tools/install [-v]' unless ARGV.empty?
 
-Installer.run!(verbose: options[:verbose]) if __FILE__ == $PROGRAM_NAME
+    LeeniInstaller.run(**options)
+  end
+end

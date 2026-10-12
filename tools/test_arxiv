@@ -176,9 +176,7 @@ module ArxivPaperTest
       raise Error, 'unsafe lock file' if File.symlink?(lock_path)
 
       File.open(lock_path, File::CREAT | File::RDWR, 0o644) do |lock|
-        unless lock.flock(File::LOCK_EX | File::LOCK_NB)
-          raise Error, 'another test is already running in this paper directory'
-        end
+        raise Error, 'another test is already running in this paper directory' unless lock.flock(File::LOCK_EX | File::LOCK_NB)
 
         run_locked
       end
@@ -205,9 +203,7 @@ module ArxivPaperTest
     def source
       metadata = JSON.parse(File.read(File.join(@sample, 'metadata.json')))
       name = metadata.fetch('source_filename')
-      unless name.is_a?(String) && !name.empty? && File.basename(name) == name && !name.include?("\0")
-        raise Error, 'unsafe source_filename'
-      end
+      raise Error, 'unsafe source_filename' unless name.is_a?(String) && !name.empty? && File.basename(name) == name && !name.include?("\0")
 
       path = File.join(@sample, name)
       raise Error, 'missing or unsafe source archive' unless File.file?(path) && !File.symlink?(path)

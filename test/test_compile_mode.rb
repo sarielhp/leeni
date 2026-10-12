@@ -192,69 +192,31 @@ class TestCompileMode < Minitest::Test
   end
 
   def test_multiply_defined_label_pinpointing_in_compile_mode
-    Dir.mktmpdir('compile_dup_labels') do |dir|
-      File.write(File.join(dir, 'chap1.tex'), <<~TEX)
-        \\section{Chapter One}
-        \\label{sec:duplicate}
-        Content of chapter one.
-      TEX
-
-      File.write(File.join(dir, 'chap2.tex'), <<~TEX)
-        \\section{Chapter Two}
-        \\label{sec:duplicate}
-        Content of chapter two.
-      TEX
-
-      File.write(File.join(dir, 'main.tex'), <<~TEX)
-        \\documentclass{article}
-        \\begin{document}
-        \\input{chap1}
-        \\input{chap2}
-        \\end{document}
-      TEX
-
-      out, status = Open3.capture2e(@bin_path, '--compile', '--no-color', 'main.tex', chdir: dir)
-      assert_equal 0, status.exitstatus, "Expected exit 0. Output: #{out}"
-
-      lines = out.lines.map(&:strip)
-      loc1 = lines.find { |l| l.include?('chap1.tex:2:') && l.include?("label 'sec:duplicate' duplicate (also at chap2.tex:2)") }
-      loc2 = lines.find { |l| l.include?('chap2.tex:2:') && l.include?("label 'sec:duplicate' duplicate (also at chap1.tex:2)") }
-
-      refute_nil loc1, "Expected location 1 in chap1.tex:2. Output:\n#{out}"
-      refute_nil loc2, "Expected location 2 in chap2.tex:2. Output:\n#{out}"
-      refute_match(/\.aux:1:/, out, 'Must not attribute multiply defined label to the .aux file')
-    end
+    assert_duplicate_label_locations('label', 'sec:duplicate')
   end
 
   def test_multiply_defined_label_with_macro_in_compile_mode
-    Dir.mktmpdir('compile_macro_dup') do |dir|
-      File.write(File.join(dir, 'chap1.tex'), <<~TEX)
-        \\section{Chapter One}
-        \\mylabel{sec:custom}
-        Content of chapter one.
-      TEX
+    assert_duplicate_label_locations('mylabel', 'sec:custom', macro: true)
+  end
 
-      File.write(File.join(dir, 'chap2.tex'), <<~TEX)
-        \\section{Chapter Two}
-        \\mylabel{sec:custom}
-        Content of chapter two.
-      TEX
-
-      File.write(File.join(dir, 'main.tex'), <<~TEX)
-        \\documentclass{article}
-        \\newcommand{\\mylabel}[1]{\\label{#1}}
-        \\begin{document}
-        \\input{chap1}
-        \\input{chap2}
-        \\end{document}
-      TEX
-
+  def assert_duplicate_label_locations(command, label, macro: false)
+    Dir.mktmpdir('compile_dup_labels') do |dir|
+      %w[One Two].each_with_index do |chapter, index|
+        File.write(File.join(dir, "chap#{index + 1}.tex"), <<~TEX)
+          \\section{Chapter #{chapter}}
+          \\#{command}{#{label}}
+          Content of chapter #{chapter.downcase}.
+        TEX
+      end
+      definition = macro ? "\\newcommand{\\mylabel}[1]{\\label{#1}}\n" : ''
+      File.write(File.join(dir, 'main.tex'), "\\documentclass{article}\n#{definition}" \
+                                             "\\begin{document}\n\\input{chap1}\n\\input{chap2}\n\\end{document}\n")
       out, status = Open3.capture2e(@bin_path, '--compile', '--no-color', 'main.tex', chdir: dir)
       assert_equal 0, status.exitstatus, "Expected exit 0. Output: #{out}"
 
       lines = out.lines.map(&:strip)
-      loc1 = lines.find { |l| l.include?('chap1.tex:2:') && l.include?("label 'sec:custom' duplicate (also at chap2.tex:2)") }
-      loc2 = lines.find { |l| l.include?('chap2.tex:2:') && l.include?("label 'sec:custom' duplicate (also at chap1.tex:2)") }
+      loc1 = lines.find { |l| l.include?('chap1.tex:2:') && l.include?("label '#{label}' duplicate (also at chap2.tex:2)") }
+      loc2 = lines.find { |l| l.include?('chap2.tex:2:') && l.include?("label '#{label}' duplicate (also at chap1.tex:2)") }
 
       refute_nil loc1, "Expected location 1 in chap1.tex:2. Output:\n#{out}"
       refute_nil loc2, "Expected location 2 in chap2.tex:2. Output:\n#{out}"
@@ -302,14 +264,12 @@ class TestCompileMode < Minitest::Test
       output = String.new
       require 'pty'
       PTY.spawn(env, 'bash', '-c', cmd) do |r, _w, _pid|
-        begin
-          r.each_line { |line| output << line }
-        rescue Errno::EIO
-          # Linux PTY raises Errno::EIO on EOF
-        end
+        r.each_line { |line| output << line }
+      rescue Errno::EIO
+        # Linux PTY raises Errno::EIO on EOF
       end
       assert_includes output, "\e]8;;file://"
-      assert_includes output, "doc.tex:3:1:"
+      assert_includes output, 'doc.tex:3:1:'
       assert_includes output, "\e]8;;\e\\"
     end
   end

@@ -22,7 +22,7 @@ class TestBibIntegration < Minitest::Test
         \bibliography{refs}
         \end{document}
       TEX
-      bib_content = <<~'BIB'
+      bib_content = <<~BIB
         @article{testentry,
           author = {Euler, Leonhard},
           title = {On something interesting},
@@ -42,7 +42,7 @@ class TestBibIntegration < Minitest::Test
 
   def test_bib_locator_resolution
     Dir.mktmpdir('bib_locator_test') do |dir|
-      bib_content = <<~'BIB'
+      bib_content = <<~BIB
         @article{Alpha:2000,
           author = {Author, A.},
           title = {First Paper},
@@ -94,7 +94,9 @@ class TestBibIntegration < Minitest::Test
   def test_decluster_errors
     diag_class = Class.new do
       include LaTeXDiagnostics
+
       attr_accessor :options, :filename
+
       def initialize
         @options = {}
         @filename = 'test.tex'
@@ -120,7 +122,7 @@ class TestBibIntegration < Minitest::Test
 
   def test_companion_generation_and_sorting
     Dir.mktmpdir('companion_test') do |dir|
-      bib_content = <<~'BIB'
+      bib_content = <<~BIB
         @article{Key1:2020,
           author = {Doe, John},
           journal = {BAD_MACRO},
@@ -133,7 +135,9 @@ class TestBibIntegration < Minitest::Test
 
       diag_class = Class.new do
         include LaTeXDiagnostics
+
         attr_accessor :options, :filename, :bfilename
+
         def initialize(bfilename, search_dir)
           @options = {}
           @filename = 'book.tex'
@@ -176,7 +180,7 @@ class TestBibIntegration < Minitest::Test
         refute_match(/^\s*3:\s*:/, companion[:formatted])
 
         # Verify sorting: primary file is first, companion is second
-        all_sorted, _, _ = diag.sort_diagnostic_items([], prepared)
+        all_sorted, = diag.sort_diagnostic_items([], prepared)
         assert_equal './01_intro/intro.tex', all_sorted[0][:file]
         assert_equal bib_file, all_sorted[1][:file]
 
@@ -189,7 +193,8 @@ class TestBibIntegration < Minitest::Test
   end
 
   def test_wrap_text_hanging_indent_and_ansi
-    text = '▸ 9 more errors were detected across 8 other files (23_two_choices/two_choices.tex, 26_jl/jl.tex, 30_lsh/lsh.tex, and 5 more files).'
+    text = '▸ 9 more errors were detected across 8 other files ' \
+           '(23_two_choices/two_choices.tex, 26_jl/jl.tex, 30_lsh/lsh.tex, and 5 more files).'
     wrapped = LaTeXUtils.wrap_text(text, width: 60)
     lines = wrapped.lines.map(&:chomp)
 
@@ -250,7 +255,7 @@ class TestBibIntegration < Minitest::Test
       assert File.file?(pdf_path), 'Expected main.pdf to be generated'
 
       # Verify cross-references were resolved on pass 2
-      txt, _ = Open3.capture2('pdftotext', pdf_path, '-')
+      txt, = Open3.capture2('pdftotext', pdf_path, '-')
       assert_includes txt, 'See section 1'
 
       # Second run untouched: should be up to date
@@ -298,7 +303,7 @@ class TestBibIntegration < Minitest::Test
         \printbibliography
         \end{document}
       TEX
-      bib = <<~'BIB'
+      bib = <<~BIB
         @article{itemA,
           author = {Author, Real},
           title = {A Valid Title},
@@ -311,7 +316,7 @@ class TestBibIntegration < Minitest::Test
 
       bin_path = File.expand_path('../leeni', __dir__)
       # Pass 1: compiles with missingKey
-      out1, _ = Open3.capture2e(bin_path, 'main.tex', chdir: dir)
+      out1, = Open3.capture2e(bin_path, 'main.tex', chdir: dir)
       assert File.exist?(File.join(dir, 'main.bbl')), 'Expected main.bbl to be created'
       assert_includes out1, 'missingKey'
 
@@ -347,7 +352,7 @@ class TestBibIntegration < Minitest::Test
         \printbibliography
         \end{document}
       TEX
-      bib1 = <<~'BIB'
+      bib1 = <<~BIB
         @article{itemA,
           author = {Initial, Author},
           title = {Initial Title},
@@ -362,7 +367,7 @@ class TestBibIntegration < Minitest::Test
       _out1, status1 = Open3.capture2e(bin_path, 'main.tex', chdir: dir)
       assert_equal 0, status1.exitstatus
       pdf_path = File.join(dir, 'main.pdf')
-      txt1, _ = Open3.capture2('pdftotext', pdf_path, '-')
+      txt1, = Open3.capture2('pdftotext', pdf_path, '-')
       assert_includes txt1, 'Initial Title'
 
       # Update refs.bib content, but forcibly backdate its mtime to be older than main.bbl!
@@ -374,7 +379,7 @@ class TestBibIntegration < Minitest::Test
 
       _out2, status2 = Open3.capture2e(bin_path, 'main.tex', chdir: dir)
       assert_equal 0, status2.exitstatus
-      txt2, _ = Open3.capture2('pdftotext', pdf_path, '-')
+      txt2, = Open3.capture2('pdftotext', pdf_path, '-')
       assert_includes txt2, 'Updated Title', 'Biber should rerun because .bib content hash changed'
     end
   end
@@ -390,7 +395,7 @@ class TestBibIntegration < Minitest::Test
         \printbibliography
         \end{document}
       TEX
-      bib = <<~'BIB'
+      bib = <<~BIB
         @article{itemA,
           author = {Author, Real},
           title = {A Valid Title},
@@ -428,7 +433,7 @@ class TestBibIntegration < Minitest::Test
         \printbibliography
         \end{document}
       TEX
-      bib = <<~'BIB'
+      bib = <<~BIB
         @article{itemA,
           author = {Author, Real},
           title = {A Valid Title},

@@ -80,13 +80,13 @@ class TestDeepDiagnostics < Minitest::Test
     ]
     builder.stub(:extract_alerts, items) do
       alerts, warnings, whatevers = builder.partition_diagnostics('', [])
-      assert_equal [:unnumbered_label], alerts.map { |item| item[:alert_type] }
-      assert_equal %i[type3_font inverted_label], warnings.map { |item| item[:alert_type] }
-      assert warnings.all? { |item| item[:tier] == 'warnings' && item[:base_color] == :yellow }
+      assert_equal([:unnumbered_label], alerts.map { |item| item[:alert_type] })
+      assert_equal(%i[type3_font inverted_label], warnings.map { |item| item[:alert_type] })
+      assert(warnings.all? { |item| item[:tier] == 'warnings' && item[:base_color] == :yellow })
       assert_equal 'Warning: inverted label', warnings.last[:text]
       assert_empty whatevers
       records = builder.collect_compile_records(errors: [], alerts: alerts, warnings: warnings, whatevers: [])
-      assert_equal %w[alerts warnings warnings], records.map { |record| record[:tier] }
+      assert_equal(%w[alerts warnings warnings], records.map { |record| record[:tier] })
     end
   end
 
@@ -298,7 +298,7 @@ class TestDeepDiagnostics < Minitest::Test
                   "(biblatex)                in the database:\n" \
                   "(biblatex)                w-nfm-74\n" \
                   "(biblatex)                Please verify the spelling and rerun\n" \
-                  "(biblatex)                LaTeX afterwards."
+                  '(biblatex)                LaTeX afterwards.'
     condensed = builder.condense_package_warning(raw_warning.lines.map(&:strip).join(' '))
     assert_equal "Package biblatex Warning: Entry 'w-nfm-74' not found in database.", condensed
   end

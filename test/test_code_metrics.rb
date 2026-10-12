@@ -43,7 +43,7 @@ class TestCodeMetrics < Minitest::Test
     Dir.mktmpdir('bundle_exec_test') do |dir|
       bundle_script = File.join(dir, 'leeni')
       File.write(bundle_script, bundle_code)
-      FileUtils.chmod(0755, bundle_script)
+      FileUtils.chmod(0o755, bundle_script)
 
       tex_file = File.join(dir, 'sample.tex')
       File.write(tex_file, "\\documentclass{article}\n\\begin{document}\n\\badcmd\n\\end{document}\n")

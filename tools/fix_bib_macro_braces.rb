@@ -77,10 +77,10 @@ module BibMacroFixer
       exit 1
     end
 
-    unless File.file?(target_file)
-      warn "❌ Error: Target bibliography file not found: #{target_file}"
-      exit 1
-    end
+    return if File.file?(target_file)
+
+    warn "❌ Error: Target bibliography file not found: #{target_file}"
+    exit 1
   end
 
   def self.load_macros(shortcuts_file)
@@ -103,7 +103,11 @@ module BibMacroFixer
 
     lines.each_with_index do |line, idx|
       if (m = line.match(field_regex))
-        indent, field, eq, val, tail = m[1], m[2], m[3], m[4], m[5]
+        indent = m[1]
+        field = m[2]
+        eq = m[3]
+        val = m[4]
+        tail = m[5]
         canonical = macro_map[val.downcase]
         if canonical
           new_line = "#{indent}#{field}#{eq}#{canonical}#{tail}"
@@ -124,7 +128,7 @@ module BibMacroFixer
     puts "Identified #{replacements.size} macro references wrapped in braces."
 
     if replacements.empty?
-      puts "✔ File is clean. No changes needed."
+      puts '✔ File is clean. No changes needed.'
       return
     end
 

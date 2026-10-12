@@ -22,7 +22,7 @@ module LaTeXMetaExtractor
   }.freeze
 
   ARXIV_ACCENTS = {
-    "\u0301" => "\\'", "\u0300" => "\\`", "\u0302" => "\\^",
+    "\u0301" => "\\'", "\u0300" => '\\`', "\u0302" => '\\^',
     "\u0308" => '\\"', "\u0303" => '\\~', "\u0327" => '\\c',
     "\u030a" => '\\r', "\u0304" => '\\=', "\u0306" => '\\u',
     "\u030c" => '\\v', "\u0328" => '\\k', "\u0307" => '\\.'
@@ -55,12 +55,12 @@ module LaTeXMetaExtractor
   TEXT_MACROS_TO_UNWRAP = %w[textbf textit texttt textmd textsc textsl textnormal emph text mathsf mathbf mathit mathrm].freeze
   MATH_FUNCTIONS = %w[log ln exp min max sin cos tan det dim ker].freeze
   MATH_REPLACEMENTS = GREEK_SYMBOLS.merge(MATH_SYMBOLS).merge(MATH_FUNCTIONS.to_h { |f| [f, f] }).freeze
-  MATH_TOKEN_PATTERN = /\\(#{Regexp.union(MATH_REPLACEMENTS.keys.sort_by { |k| -k.length }).source})\b/.freeze
-  MATH_FONT_PATTERN = /\\(?:mathbb|mathcal|mathfrak)\{([A-Za-z])\}/.freeze
-  MATH_SQRT_PATTERN = /\\sqrt\{([^}]+)\}/.freeze
-  MATH_INLINE_PATTERN = /\$([^\$]+)\$/.freeze
+  MATH_TOKEN_PATTERN = /\\(#{Regexp.union(MATH_REPLACEMENTS.keys.sort_by { |k| -k.length }).source})\b/
+  MATH_FONT_PATTERN = /\\(?:mathbb|mathcal|mathfrak)\{([A-Za-z])\}/
+  MATH_SQRT_PATTERN = /\\sqrt\{([^}]+)\}/
+  MATH_INLINE_PATTERN = /\$([^$]+)\$/
 
-  def self.extract(main_tex, base_dir = '.', pdf_path = nil, fls_path = nil, log_path = nil, extra_comments = nil)
+  def self.extract(main_tex, base_dir: '.', pdf_path: nil, fls_path: nil, log_path: nil, extra_comments: nil)
     raw_content = LaTeXUtils.safe_read(File.join(base_dir, main_tex))
     title = extract_title(raw_content)
     authors = extract_authors(raw_content)
@@ -102,7 +102,7 @@ module LaTeXMetaExtractor
         depth += 1
       elsif c == '}' && preceding_backslash_count(text, i).even?
         depth -= 1
-        return text[(start_pos + 1)...i] if depth == 0
+        return text[(start_pos + 1)...i] if depth.zero?
       end
       i += 1
     end
@@ -140,9 +140,9 @@ module LaTeXMetaExtractor
     unwrap_macros(str, TEXT_MACROS_TO_UNWRAP, replace_with_inner: true)
 
     str.gsub!(/\\\\(\[[^\]]*\])?/, ' ')
-    str.gsub!(/\\newline/, ' ')
-    str.gsub!(/~/, ' ')
-    str.gsub!(/\\%/, '%')
+    str.gsub!('\\newline', ' ')
+    str.gsub!('~', ' ')
+    str.gsub!('\\%', '%')
     strip_accent_macros(str)
     str
   end
@@ -249,7 +249,7 @@ module LaTeXMetaExtractor
     authors = []
     raw_blocks.each do |raw|
       str = clean_author_block(raw)
-      str.split(/\\and/).each do |block|
+      str.split('\\and').each do |block|
         lines = block.split(/\\\\|\\newline/).map { |l| parse_single_author_line(l) }
         lines.reject! do |l|
           l.empty? || l =~ /department|university|institute|laboratory|school|college|center|address|\b(?:USA|UK|IL|CA|NY)\b|\d{4,}/i
@@ -342,7 +342,11 @@ module LaTeXMetaExtractor
       next line unless comment_at
 
       prefix = line[0...comment_at]
-      prefix.strip.empty? ? '' : prefix + (line.end_with?("\n") ? "\n" : '')
+      if prefix.strip.empty?
+        ''
+      else
+        prefix + (line.end_with?("\n") ? "\n" : '')
+      end
     end.join
   end
 
@@ -381,8 +385,8 @@ module LaTeXMetaExtractor
 
   def self.format_comments(page_count, fig_count, extra_comments = nil)
     parts = []
-    parts << "#{page_count} #{page_count == 1 ? 'page' : 'pages'}" if page_count && page_count > 0
-    parts << "#{fig_count} #{fig_count == 1 ? 'figure' : 'figures'}" if fig_count && fig_count > 0
+    parts << "#{page_count} #{page_count == 1 ? 'page' : 'pages'}" if page_count&.positive?
+    parts << "#{fig_count} #{fig_count == 1 ? 'figure' : 'figures'}" if fig_count&.positive?
     base = parts.join(', ')
     base += '.' unless base.empty? || base.end_with?('.')
     if extra_comments && !extra_comments.strip.empty?

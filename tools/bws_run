@@ -33,14 +33,16 @@ def copy_source(source, destination)
     stat = File.lstat(path)
     if stat.directory?
       FileUtils.mkdir_p(target)
-    elsif stat.symlink?
-      raise ArgumentError, "source contains symlink: #{relative}"
-    elsif stat.file?
+      next
+    end
+    raise ArgumentError, "source contains symlink: #{relative}" if stat.symlink?
+
+    if stat.file?
       FileUtils.mkdir_p(File.dirname(target))
       FileUtils.cp(path, target)
-    else
-      raise ArgumentError, "source contains a special file: #{relative}"
+      next
     end
+    raise ArgumentError, "source contains a special file: #{relative}"
   end
 end
 
@@ -112,9 +114,7 @@ def validate_options(source, options)
   end
 
   raise ArgumentError, 'source must be a paper directory, not /' if source == '/'
-  if !options[:output] && source == '/tmp'
-    raise ArgumentError, '--output must be outside the source directory'
-  end
+  raise ArgumentError, '--output must be outside the source directory' if !options[:output] && source == '/tmp'
 
   options[:leeni] = File.realpath(options[:leeni])
   options[:bws] = File.expand_path(options[:bws]) if options[:bws].include?(File::SEPARATOR)
@@ -124,9 +124,7 @@ def validate_options(source, options)
   raise ArgumentError, "--output already exists: #{output}" if File.exist?(output) || File.symlink?(output)
 
   output = resolved_output(output)
-  if output == source || output.start_with?("#{source}/")
-    raise ArgumentError, '--output must be outside the source directory'
-  end
+  raise ArgumentError, '--output must be outside the source directory' if output == source || output.start_with?("#{source}/")
 
   options[:output] = output
 end
@@ -162,8 +160,8 @@ def launch(workspace, sandbox_home, staged_latex, options, command)
     'HOME' => sandbox_home,
     'XDG_CONFIG_HOME' => File.join(sandbox_home, '.config'),
     'PATH' => ENV.fetch('PATH', '/usr/bin:/bin'),
-    'USER' => ENV['USER'], 'LOGNAME' => ENV['LOGNAME'],
-    'LANG' => ENV['LANG'], 'TERM' => ENV['TERM'], 'SSH_AUTH_SOCK' => nil
+    'USER' => ENV.fetch('USER', nil), 'LOGNAME' => ENV.fetch('LOGNAME', nil),
+    'LANG' => ENV.fetch('LANG', nil), 'TERM' => ENV.fetch('TERM', nil), 'SSH_AUTH_SOCK' => nil
   }
   File.open(File.join(workspace, 'bws-run.log'), 'w') do |log|
     Open3.popen2e(env, options[:bws], *args, chdir: workspace, unsetenv_others: true,

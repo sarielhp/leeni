@@ -53,6 +53,7 @@ flycheck_*.tex
 .bws/
 
 # Ruby & Bundler
+/build/
 *.gem
 .bundle/
 vendor/bundle/

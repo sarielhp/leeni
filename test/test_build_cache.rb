@@ -275,7 +275,7 @@ class TestBuildCache < Minitest::Test
   def test_bib_files_newer_than_bbl_discovers_bcf_datasources
     Dir.mktmpdir do |dir|
       Dir.chdir(dir) do
-        FileUtils.mkdir_p(['junk', 'ext_bib'])
+        FileUtils.mkdir_p(%w[junk ext_bib])
         bib_file = File.expand_path('ext_bib/my_refs.bib')
         File.write(bib_file, "@book{k, title={T}}\n")
 

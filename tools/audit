@@ -10,5 +10,5 @@ if File.exist?(target)
   end
 else
   warn "Audit standard not installed at #{target}"
-  exit 0
+  exit 1
 end

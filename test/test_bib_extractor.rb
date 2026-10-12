@@ -19,7 +19,7 @@ class TestBibExtractor < Minitest::Test
     dummy_builder = Struct.new(:filename, :bfilename, :bdir, :options).new('test.tex', 'test', '.', {})
     extractor = LaTeXBibExtractor.new(dummy_builder)
 
-    bib_text = <<~'BIB'
+    bib_text = <<~BIB
       @string{ieee = "IEEE"}
       @string{tc = ieee # " Trans. Comp."}
       @comment{Some notes}
@@ -96,7 +96,7 @@ class TestBibExtractor < Minitest::Test
         \end{document}
       TEX
 
-      bib_content = <<~'BIB'
+      bib_content = <<~BIB
         @string{ieee = "IEEE"}
         @string{tc = ieee # " Trans. Comp."}
         @string{unused_string = "Unused"}
@@ -164,7 +164,7 @@ class TestBibExtractor < Minitest::Test
         \end{document}
       TEX
 
-      bib_content = <<~'BIB'
+      bib_content = <<~BIB
         @article{k84,
           author = {Knuth, Donald},
           title = {Literate Programming},
@@ -215,7 +215,7 @@ class TestBibExtractor < Minitest::Test
       extractor = LaTeXBibExtractor.new(dummy_builder)
 
       Dir.chdir(dir) do
-        assert extractor.send(:is_biblatex?)
+        assert extractor.send(:biblatex?)
       end
     end
   end

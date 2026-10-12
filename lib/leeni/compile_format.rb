@@ -13,13 +13,13 @@ module LaTeXCompileFormat
   module_function
 
   SEVERITY = {
-    'errors'    => { label: 'error',            style: :error },
-    'alerts'    => { label: 'warning: [alert]', style: :alert },
-    'warnings'  => { label: 'warning',          style: :warning },
-    'whatevers' => { label: 'note',             style: :note }
+    'errors' => { label: 'error',            style: :error },
+    'alerts' => { label: 'warning: [alert]', style: :alert },
+    'warnings' => { label: 'warning', style: :warning },
+    'whatevers' => { label: 'note', style: :note }
   }.freeze
 
-  WARNING_HEADER_PATTERN = /^(?:LaTeX|Class|Package|\*)(?:\s+[-\w.@*]+)*\s+[Ww]arning:\s*/.freeze
+  WARNING_HEADER_PATTERN = /^(?:LaTeX|Class|Package|\*)(?:\s+[-\w.@*]+)*\s+[Ww]arning:\s*/
 
   def render(record, color: true, link: false)
     loc = format_location(record[:file], record[:line], record[:col], color: color, link: link)
@@ -30,8 +30,8 @@ module LaTeXCompileFormat
   end
 
   def format_location(file, line, col, color: true, link: false)
-    active_line = (line && line.to_i.positive?) ? line.to_i : 1
-    active_col = (col && col.to_i.positive?) ? col.to_i : nil
+    active_line = line&.to_i&.positive? ? line.to_i : 1
+    active_col = col&.to_i&.positive? ? col.to_i : nil
 
     loc_str = active_col ? "#{active_line}:#{active_col}" : active_line.to_s
     raw_loc = "#{file}:#{loc_str}:"
@@ -103,17 +103,18 @@ module LaTeXCompileFormat
   end
 
   def strip_warning_header(text)
-    if text =~ /\A(?:Package|Class)\s+([-\w.@*]+)\s+[Ww]arning:\s*(.*)\z/
+    case text
+    when /\A(?:Package|Class)\s+([-\w.@*]+)\s+[Ww]arning:\s*(.*)\z/
       pkg = Regexp.last_match(1)
       rest = Regexp.last_match(2)
       "[#{pkg}] #{rest}"
-    elsif text =~ /\ALaTeX\s+([-\w.@*]+)\s+[Ww]arning:\s*(.*)\z/i
+    when /\ALaTeX\s+([-\w.@*]+)\s+[Ww]arning:\s*(.*)\z/i
       subsystem = Regexp.last_match(1).downcase
       rest = Regexp.last_match(2)
       "[#{subsystem}] #{rest}"
-    elsif text =~ WARNING_HEADER_PATTERN
+    when WARNING_HEADER_PATTERN
       text.sub(WARNING_HEADER_PATTERN, '')
-    elsif text =~ /\A(?:Alert|Warning|Note|Error):\s*(.*)\z/i
+    when /\A(?:Alert|Warning|Note|Error):\s*(.*)\z/i
       Regexp.last_match(1)
     else
       text
@@ -134,13 +135,11 @@ module LaTeXCompileFormat
 
     # If first token is all-caps or CamelCase (e.g. LaTeX, URL, Overfull, Underfull), handle carefully:
     # Overfull and Underfull should be downcased to overfull / underfull:
-    if text =~ /\A(Overfull|Underfull)\b/
-      return text.sub(/\A\w+/, &:downcase)
-    end
+    return text.sub(/\A\w+/, &:downcase) if text =~ /\A(Overfull|Underfull)\b/
 
     # Don't lowercase words with multiple uppercase letters (LaTeX, BibTeX, PDFDocEncoding, etc.)
     first_word = text.split(/\s+/, 2).first
-    if first_word =~ /\A[A-Z][a-z0-9_\-]*\z/
+    if first_word =~ /\A[A-Z][a-z0-9_-]*\z/
       text.sub(/\A[A-Z]/, &:downcase)
     else
       text

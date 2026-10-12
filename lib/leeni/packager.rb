@@ -13,6 +13,7 @@ require 'open3'
 require 'rbconfig'
 require 'tmpdir'
 require_relative 'flattener'
+require_relative 'packaging_shared'
 
 class LatexPackager
   attr_reader :builder, :filename, :bfilename, :bdir, :options
@@ -76,12 +77,14 @@ class LatexPackager
       next unless line.start_with?('INPUT ')
 
       path = line.sub(/^INPUT\s+/, '').strip
-      next if path.empty? || path.start_with?("#{junk_dir}/") || path.start_with?('junk/') || path.start_with?('.junk/') || system_texmf_file?(path)
+      next if path.empty? || path.start_with?("#{junk_dir}/") || path.start_with?('junk/') ||
+              path.start_with?('.junk/') || system_texmf_file?(path)
+
       workspace_abs = File.expand_path(junk_dir)
       next if File.expand_path(path).start_with?(workspace_abs + File::SEPARATOR)
 
       clean_path = normalize_dep_path(path)
-      next if clean_path == @filename || clean_path == "#{@bfilename}.pdf"
+      next if [@filename, "#{@bfilename}.pdf"].include?(clean_path)
 
       categorize_fls_dep(clean_path, styles, figures, tex_inputs)
     end
@@ -165,16 +168,17 @@ class LatexPackager
 
     bcf_file = File.join(junk_dir, "#{@bfilename}.bcf")
     if File.file?(bcf_file)
-      LaTeXUtils.safe_read(bcf_file).scan(/<bcf:datasource[^>]*>([^<]+)<\/bcf:datasource>/).flatten.each do |ds|
+      LaTeXUtils.safe_read(bcf_file).scan(%r{<bcf:datasource[^>]*>([^<]+)</bcf:datasource>}).flatten.each do |ds|
         candidates << ds if File.file?(ds)
       end
     end
 
     cwd = Dir.pwd
-    candidates.map { |p| normalize_dep_path(p) }.uniq.select do |p|
+    selected = candidates.map { |p| normalize_dep_path(p) }.uniq.select do |p|
       expanded = File.expand_path(p)
       File.file?(p) && (expanded.start_with?(cwd + '/') || expanded == cwd || !p.start_with?('/'))
-    end.reject do |p|
+    end
+    selected.reject do |p|
       p =~ %r{(^|/)(junk|\.junk|bak|old|archive)/} || p.end_with?('.bak', '~')
     end
   end
@@ -183,11 +187,12 @@ class LatexPackager
     copy_target_outputs(stage_dir)
 
     if @options[:zip_flat]
-      return false unless stage_flattened_main_tex(stage_dir, !deps[:styles].empty?)
+      return false unless stage_flattened_main_tex(stage_dir, has_styles: !deps[:styles].empty?)
+
       return stage_remaining_assets(stage_dir, deps, fig_sources)
     end
 
-    stage_main_tex(stage_dir, !deps[:styles].empty?)
+    stage_main_tex(stage_dir, has_styles: !deps[:styles].empty?)
     deps[:tex_inputs].each { |f| copy_preserving_path(f, stage_dir) if File.file?(f) }
     stage_remaining_assets(stage_dir, deps, fig_sources)
   end
@@ -203,7 +208,7 @@ class LatexPackager
     true
   end
 
-  def stage_flattened_main_tex(stage_dir, has_styles = false)
+  def stage_flattened_main_tex(stage_dir, has_styles: false)
     dest_path = File.join(stage_dir, @filename)
     FileUtils.mkdir_p(File.dirname(dest_path))
 
@@ -259,12 +264,12 @@ class LatexPackager
 
     bbl_candidates = ["#{@bfilename}.bbl", File.join(junk_dir, "#{@bfilename}.bbl")]
     bbl_source = bbl_candidates.find { |f| File.file?(f) }
-    if bbl_source && LaTeXUtils.bbl_has_entries?(bbl_source)
-      FileUtils.cp(bbl_source, File.join(stage_dir, "#{@bfilename}.bbl"))
-    end
+    return unless bbl_source && LaTeXUtils.bbl_has_entries?(bbl_source)
+
+    FileUtils.cp(bbl_source, File.join(stage_dir, "#{@bfilename}.bbl"))
   end
 
-  def stage_main_tex(stage_dir, has_styles = false)
+  def stage_main_tex(stage_dir, has_styles: false)
     dest_path = File.join(stage_dir, @filename)
     FileUtils.mkdir_p(File.dirname(dest_path))
 
@@ -305,38 +310,12 @@ class LatexPackager
   end
 
   def copy_preserving_path(src, dest_root)
-    return unless File.exist?(src)
-
-    cwd = Dir.pwd
-    real_cwd = begin
-      File.realpath(cwd)
-    rescue StandardError
-      cwd
-    end
-    real_src = begin
-      File.realpath(src)
-    rescue StandardError
-      nil
-    end
-    return unless real_src && (real_src == real_cwd || real_src.start_with?(real_cwd + File::SEPARATOR))
-
-    expanded = File.expand_path(src)
-    rel_path = if expanded.start_with?(cwd + File::SEPARATOR)
-                 expanded.sub(cwd + File::SEPARATOR, '')
-               elsif real_src.start_with?(real_cwd + File::SEPARATOR)
-                 real_src.sub(real_cwd + File::SEPARATOR, '')
-               else
-                 return
-               end
-
-    dest = File.join(dest_root, rel_path)
-    FileUtils.mkdir_p(File.dirname(dest))
-    FileUtils.cp_r(src, dest)
+    LaTeXPackagingShared.copy_preserving_path(src, dest_root, recursive: true)
   end
 
   def verify_archive!(zip_filename)
     zip_abs = File.expand_path(zip_filename)
-    puts Rainbow("==> Verifying archive portability in isolated sandbox...").cyan.bright
+    puts Rainbow('==> Verifying archive portability in isolated sandbox...').cyan.bright
 
     unless LaTeXUtils.command_available?('unzip')
       warn Rainbow("[ERROR] 'unzip' command not found in PATH! Cannot verify archive.").red.bright
@@ -372,7 +351,7 @@ class LatexPackager
     new_pdf = File.join(tmpdir, "#{@bfilename}.pdf")
 
     unless compile_stat.success? && File.file?(new_pdf) && File.size(new_pdf).positive?
-      warn Rainbow("[FAIL] Verification failed! Document did not compile in clean environment.").red.bright
+      warn Rainbow('[FAIL] Verification failed! Document did not compile in clean environment.').red.bright
       warn compile_out
       warn compile_err unless compile_err.empty?
       return false
@@ -381,7 +360,7 @@ class LatexPackager
     return false unless verify_pdf_diff(backup_pdf, new_pdf)
     return false if @options[:zip_alone] && !verify_pdf_visual_match(backup_pdf, new_pdf)
 
-    puts Rainbow("[VERIFIED] Archive successfully verified: self-contained and compiles in clean environment.").green.bright
+    puts Rainbow('[VERIFIED] Archive successfully verified: self-contained and compiles in clean environment.').green.bright
     true
   end
 
@@ -394,7 +373,7 @@ class LatexPackager
 
     rejected_tiers = @options[:errors_only] ? %w[errors] : %w[errors alerts]
     tier_names = rejected_tiers.join(' or ')
-    if result['success'] == true && rejected_tiers.all? { |tier| summary.fetch(tier) == 0 }
+    if result['success'] == true && rejected_tiers.all? { |tier| summary.fetch(tier).zero? }
       puts Rainbow(" -- Isolated build has no #{tier_names}.").green
       return true
     end
@@ -455,8 +434,9 @@ class LatexPackager
     t1, s1 = Open3.capture2e('pdftotext', '-layout', orig_pdf, '-')
     t2, s2 = Open3.capture2e('pdftotext', '-layout', new_pdf, '-')
     return false unless s1.success? && s2.success?
+
     if t1 == t2
-      puts Rainbow(" -- Text layout exact match confirmed between bundled PDF and test build.").green
+      puts Rainbow(' -- Text layout exact match confirmed between bundled PDF and test build.').green
       return true
     end
 
@@ -465,23 +445,6 @@ class LatexPackager
   end
 
   def sandbox_environment(tmpdir)
-    home = File.join(tmpdir, 'home')
-    texmf_home = File.join(tmpdir, 'texmf-home')
-    texmf_var = File.join(tmpdir, 'texmf-var')
-    texmf_config = File.join(tmpdir, 'texmf-config')
-    texmf_cache = File.join(tmpdir, 'texmf-cache')
-    xdg_config = File.join(tmpdir, 'config')
-    xdg_cache = File.join(tmpdir, 'cache')
-    [home, texmf_home, texmf_var, texmf_config, texmf_cache, xdg_config, xdg_cache].each { |dir| FileUtils.mkdir_p(dir) }
-    ENV.to_h.merge(
-      'HOME' => home,
-      'TEXMFHOME' => texmf_home,
-      'TEXMFVAR' => texmf_var,
-      'TEXMFCONFIG' => texmf_config,
-      'TEXMFCACHE' => texmf_cache,
-      'XDG_CONFIG_HOME' => xdg_config,
-      'XDG_CACHE_HOME' => xdg_cache,
-      'LEENI_DISABLE_BUNDLED_REVTeX' => '1'
-    )
+    LaTeXPackagingShared.sandbox_environment(tmpdir)
   end
 end

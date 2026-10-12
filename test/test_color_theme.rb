@@ -144,7 +144,7 @@ class TestColorTheme < Minitest::Test
     refute LatexCLI.determine_color_enabled(emacs: true, color: nil)
 
     # NO_COLOR environment variable disables color
-    orig_no_color = ENV['NO_COLOR']
+    orig_no_color = ENV.fetch('NO_COLOR', nil)
     begin
       ENV['NO_COLOR'] = '1'
       refute LatexCLI.determine_color_enabled(color: nil)
@@ -153,7 +153,7 @@ class TestColorTheme < Minitest::Test
     end
 
     # Dumb terminal disables color
-    orig_term = ENV['TERM']
+    orig_term = ENV.fetch('TERM', nil)
     begin
       ENV['TERM'] = 'dumb'
       refute LatexCLI.determine_color_enabled(color: nil)

@@ -30,7 +30,7 @@ class TestPathologicalLatex < Minitest::Test
       out, status = compile(dir, 'main.tex')
 
       assert_equal 1, status.exitstatus, out
-      assert_match(/^child\.tex:1(?::\d+)?: error: .*assets\/definitely-missing-image.*not found/i, out)
+      assert_match(%r{^child\.tex:1(?::\d+)?: error: .*assets/definitely-missing-image.*not found}i, out)
       refute_match(/^main\.tex:.*error:/, out)
     end
   end
@@ -304,8 +304,8 @@ class TestPathologicalLatex < Minitest::Test
 
   private
 
-  def with_project(name)
-    Dir.mktmpdir(name) { |dir| yield dir }
+  def with_project(name, &)
+    Dir.mktmpdir(name, &)
   end
 
   def write(dir, relative, content, binary: false)
@@ -314,8 +314,8 @@ class TestPathologicalLatex < Minitest::Test
     binary ? File.binwrite(path, content) : File.write(path, content)
   end
 
-  def compile(dir, *args)
-    Open3.capture2e(BIN, '--compile', '--all', '--no-color', *args, chdir: dir)
+  def compile(dir, *)
+    Open3.capture2e(BIN, '--compile', '--all', '--no-color', *, chdir: dir)
   end
 
   def document(body)

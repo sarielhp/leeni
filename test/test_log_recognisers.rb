@@ -116,7 +116,7 @@ class TestLogRecognisers < Minitest::Test
   def test_package_names_containing_a_dot_are_recognised
     log = "Package pdftex.def Warning: Image file `fig1.png' used more than once on input line 42.\n"
 
-    items = builder.send(:extract_warnings, log, false)
+    items = builder.send(:extract_warnings, log, verbose: false)
     assert_equal 1, items.size, 'a Package <name>.def warning was dropped entirely'
     assert_includes items.first[:text], 'used more than once'
   end
@@ -128,7 +128,7 @@ class TestLogRecognisers < Minitest::Test
     LOG
 
     b = builder
-    items = b.send(:extract_warnings, log, false)
+    items = b.send(:extract_warnings, log, verbose: false)
     _alerts, regular, whatevers = b.send(:partition_diagnostics, log, items)
 
     assert_equal 2, items.size, 'the second warning was glued onto the first'
@@ -142,7 +142,7 @@ class TestLogRecognisers < Minitest::Test
   def test_underscored_and_starred_package_names_are_recognised
     %w[epstopdf-base fontspec l3backend].each do |pkg|
       log = "Package #{pkg} Warning: something happened on input line 3.\n"
-      assert_equal 1, builder.send(:extract_warnings, log, false).size,
+      assert_equal 1, builder.send(:extract_warnings, log, verbose: false).size,
                    "a warning from package #{pkg} was dropped"
     end
   end

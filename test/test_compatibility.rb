@@ -26,7 +26,7 @@ class TestCompatibility < Minitest::Test
   def test_source_needs_revtex4_detection
     assert LaTeXCompatibility.source_needs_revtex4?('\\documentclass{revtex4}')
     assert LaTeXCompatibility.source_needs_revtex4?("\\documentclass[prl,twocolumn]{revtex4}\n")
-    assert LaTeXCompatibility.source_needs_revtex4?("\\documentclass [10pt] {revtex4}")
+    assert LaTeXCompatibility.source_needs_revtex4?('\\documentclass [10pt] {revtex4}')
     refute LaTeXCompatibility.source_needs_revtex4?('\\documentclass{revtex4-1}')
     refute LaTeXCompatibility.source_needs_revtex4?('\\documentclass{revtex4-2}')
     refute LaTeXCompatibility.source_needs_revtex4?('\\documentclass{article}')

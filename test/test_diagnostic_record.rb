@@ -11,7 +11,7 @@ class TestDiagnosticRecord < Minitest::Test
       col: 5,
       tier: 'errors',
       category: :undefined_control_sequence,
-      message: "undefined control sequence \\foo",
+      message: 'undefined control sequence \\foo',
       token: '\\foo'
     )
 

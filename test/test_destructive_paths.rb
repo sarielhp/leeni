@@ -86,7 +86,7 @@ class TestDestructivePaths < Minitest::Test
       project = File.join(base, 'project')
       cache_home = File.join(base, 'cache-home')
       FileUtils.mkdir_p(project)
-      original = ENV['XDG_CACHE_HOME']
+      original = ENV.fetch('XDG_CACHE_HOME', nil)
       ENV['XDG_CACHE_HOME'] = cache_home
       cache = LeeniBuildWorkspace.cache_dir(project)
       FileUtils.mkdir_p(cache)
@@ -248,7 +248,7 @@ class TestDestructivePaths < Minitest::Test
       File.chmod(0o777, hostile)
 
       builder = LatexBuilder.new('paper.tex', build_options)
-      original = ENV['TMPDIR']
+      original = ENV.fetch('TMPDIR', nil)
       begin
         ENV['TMPDIR'] = dir
         assert_raises(SystemExit, 'a world-writable temp directory was accepted') do
@@ -263,7 +263,7 @@ class TestDestructivePaths < Minitest::Test
   def test_private_lock_directory_is_accepted
     Dir.mktmpdir('leeni_tmpdir_ok_test') do |dir|
       builder = LatexBuilder.new('paper.tex', build_options)
-      original = ENV['TMPDIR']
+      original = ENV.fetch('TMPDIR', nil)
       begin
         ENV['TMPDIR'] = dir
         path = builder.send(:project_tmp_dir)
@@ -291,37 +291,15 @@ class TestDestructivePaths < Minitest::Test
   end
 
   def test_arxiv_copy_preserving_path_rejects_out_of_tree_and_symlinks
-    Dir.mktmpdir('leeni_arxiv_copy_test') do |root|
-      outside = File.join(root, 'outside.png')
-      File.write(outside, 'secret outside')
-
-      proj = File.join(root, 'proj')
-      stage = File.join(root, 'stage')
-      FileUtils.mkdir_p(File.join(proj, 'figs'))
-      FileUtils.mkdir_p(stage)
-
-      local = File.join(proj, 'figs', 'local.png')
-      File.write(local, 'local figure')
-
-      link = File.join(proj, 'figs', 'link.png')
-      File.symlink(outside, link)
-
-      Dir.chdir(proj) do
-        arxiv = LatexArxivPackager.allocate
-        arxiv.send(:copy_preserving_path, outside, stage)
-        arxiv.send(:copy_preserving_path, '../outside.png', stage)
-        arxiv.send(:copy_preserving_path, 'figs/link.png', stage)
-        arxiv.send(:copy_preserving_path, 'figs/local.png', stage)
-      end
-
-      refute_path_exists File.join(stage, 'outside.png')
-      refute_path_exists File.join(stage, 'figs', 'link.png')
-      assert_path_exists File.join(stage, 'figs', 'local.png')
-    end
+    assert_copy_preserving_path_safety(LatexArxivPackager)
   end
 
   def test_packager_copy_preserving_path_rejects_out_of_tree_and_symlinks
-    Dir.mktmpdir('leeni_packager_copy_test') do |root|
+    assert_copy_preserving_path_safety(LatexPackager)
+  end
+
+  def assert_copy_preserving_path_safety(packager_class)
+    Dir.mktmpdir('leeni_copy_test') do |root|
       outside = File.join(root, 'outside.png')
       File.write(outside, 'secret outside')
 
@@ -337,7 +315,7 @@ class TestDestructivePaths < Minitest::Test
       File.symlink(outside, link)
 
       Dir.chdir(proj) do
-        packager = LatexPackager.allocate
+        packager = packager_class.allocate
         packager.send(:copy_preserving_path, outside, stage)
         packager.send(:copy_preserving_path, '../outside.png', stage)
         packager.send(:copy_preserving_path, 'figs/link.png', stage)

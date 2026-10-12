@@ -22,7 +22,7 @@ class TestArxivTestCycle < Minitest::Test
   end
 
   def downloader_body
-    <<~'RUBY'
+    <<~RUBY
       destination = File.join(ARGV.fetch(ARGV.index('--output') + 1), '2401.00001v1')
       Dir.mkdir(destination)
       File.write(File.join(destination, 'metadata.json'), '{}')

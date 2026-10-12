@@ -32,8 +32,8 @@ module GalleryGenerator
       id: :unclosed_dollar,
       filename: 'gallery_01_unclosed_dollar',
       title: '1. Unclosed Dollar Sign ($) Inversion & Pinpointing',
-      left_pill: "❌ Blames line 8 ($1 + \\epsilon$) — 4 lines away from the real typo!",
-      right_pill: "✔ Inverts paragraph parity: pinpoints unclosed $ on line 4, col 5!",
+      left_pill: '❌ Blames line 8 ($1 + \\epsilon$) — 4 lines away from the real typo!',
+      right_pill: '✔ Inverts paragraph parity: pinpoints unclosed $ on line 4, col 5!',
       tex: <<~TEX,
         \\documentclass{article}
         \\begin{document}
@@ -47,8 +47,8 @@ module GalleryGenerator
         Next section begins here.
         \\end{document}
       TEX
-      problem: "An unclosed `$` on line 4 propagates across five lines of dense mathematical prose, inverting text and math across multiple formulas until TeX crashes far downstream.",
-      standard_fails: "TeX halts on line 8 (`$1 + \\epsilon$`) with `! Missing $ inserted.`, blaming an innocent, well-formed formula for missing a dollar sign and completely concealing that math mode was opened four lines earlier on line 4.",
+      problem: 'An unclosed `$` on line 4 propagates across five lines of dense mathematical prose, inverting text and math across multiple formulas until TeX crashes far downstream.',
+      standard_fails: 'TeX halts on line 8 (`$1 + \\epsilon$`) with `! Missing $ inserted.`, blaming an innocent, well-formed formula for missing a dollar sign and completely concealing that math mode was opened four lines earlier on line 4.',
       leeni_wins: "Performs candidate pair scoring across the paragraph, recognizes that downstream formulas are valid, and pinpoints the true culprit: `Unclosed '$' opened on line 4 (col 5); insert closing '$'`."
     },
     {
@@ -66,9 +66,9 @@ module GalleryGenerator
         And here is some text that should not be in the bold.
         \\end{document}
       TEX
-      problem: "A macro argument or group opened with `{` is left unclosed across a paragraph or EOF.",
-      standard_fails: "Standard TeX parsers only complain when they encounter `\\par` or EOF (`Runaway argument?`, `! File ended while scanning use of \\textbf`). The terminal fills with 70+ lines of internal macro call traces and rule checks, but completely obscures where the `{` was actually typed.",
-      leeni_wins: "Runs an AST-aware lexical brace scanner with environment scoping that identifies the exact line (`line 3`), column (`col 34`), and enclosing environment (`document`) where the unclosed brace started, along with an actionable remediation hint."
+      problem: 'A macro argument or group opened with `{` is left unclosed across a paragraph or EOF.',
+      standard_fails: 'Standard TeX parsers only complain when they encounter `\\par` or EOF (`Runaway argument?`, `! File ended while scanning use of \\textbf`). The terminal fills with 70+ lines of internal macro call traces and rule checks, but completely obscures where the `{` was actually typed.',
+      leeni_wins: 'Runs an AST-aware lexical brace scanner with environment scoping that identifies the exact line (`line 3`), column (`col 34`), and enclosing environment (`document`) where the unclosed brace started, along with an actionable remediation hint.'
     },
     {
       id: :misplaced_tab,
@@ -85,8 +85,8 @@ module GalleryGenerator
         \\end{equation*}
         \\end{document}
       TEX
-      problem: "The author used `&` to align multi-part equations, but placed it inside `equation*` instead of `align*`.",
-      standard_fails: "Standard LaTeX emits a generic `! Misplaced alignment tab character &.`, followed by 45 lines of engine state and generic failure boilerplate. It offers zero explanation of *why* the ampersand is invalid or how to structure the math environment.",
+      problem: 'The author used `&` to align multi-part equations, but placed it inside `equation*` instead of `align*`.',
+      standard_fails: 'Standard LaTeX emits a generic `! Misplaced alignment tab character &.`, followed by 45 lines of engine state and generic failure boilerplate. It offers zero explanation of *why* the ampersand is invalid or how to structure the math environment.',
       leeni_wins: "Performs backwards AST scope resolution, detects that the tab character resides inside `equation*`, and delivers an immediate, tailored hint: `Misplaced '&' in 'equation*'; switch to 'align*' (or use 'aligned' / 'split')`."
     },
     {
@@ -101,8 +101,8 @@ module GalleryGenerator
         \\includegrahics{my_figure.png}
         \\end{document}
       TEX
-      problem: "A minor typo in a common macro name (`\\includegrahics` instead of `\\includegraphics`).",
-      standard_fails: "TeX fails on the unknown macro and attempts to recover by misinterpreting underscores (`_`) in filenames as text-mode subscripts, causing a cascade of misleading secondary errors (`Missing $ inserted`, `Extra }, or forgotten $`).",
+      problem: 'A minor typo in a common macro name (`\\includegrahics` instead of `\\includegraphics`).',
+      standard_fails: 'TeX fails on the unknown macro and attempts to recover by misinterpreting underscores (`_`) in filenames as text-mode subscripts, causing a cascade of misleading secondary errors (`Missing $ inserted`, `Extra }, or forgotten $`).',
       leeni_wins: "Uses Levenshtein edit distance against standard LaTeX commands and package signatures, identifying the intended macro with: `Did you mean '\\includegraphics'? (requires \\usepackage{graphicx})`."
     },
     {
@@ -120,8 +120,8 @@ module GalleryGenerator
         \\end{tabular}
         \\end{document}
       TEX
-      problem: "Using standard publication-quality table markup (`\\toprule`) without importing the prerequisite package.",
-      standard_fails: "Reports `! Undefined control sequence. <recently read> \\toprule`. Standard tools do not associate macro names with external CTAN packages, leaving the author to manually look up what package supplies the command.",
+      problem: 'Using standard publication-quality table markup (`\\toprule`) without importing the prerequisite package.',
+      standard_fails: 'Reports `! Undefined control sequence. <recently read> \\toprule`. Standard tools do not associate macro names with external CTAN packages, leaving the author to manually look up what package supplies the command.',
       leeni_wins: "Looks up the command signature in its package index and reports: `Command '\\toprule' requires \\usepackage{booktabs}`."
     },
     {
@@ -141,9 +141,9 @@ module GalleryGenerator
         \\end{figure}
         \\end{document}
       TEX
-      problem: "Placing `\\label{...}` before `\\caption{...}` inside a floating `figure` or `table`.",
-      standard_fails: "Standard compilers are **completely silent** and exit with code 0. However, `\\caption` is what increments the float counter; placing `\\label` before it causes `\\ref{fig:myfig}` to quietly bind to Section 1 instead of Figure 1, producing corrupt citations in published papers.",
-      leeni_wins: "Inspects float structure and elevates this silent bug to the **Alert** diagnostic tier: `6: Inverted \\label{fig:myfig} before \\caption in figure environment. Move \\label after or inside \\caption.`"
+      problem: 'Placing `\\label{...}` before `\\caption{...}` inside a floating `figure` or `table`.',
+      standard_fails: 'Standard compilers are **completely silent** and exit with code 0. However, `\\caption` is what increments the float counter; placing `\\label` before it causes `\\ref{fig:myfig}` to quietly bind to Section 1 instead of Figure 1, producing corrupt citations in published papers.',
+      leeni_wins: 'Inspects float structure and elevates this silent bug to the **Alert** diagnostic tier: `6: Inverted \\label{fig:myfig} before \\caption in figure environment. Move \\label after or inside \\caption.`'
     },
     {
       id: :bib_syntax_error,
@@ -170,8 +170,8 @@ module GalleryGenerator
           }
         BIB
       },
-      problem: "An unescaped underscore (`_`) in a `.bib` database field (such as `journal = {NORDIC_J_COMP}`).",
-      standard_fails: "TeX crashes during `\\printbibliography` with `! Missing $ inserted.` or `! Double subscript.` on line 7 of `paper.tex`. It offers zero indication of which citation key failed, which `.bib` file it came from, or what field caused the syntax crash, forcing authors into tedious binary-search debugging.",
+      problem: 'An unescaped underscore (`_`) in a `.bib` database field (such as `journal = {NORDIC_J_COMP}`).',
+      standard_fails: 'TeX crashes during `\\printbibliography` with `! Missing $ inserted.` or `! Double subscript.` on line 7 of `paper.tex`. It offers zero indication of which citation key failed, which `.bib` file it came from, or what field caused the syntax crash, forcing authors into tedious binary-search debugging.',
       leeni_wins: "Injects an AST hook into BibLaTeX's entry pipeline to capture the active citation key at the instant of failure, locates the entry and line in `refs.bib`, and prints an actionable companion error: `refs.bib:4: [leeni] Bibliography error in entry 'grss95'` with `▸ Hint: Offending token 'NORDIC_J_COMP' found on this line.`."
     }
   ].freeze
@@ -212,12 +212,11 @@ module GalleryGenerator
     l = raw.rstrip
     color = '#c0caf5'
     bold = false
+    return [{ text: l, color: '#e0af68', bold: true, font_size: '15.5px' }] if l =~ /\A(?:<<< DELETED \d+ LINES? >>>|<deleted \d+ lines?>)/i
 
     if l.start_with?('$')
       color = '#7dcfff'
       bold = true
-    elsif l =~ /\A(?:<<< DELETED \d+ LINES? >>>|<deleted \d+ lines?>)/i
-      return [{ text: l, color: '#e0af68', bold: true, font_size: '15.5px' }]
     elsif l =~ /\A(?:!|Collected error summary)/i
       color = '#ff6b6b'
       bold = true
@@ -240,7 +239,7 @@ module GalleryGenerator
       while cur_len + text.length > max_chars && text.include?(' ')
         avail = max_chars - cur_len
         split_idx = text[0..avail].rindex(' ') || text.index(' ')
-        break unless split_idx && split_idx > 0
+        break unless split_idx&.positive?
 
         lines.last << tok.merge(text: text[0...split_idx])
         lines << [{ text: '    ', color: tok[:color], bold: false }]
@@ -360,7 +359,7 @@ module GalleryGenerator
       if start_idx > [err_idx - 1, 0].max
         start_idx = [err_idx - 1, 0].max
         end_idx = [start_idx + needed - 1, rest.size - 1].min
-      elsif start_idx < 0
+      elsif start_idx.negative?
         start_idx = 0
         end_idx = [needed - 1, rest.size - 1].min
       end
@@ -393,7 +392,7 @@ module GalleryGenerator
 
   def self.assemble_truncated(cmd_line, skipped, slice)
     res = [cmd_line]
-    res << format_deleted(skipped) if skipped > 0
+    res << format_deleted(skipped) if skipped.positive?
     res.concat(slice)
     res
   end
@@ -406,8 +405,8 @@ module GalleryGenerator
         File.write(File.join(dir, fname), content)
       end
 
-      out_mk, _ = Open3.capture2e('latexmk', '-xelatex', '-halt-on-error', 'paper.tex', chdir: dir)
-      out_l, _ = Open3.capture2e({ 'CLICOLOR_FORCE' => '1' }, LEENI, '--no-lock', '-f', 'paper.tex', chdir: dir)
+      out_mk, = Open3.capture2e('latexmk', '-xelatex', '-halt-on-error', 'paper.tex', chdir: dir)
+      out_l, = Open3.capture2e({ 'CLICOLOR_FORCE' => '1' }, LEENI, '--no-lock', '-f', 'paper.tex', chdir: dir)
 
       right_raw = ['$ l paper.tex'] + out_l.lines.map(&:chomp)
       right_display = build_display_lines(right_raw, is_ansi: true)

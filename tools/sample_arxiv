@@ -36,6 +36,7 @@ module ArxivSampler
 
       data = JSON.parse(File.read(path))
       return nil unless data.is_a?(Hash) && data['month'] == month.strftime('%Y-%m')
+
       total = data['total_results']
       return nil unless total.is_a?(Integer) && total >= 0
 
@@ -83,6 +84,7 @@ module ArxivSampler
         response, body = request(uri, 0)
         return body if response.is_a?(Net::HTTPSuccess)
         return nil if response.code == '404'
+
         if response.code == '429' && retries < MAX_429_RETRIES
           retry_request(response, retries += 1)
           next
@@ -257,7 +259,8 @@ module ArxivSampler
       next_month = month >> 1
       final_day = next_month - 1
       range = "submittedDate:[#{month.strftime('%Y%m%d')}0000 TO #{final_day.strftime('%Y%m%d')}2359]"
-      uri = "#{API}?search_query=#{URI.encode_www_form_component(range)}&start=#{offset}&max_results=1&sortBy=submittedDate&sortOrder=ascending"
+      uri = "#{API}?search_query=#{URI.encode_www_form_component(range)}&start=#{offset}" \
+            '&max_results=1&sortBy=submittedDate&sortOrder=ascending'
       ArxivSampler.parse_entries(@client.get(uri).to_s)
     end
 

@@ -43,24 +43,26 @@ class LatexBuilder
     /Package rerunfilecheck Warning: File .* has changed/i, /Package ocgx2 Warning: Rerun/i
   ].freeze
 
-  BIBLATEX_USE = /\\(?:usepackage|RequirePackage)\s*(?:\[[^\]]*\])?\s*\{[^}]*\bbiblatex\b/.freeze
+  BIBLATEX_USE = /\\(?:usepackage|RequirePackage)\s*(?:\[[^\]]*\])?\s*\{[^}]*\bbiblatex\b/
   BIBLATEX_BBL_HEADER = 'biblatex bbl format'
   MAX_BIB_RUNS = 2
   MAX_INDEX_FAILURES = 2
   # TeX error context ("l.12 ...") and the trace header echo document text, which
   # can contain rerun phrases without TeX asking for a rerun.
-  ECHOED_SOURCE_LINE = /\A(?:l\.\d+ |\(cd )/.freeze
+  ECHOED_SOURCE_LINE = /\A(?:l\.\d+ |\(cd )/
   # Files whose content shifts with pagination but that never appear in *.aux
   # itself, so an aux-only comparison would miss a change in them.
   SIDE_STATE_EXTS = %w[toc lof lot out nav snm].freeze
 
   ProcessResultStatus = LaTeXUtils::ProcessResultStatus
   LABEL_HOOK = '\let\lit@orig@pw\protected@write' \
-               '\long\def\protected@write#1#2#3{\ifx#1\@auxout\typeout{LIT_LBL:\the\inputlineno:\detokenize{#3}}\fi\lit@orig@pw{#1}{#2}{#3}}'
+               '\long\def\protected@write#1#2#3{' \
+               '\ifx#1\@auxout\typeout{LIT_LBL:\the\inputlineno:\detokenize{#3}}\fi' \
+               '\lit@orig@pw{#1}{#2}{#3}}'
 
   BIBLATEX_HOOK = '\AtBeginDocument{\@ifpackageloaded{biblatex}{\AtEveryBibitem{\typeout{BIB_ENTRY: \thefield{entrykey}}}}{}}'
 
-  RUNTIME_HOOK = "\\makeatletter#{LABEL_HOOK}#{BIBLATEX_HOOK}\\makeatother"
+  RUNTIME_HOOK = "\\makeatletter#{LABEL_HOOK}#{BIBLATEX_HOOK}\\makeatother".freeze
 
   def initialize(target, options)
     @options = options
@@ -88,14 +90,13 @@ class LatexBuilder
   end
 
   def interactive_tty?
-    $stdout.tty? && ENV['TERM'] != 'dumb' && !@options[:emacs] && !@options[:trace] && !@options[:score] && !@options[:raw] && !llm_mode? && !json_mode?
+    $stdout.tty? && ENV['TERM'] != 'dumb' && !@options[:emacs] && !@options[:trace] &&
+      !@options[:score] && !@options[:raw] && !llm_mode? && !json_mode?
   end
 
   def run!
     build_dir = File.expand_path(@bdir)
-    if !@options[:score] && build_dir != File.expand_path('.') && (!interactive_tty? || @options[:verbose])
-      puts "      cd #{build_dir}"
-    end
+    puts "      cd #{build_dir}" if !@options[:score] && build_dir != File.expand_path('.') && (!interactive_tty? || @options[:verbose])
     Dir.chdir(build_dir) { run_in_current_directory! }
   end
 
@@ -107,7 +108,11 @@ class LatexBuilder
     compile_target
   ensure
     if @options[:score]
-      $stdout.close rescue nil
+      begin
+        $stdout.close
+      rescue StandardError
+        nil
+      end
       $stdout = @orig_stdout
     end
   end
@@ -203,16 +208,22 @@ class LatexBuilder
   end
 
   def targets_up_to_date?
-    return false if @options[:clean] || @options[:single_pass] || @options[:force] || @options[:score] || @options[:werror] || @options[:raw]
+    if @options[:clean] || @options[:single_pass] || @options[:force] || @options[:score] || @options[:werror] || @options[:raw]
+      return false
+    end
     return false if @options[:bib] == true
 
     target_pdf = "#{@bfilename}.pdf"
-    return false unless File.exist?(target_pdf) && File.size(target_pdf) > 0
+    return false unless File.exist?(target_pdf) && File.size(target_pdf).positive?
 
     state_file = File.join(@junk_dir, '.build_state.json')
     return false unless File.exist?(state_file)
 
-    state = JSON.parse(File.read(state_file)) rescue nil
+    state = begin
+      JSON.parse(File.read(state_file))
+    rescue StandardError
+      nil
+    end
     return false unless state.is_a?(Hash) && state['target'] == target_pdf
     return false unless state['signature'] == build_signature
     return false if @options[:index] == true && index_stale?(state)
@@ -245,7 +256,10 @@ class LatexBuilder
     end
   end
 
-  def log_pass_start(engine, pass, first: false) = log_activity_start(engine, "Building #{@bfilename}.pdf (#{engine} pass #{pass})...", suffix: " (#{pass})", first: first)
+  def log_pass_start(engine, pass, first: false)
+    log_activity_start(engine, "Building #{@bfilename}.pdf (#{engine} pass #{pass})...", suffix: " (#{pass})", first: first)
+  end
+
   def log_bib_start(tool, first: false) = log_activity_start(tool, "Running #{tool} on #{@bfilename}...", first: first)
 
   # The first run is decided by needs_bib_pass?; a repeat only when the last run
@@ -419,7 +433,7 @@ class LatexBuilder
 
   def needs_index_pass?
     idx = File.join(@junk_dir, "#{@bfilename}.idx")
-    return false unless File.file?(idx) && File.size(idx) > 0
+    return false unless File.file?(idx) && File.size(idx).positive?
     return false if @index_failures.to_i >= MAX_INDEX_FAILURES
 
     Digest::SHA256.file(idx).hexdigest != @last_idx_hash || !File.file?(File.join(@junk_dir, "#{@bfilename}.ind"))
@@ -438,7 +452,7 @@ class LatexBuilder
 
     if @options[:time]
       t1 = Process.clock_gettime(Process::CLOCK_MONOTONIC)
-      printf(" [%s]", Rainbow(format('%.2fs', t1 - t0)).green)
+      printf(' [%s]', Rainbow(format('%.2fs', t1 - t0)).green)
     end
     record_index_result(status.success?, idx_hash)
   end
@@ -459,7 +473,7 @@ class LatexBuilder
 
   def index_stale?(state = nil)
     idx = File.join(@junk_dir, "#{@bfilename}.idx")
-    return false unless File.file?(idx) && File.size(idx) > 0
+    return false unless File.file?(idx) && File.size(idx).positive?
 
     ind = File.join(@junk_dir, "#{@bfilename}.ind")
     return true unless File.file?(ind)
@@ -485,6 +499,7 @@ class LatexBuilder
       abs = File.expand_path(path)
       workspace_abs = File.expand_path(@junk_dir)
       next if abs == workspace_abs || abs.start_with?(workspace_abs + File::SEPARATOR)
+
       if abs.start_with?(root_abs + File::SEPARATOR) && File.file?(abs)
         rel = abs.sub(%r{\A#{Regexp.escape(root_abs)}/?}, '')
         next if rel.start_with?("#{@junk_dir}/") || rel.start_with?('junk/') || rel.start_with?('.junk/') || rel.empty?
@@ -505,20 +520,29 @@ class LatexBuilder
     files.uniq.each do |f|
       next unless File.file?(f)
 
-      @input_snapshots[f] = { mtime: File.mtime(f).to_f, sha: (Digest::SHA256.file(f).hexdigest rescue nil) }
+      @input_snapshots[f] = { mtime: File.mtime(f).to_f, sha: begin
+        Digest::SHA256.file(f).hexdigest
+      rescue StandardError
+        nil
+      end }
     end
-    state = JSON.parse(File.read(File.join(@junk_dir, '.build_state.json'))) rescue nil
-    if state.is_a?(Hash)
-      bib_manager.last_bib_citations ||= state['citations'] if state['citations'].is_a?(Array)
-      bib_manager.last_bib_sources ||= state['sources'] if state['sources'].is_a?(Hash)
-      bib_manager.last_bcf_sha ||= state['bcf_sha'] if state['bcf_sha']
+    state = begin
+      JSON.parse(File.read(File.join(@junk_dir, '.build_state.json')))
+    rescue StandardError
+      nil
     end
+    return unless state.is_a?(Hash)
+
+    bib_manager.last_bib_citations ||= state['citations'] if state['citations'].is_a?(Array)
+    bib_manager.last_bib_sources ||= state['sources'] if state['sources'].is_a?(Hash)
+    bib_manager.last_bcf_sha ||= state['bcf_sha'] if state['bcf_sha']
   end
 
   def save_build_state!
     return if @cacheable_build == false
+
     pdf_file = File.join(@junk_dir, "#{@bfilename}.pdf")
-    return unless File.exist?(pdf_file) && File.size(pdf_file) > 0
+    return unless File.exist?(pdf_file) && File.size(pdf_file).positive?
 
     deps = collect_active_dependencies
     sources, tainted = inspect_source_snapshots(deps)
@@ -597,7 +621,11 @@ class LatexBuilder
     deps = []
     state_file = File.join(@junk_dir, '.build_state.json')
     if File.exist?(state_file)
-      state = JSON.parse(File.read(state_file)) rescue nil
+      state = begin
+        JSON.parse(File.read(state_file))
+      rescue StandardError
+        nil
+      end
       deps = state['sources'].keys if state.is_a?(Hash) && state['sources'].is_a?(Hash)
     end
 
@@ -651,7 +679,7 @@ class LatexBuilder
 
   def latex_rerun_requested?(log_content)
     filtered = log_content.gsub(/Package biblatex Warning: Please \(re\)run Biber.*?and rerun LaTeX afterwards\./m, '')
-    filtered = filtered.lines.reject { |l| l.match?(ECHOED_SOURCE_LINE) }.join
+    filtered = filtered.lines.grep_v(ECHOED_SOURCE_LINE).join
     LATEX_RERUN_PATTERNS.any? { |pat| filtered =~ pat }
   end
 
@@ -690,8 +718,10 @@ class LatexBuilder
   def update_target_file(src, dst, update_on_diff: false)
     return unless File.exist?(src)
 
-    if update_on_diff && File.exist?(dst) && dst.end_with?('.pdf') && LaTeXUtils.command_available?('pdftotext')
-      return if pdf_text_unchanged?(src, dst)
+    if update_on_diff && File.exist?(dst) && dst.end_with?('.pdf') && LaTeXUtils.command_available?('pdftotext') && pdf_text_unchanged?(
+      src, dst
+    )
+      return
     end
 
     atomic_copy(src, dst)

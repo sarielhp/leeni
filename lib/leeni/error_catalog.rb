@@ -183,21 +183,15 @@ module LaTeXErrorCatalog
     return false if best[:is_proj].zero? && runner_up[:is_proj] == 1 && best[:dist] <= runner_up[:dist]
     return true if (best[:dist] - runner_up[:dist]).abs < 0.05
 
-    if best[:dist] >= 1.5 && runner_up[:dist] < best[:dist] + 0.5
-      return true unless best[:is_proj].zero? && runner_up[:is_proj] == 1
-    end
+    return true if best[:dist] >= 1.5 && runner_up[:dist] < best[:dist] + 0.5 && !(best[:is_proj].zero? && runner_up[:is_proj] == 1)
 
     false
   end
 
   def self.extract_undefined_cs_info(err_block)
     block_text = err_block.join("\n")
-    if block_text =~ /<recently read>\s*(\\[a-zA-Z@]+|\\[^\s])/
-      return [Regexp.last_match(1), nil]
-    end
-    if block_text =~ /<to be read again>\s*(\\[a-zA-Z@]+|\\[^\s])/
-      return [Regexp.last_match(1), nil]
-    end
+    return [Regexp.last_match(1), nil] if block_text =~ /<recently read>\s*(\\[a-zA-Z@]+|\\[^\s])/
+    return [Regexp.last_match(1), nil] if block_text =~ /<to be read again>\s*(\\[a-zA-Z@]+|\\[^\s])/
 
     # Check macro expansion lines: \macro ...->... \badcs
     # TeX breaks the line immediately after the offending token, so the culprit
@@ -231,13 +225,17 @@ module LaTeXErrorCatalog
 
   def self.find_undefined_cs_source_location(file, line, token, err_block)
     source_file = find_source_file(file)
-    return [nil, nil] unless source_file && line && line.to_i > 0
+    return [nil, nil] unless source_file && line&.to_i&.positive?
 
-    lines = File.readlines(source_file) rescue nil
+    lines = begin
+      File.readlines(source_file)
+    rescue StandardError
+      nil
+    end
     return [nil, nil] unless lines
 
     err_idx = line.to_i - 1
-    return [nil, nil] if err_idx < 0 || err_idx >= lines.size
+    return [nil, nil] if err_idx.negative? || err_idx >= lines.size
 
     _cs, macro = extract_undefined_cs_info(err_block)
 
@@ -314,12 +312,12 @@ module LaTeXErrorCatalog
   def self.parse_env_tags(line)
     clean_line = line.sub(/(?<!\\)%.*\z/, '')
     matches = []
-    clean_line.scan(/\\(begin|end)\{([a-zA-Z0-9_\*@\-]+)\}|(\\\[|\\\])/) do |b_or_e, env, bracket|
-      if bracket
-        matches << [bracket == '\\[' ? 'begin' : 'end', '\\[ ... \\]']
-      else
-        matches << [b_or_e, env]
-      end
+    clean_line.scan(/\\(begin|end)\{([a-zA-Z0-9_*@-]+)\}|(\\\[|\\\])/) do |b_or_e, env, bracket|
+      matches << if bracket
+                   [bracket == '\\[' ? 'begin' : 'end', '\\[ ... \\]']
+                 else
+                   [b_or_e, env]
+                 end
     end
     matches
   end
@@ -338,11 +336,11 @@ module LaTeXErrorCatalog
 
   def self.detect_enclosing_environment(file_path, error_line)
     source_file = find_source_file(file_path)
-    return nil unless source_file && error_line && error_line.to_i > 0
+    return nil unless source_file && error_line&.to_i&.positive?
 
     lines = File.readlines(source_file)
     idx = [error_line.to_i - 1, lines.size - 1].min
-    return nil if idx < 0
+    return nil if idx.negative?
 
     env_stack = []
     idx.downto(0) do |i|
@@ -383,10 +381,10 @@ module LaTeXErrorCatalog
 
   def self.find_paragraph_bounds(lines, err_idx)
     idx = [err_idx, lines.size - 1].min
-    idx -= 1 while idx > 0 && (lines[idx].strip.empty? || lines[idx].strip =~ /\A(?:\\par|\s*\\end\{)/)
+    idx -= 1 while idx.positive? && (lines[idx].strip.empty? || lines[idx].strip =~ /\A(?:\\par|\s*\\end\{)/)
 
     start_idx = idx
-    while start_idx > 0 && (idx - start_idx) < 25
+    while start_idx.positive? && (idx - start_idx) < 25
       prev = lines[start_idx - 1].strip
       break if prev.empty? || prev =~ /\A\\par\b/ || prev =~ /\A\\(?:section|chapter|subsection|subsubsection)\b/
       break if prev =~ /\A\\(?:begin|end)\{/
@@ -400,7 +398,7 @@ module LaTeXErrorCatalog
   def self.extract_dollars_in_range(lines, start_idx, end_idx)
     dollars = []
     (start_idx..end_idx).each do |l_idx|
-      line = lines[l_idx].sub(/(?<!\\)%.*\z/, '').gsub(/\$\$/, '  ')
+      line = lines[l_idx].sub(/(?<!\\)%.*\z/, '').gsub('$$', '  ')
       line.enum_for(:scan, /(?<!\\)\$/).each do
         col = Regexp.last_match.begin(0) + 1
         rest = line[col..] || ''
@@ -428,11 +426,11 @@ module LaTeXErrorCatalog
       d_close = remaining[p_idx + 1]
       spans = d_open[:line_idx] != d_close[:line_idx]
 
-      chunk = if !spans
-        lines[d_open[:line_idx]][d_open[:col]...(d_close[:col] - 1)] || ''
-      else
-        lines[d_open[:line_idx]..d_close[:line_idx]].join(' ')
-      end
+      chunk = if spans
+                lines[d_open[:line_idx]..d_close[:line_idx]].join(' ')
+              else
+                lines[d_open[:line_idx]][d_open[:col]...(d_close[:col] - 1)] || ''
+              end
       total += score_math_chunk(chunk, spans)
     end
     total
@@ -470,18 +468,18 @@ module LaTeXErrorCatalog
       if match && COMMON_COMMANDS.include?(match[1])
         "Math command '\\#{match[1]}' outside math mode; wrap in $...$"
       else
-        "Math symbol (like _ or ^) outside math mode; wrap in $...$"
+        'Math symbol (like _ or ^) outside math mode; wrap in $...$'
       end
     end
   end
 
   def self.detect_missing_dollar(file_path, error_line)
     source_file = find_source_file(file_path)
-    return nil unless source_file && error_line && error_line.to_i > 0
+    return nil unless source_file && error_line&.to_i&.positive?
 
     lines = File.readlines(source_file)
     err_idx = [error_line.to_i - 1, lines.size - 1].min
-    return nil if err_idx < 0
+    return nil if err_idx.negative?
 
     start_idx, end_idx = find_paragraph_bounds(lines, err_idx)
     dollars = extract_dollars_in_range(lines, start_idx, end_idx)
@@ -502,7 +500,7 @@ module LaTeXErrorCatalog
   end
 
   def self.suggest_missing_dollar(tok)
-    tok || "Math symbol (like _ or ^) outside math mode; wrap in $...$"
+    tok || 'Math symbol (like _ or ^) outside math mode; wrap in $...$'
   end
 
   def self.extract_missing_dollar_info(err_block, file, line)
@@ -578,7 +576,9 @@ module LaTeXErrorCatalog
       id: :environment_undefined,
       pattern: /Environment (\S+) undefined/i,
       title: 'Environment undefined',
-      hint: ->(tok) { tok ? "Undefined environment '#{tok}'; check spelling or \\usepackage" : 'Undefined environment; check spelling or \\usepackage' },
+      hint: lambda { |tok|
+        tok ? "Undefined environment '#{tok}'; check spelling or \\usepackage" : 'Undefined environment; check spelling or \\usepackage'
+      },
       why: 'The environment named in \\begin{...} is not defined by any loaded package.',
       fix: 'Check environment name spelling or load the package that provides it.',
       doc_slug: '07_environment_undefined'
@@ -605,7 +605,9 @@ module LaTeXErrorCatalog
       id: :command_already_defined,
       pattern: /Command (\S+) already defined/i,
       title: 'Command already defined',
-      hint: ->(tok) { tok ? "Command '#{tok}' already defined; use \\renewcommand or rename" : 'Command already defined; use \\renewcommand or rename' },
+      hint: lambda { |tok|
+        tok ? "Command '#{tok}' already defined; use \\renewcommand or rename" : 'Command already defined; use \\renewcommand or rename'
+      },
       why: '\\newcommand tried to define a macro that already exists in LaTeX or a loaded package.',
       fix: 'Use \\renewcommand instead of \\newcommand, or choose a different macro name.',
       doc_slug: '10_command_already_defined'
@@ -657,9 +659,11 @@ module LaTeXErrorCatalog
     },
     {
       id: :option_clash_for_package,
-      pattern: /Option clash for package ([a-zA-Z0-9_\-]+)/i,
+      pattern: /Option clash for package ([a-zA-Z0-9_-]+)/i,
       title: 'Option clash for package',
-      hint: ->(tok) { tok ? "Conflicting options for package '#{tok}'; pass all options in first \\usepackage" : 'Conflicting package options; unify options in first \\usepackage' },
+      hint: lambda { |tok|
+        tok ? "Conflicting options for package '#{tok}'; pass all options in first \\usepackage" : 'Conflicting package options; unify options in first \\usepackage'
+      },
       why: 'A package was loaded multiple times with mutually conflicting options.',
       fix: 'Move all required package options to the first \\usepackage call or use \\PassOptionsToPackage.',
       doc_slug: '16_option_clash_for_package'
@@ -758,7 +762,9 @@ module LaTeXErrorCatalog
       id: :counter_too_large,
       pattern: /Counter(?: (\S+))? too large/i,
       title: 'Counter too large',
-      hint: ->(tok) { tok ? "Counter '#{tok}' exceeded limit (e.g. fnsymbol pool); reset or switch to numeric" : 'Counter exceeded limit (e.g. fnsymbol pool); reset or switch to numeric' },
+      hint: lambda { |tok|
+        tok ? "Counter '#{tok}' exceeded limit (e.g. fnsymbol pool); reset or switch to numeric" : 'Counter exceeded limit (e.g. fnsymbol pool); reset or switch to numeric'
+      },
       why: 'A counter representation (such as \\fnsymbol for footnotes) exceeded its fixed symbol pool.',
       fix: 'Reset the counter per page or switch to arabic numerals.',
       doc_slug: '27_counter_too_large'
@@ -776,17 +782,21 @@ module LaTeXErrorCatalog
       id: :undefined_color,
       pattern: /Undefined color `?([^']+)'?/i,
       title: 'Package xcolor: Undefined color',
-      hint: ->(tok) { tok ? "Undefined color '#{tok}'; define with \\definecolor or load colornames" : 'Undefined color; define with \\definecolor or load colornames' },
+      hint: lambda { |tok|
+        tok ? "Undefined color '#{tok}'; define with \\definecolor or load colornames" : 'Undefined color; define with \\definecolor or load colornames'
+      },
       why: 'A color name was passed to \\textcolor or \\colorbox that has not been defined.',
       fix: 'Define the color using \\definecolor or load \\usepackage[dvipsnames]{xcolor}.',
       doc_slug: '29_undefined_color'
     },
     {
       id: :mismatched_environment,
-      pattern: /\\begin\{([^\}]+)\} (?:on input line \d+ )?ended by \\end\{([^\}]+)\}/i,
+      pattern: /\\begin\{([^}]+)\} (?:on input line \d+ )?ended by \\end\{([^}]+)\}/i,
       title: 'Mismatched \\begin and \\end environments',
       token_extractor: ->(match, _block) { "#{match[1]} vs #{match[2]}" },
-      hint: ->(tok) { tok ? "Environment mismatch ('#{tok}'); ensure \\begin{foo} matches \\end{foo}" : 'Environment mismatch; ensure \\begin matches \\end' },
+      hint: lambda { |tok|
+        tok ? "Environment mismatch ('#{tok}'); ensure \\begin{foo} matches \\end{foo}" : 'Environment mismatch; ensure \\begin matches \\end'
+      },
       why: 'An environment was opened with \\begin{foo} but closed with \\end{bar}.',
       fix: 'Ensure the environment name in \\end matches the opening \\begin.',
       doc_slug: '30_mismatched_environment'
@@ -831,7 +841,9 @@ module LaTeXErrorCatalog
       id: :illegal_parameter_number,
       pattern: /Illegal parameter number in definition of (\S+)/i,
       title: 'Illegal parameter number in definition',
-      hint: ->(tok) { tok ? "Macro '#{tok}' uses parameters (#1) without declaring argument count [n]" : 'Macro uses parameters without declaring argument count' },
+      hint: lambda { |tok|
+        tok ? "Macro '#{tok}' uses parameters (#1) without declaring argument count [n]" : 'Macro uses parameters without declaring argument count'
+      },
       why: 'A macro definition referenced #1 or #2 but omitted the parameter count declaration.',
       fix: 'Declare the number of arguments: \\newcommand{\\cmd}[1]{...}.',
       doc_slug: '35_illegal_parameter_number'
@@ -867,7 +879,9 @@ module LaTeXErrorCatalog
       id: :use_of_doesnt_match_definition,
       pattern: /Use of (\S+) doesn't match its definition/i,
       title: "Use of command doesn't match its definition",
-      hint: ->(tok) { tok ? "Argument mismatch for delimited macro '#{tok}'; check delimiter syntax" : "Argument mismatch for delimited macro; check delimiter syntax" },
+      hint: lambda { |tok|
+        tok ? "Argument mismatch for delimited macro '#{tok}'; check delimiter syntax" : 'Argument mismatch for delimited macro; check delimiter syntax'
+      },
       why: 'A delimited macro was defined with custom argument syntax but invoked with different delimiters.',
       fix: 'Match the macro delimiter structure (e.g. \\cmd(arg) instead of \\cmd{arg}).',
       doc_slug: '39_use_of_doesnt_match_definition'
@@ -894,7 +908,9 @@ module LaTeXErrorCatalog
       id: :package_babel_unknown_language,
       pattern: /Package babel Error: Unknown (?:language|option) [`']([^`'.]+)['`]/i,
       title: 'Package babel Error: Unknown language',
-      hint: ->(tok) { tok ? "Unknown babel language '#{tok}'; check spelling or texlive-lang" : 'Unknown babel language; check spelling or texlive-lang' },
+      hint: lambda { |tok|
+        tok ? "Unknown babel language '#{tok}'; check spelling or texlive-lang" : 'Unknown babel language; check spelling or texlive-lang'
+      },
       why: 'The language option passed to babel is not defined or installed.',
       fix: 'Verify language spelling (e.g. english, french, german) and install language packs.',
       doc_slug: '42_package_babel_unknown_language'
@@ -921,7 +937,9 @@ module LaTeXErrorCatalog
       id: :no_counter_defined,
       pattern: /No counter [`']([^`']+)['`] defined/i,
       title: 'LaTeX Error: No counter defined',
-      hint: ->(tok) { tok ? "Counter '#{tok}' does not exist; declare with \\newcounter{#{tok}}" : 'Counter does not exist; declare with \\newcounter' },
+      hint: lambda { |tok|
+        tok ? "Counter '#{tok}' does not exist; declare with \\newcounter{#{tok}}" : 'Counter does not exist; declare with \\newcounter'
+      },
       why: 'A counter operation was performed on an undeclared counter name.',
       fix: 'Declare the counter with \\newcounter{...} or check spelling.',
       doc_slug: '45_no_counter_defined'
@@ -930,7 +948,9 @@ module LaTeXErrorCatalog
       id: :command_undefined,
       pattern: /Command `?(\\?\S+?)'? undefined/i,
       title: 'LaTeX Error: Command undefined',
-      hint: ->(tok) { tok ? "Command '#{tok}' is not defined; use \\newcommand instead of \\renewcommand" : 'Command is not defined; use \\newcommand instead of \\renewcommand' },
+      hint: lambda { |tok|
+        tok ? "Command '#{tok}' is not defined; use \\newcommand instead of \\renewcommand" : 'Command is not defined; use \\newcommand instead of \\renewcommand'
+      },
       why: '\\renewcommand was used on a macro that has not yet been declared.',
       fix: 'Use \\newcommand to define the command or check for typos in the name.',
       doc_slug: '46_command_undefined'
@@ -939,7 +959,9 @@ module LaTeXErrorCatalog
       id: :file_ended_while_scanning,
       pattern: /File ended while scanning (?:use|text) of (\\\S+?|\S+?)\.?$/i,
       title: 'File ended while scanning macro',
-      hint: ->(tok) { tok ? "Unclosed brace in argument of '#{tok}'; add missing '}' before EOF" : "Unclosed brace before end of file; add missing '}'" },
+      hint: lambda { |tok|
+        tok ? "Unclosed brace in argument of '#{tok}'; add missing '}' before EOF" : "Unclosed brace before end of file; add missing '}'"
+      },
       why: 'End of file was reached while TeX was still looking for a closing brace.',
       fix: 'Add the missing closing curly brace } to terminate the macro argument.',
       doc_slug: '47_file_ended_while_scanning'
@@ -984,7 +1006,9 @@ module LaTeXErrorCatalog
       id: :package_pgfkeys_unknown_key,
       pattern: /Package pgfkeys Error: I do not know the key [`']([^`']+)['`]/i,
       title: 'Package pgfkeys Error: Unknown key',
-      hint: ->(tok) { tok ? "Unknown pgfkeys option '#{tok}'; check spelling or load library" : 'Unknown pgfkeys option; check spelling or load library' },
+      hint: lambda { |tok|
+        tok ? "Unknown pgfkeys option '#{tok}'; check spelling or load library" : 'Unknown pgfkeys option; check spelling or load library'
+      },
       why: 'A key passed to a TikZ/PGF command is not recognized.',
       fix: 'Check the key spelling or load the required library (\\usetikzlibrary{...}).',
       doc_slug: '52_package_pgfkeys_unknown_key'
@@ -1002,7 +1026,9 @@ module LaTeXErrorCatalog
       id: :package_enumitem_key_undefined,
       pattern: /Package enumitem Error: (\S+) undefined/i,
       title: 'Package enumitem Error: Key undefined',
-      hint: ->(tok) { tok ? "Undefined enumitem key '#{tok}'; check documentation (e.g. label, leftmargin)" : 'Undefined enumitem key; check documentation' },
+      hint: lambda { |tok|
+        tok ? "Undefined enumitem key '#{tok}'; check documentation (e.g. label, leftmargin)" : 'Undefined enumitem key; check documentation'
+      },
       why: 'An invalid option key was passed to an enumitem list environment.',
       fix: 'Use valid enumitem options like label, leftmargin, itemsep, or topsep.',
       doc_slug: '54_package_enumitem_key_undefined'
@@ -1025,7 +1051,7 @@ module LaTeXErrorCatalog
       next unless match
 
       token = extract_token(entry, match, err_block, file: file, line: line)
-      _cs, macro = (entry[:id] == :undefined_control_sequence) ? extract_undefined_cs_info(err_block) : [token, nil]
+      _cs, macro = entry[:id] == :undefined_control_sequence ? extract_undefined_cs_info(err_block) : [token, nil]
       hint = resolve_hint(entry[:hint], token, file: file, macro: macro, junk_dir: junk_dir)
       root_line, root_col = extract_root_location(entry, token, hint, file, line, err_block: err_block)
 
@@ -1056,9 +1082,7 @@ module LaTeXErrorCatalog
   end
 
   def self.extract_root_location(entry, token, hint, file, line, err_block: [])
-    if hint =~ /opened on line (\d+)(?:\s*\(col\s*(\d+)\))?/i
-      return [Regexp.last_match(1).to_i, Regexp.last_match(2) ? Regexp.last_match(2).to_i : nil]
-    end
+    return [Regexp.last_match(1).to_i, Regexp.last_match(2)&.to_i] if hint =~ /opened on line (\d+)(?:\s*\(col\s*(\d+)\))?/i
 
     if entry[:id] == :misplaced_alignment_tab
       col = extract_misplaced_tab_col(file, line)
@@ -1078,11 +1102,11 @@ module LaTeXErrorCatalog
 
   def self.extract_misplaced_tab_col(file, line)
     source_file = find_source_file(file)
-    return nil unless source_file && line && line.to_i > 0
+    return nil unless source_file && line&.to_i&.positive?
 
     lines = File.readlines(source_file)
     idx = line.to_i - 1
-    return nil if idx < 0 || idx >= lines.size
+    return nil if idx.negative? || idx >= lines.size
 
     pos = lines[idx].index(/(?<!\\)&/)
     pos ? pos + 1 : nil
@@ -1094,11 +1118,11 @@ module LaTeXErrorCatalog
     return nil unless token && !token.empty?
 
     source_file = find_source_file(file)
-    return nil unless source_file && line && line.to_i > 0
+    return nil unless source_file && line&.to_i&.positive?
 
     lines = File.readlines(source_file)
     idx = line.to_i - 1
-    return nil if idx < 0 || idx >= lines.size
+    return nil if idx.negative? || idx >= lines.size
 
     pos = lines[idx].index(token)
     pos ? pos + 1 : nil
@@ -1108,7 +1132,7 @@ module LaTeXErrorCatalog
 
   def self.extract_token(entry, match, err_block, file: nil, line: nil)
     extractor = entry[:token_extractor]
-    return nil unless extractor || (match && match.captures.any?)
+    return nil unless extractor || match&.captures&.any?
 
     if extractor
       extractor.arity == 2 ? extractor.call(match, err_block) : extractor.call(match, err_block, file, line)

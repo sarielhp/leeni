@@ -60,11 +60,16 @@ class TestVimIntegration < Minitest::Test
 
       # Verify Vim parses this into quickfix list
       File.write(File.join(dir, 'out.txt'), out)
-      efm = "%f:%l:%c:\\ %t%*[^:]:\\ %m,%f:%l:\\ %t%*[^:]:\\ %m,%f:%l:\\ %m,%-G%.%#"
-      cmd = %(vim -N -u NONE -es -c "set efm=#{efm}" -c "cfile out.txt" -c "redir! > qf.txt | echom string(getqflist()) | redir END" -c "qall!")
-      system(cmd, chdir: dir)
+      efm = '%f:%l:%c:\\ %t%*[^:]:\\ %m,%f:%l:\\ %t%*[^:]:\\ %m,%f:%l:\\ %m,%-G%.%#'
+      cmd = ['vim', '-N', '-u', 'NONE', '-es', '-c', "set efm=#{efm}", '-c', 'cfile out.txt',
+             '-c', 'redir! > qf.txt | echom string(getqflist()) | redir END', '-c', 'qall!']
+      system(*cmd, chdir: dir)
 
-      qf_content = File.read(File.join(dir, 'qf.txt')) rescue ''
+      qf_content = begin
+        File.read(File.join(dir, 'qf.txt'))
+      rescue StandardError
+        ''
+      end
       assert_includes qf_content, "'valid': 1"
       assert_includes qf_content, "'type': 'e'"
       assert_includes qf_content, "'lnum': 3"
@@ -90,11 +95,16 @@ class TestVimIntegration < Minitest::Test
       refute_includes out, '── warn.tex'
 
       File.write(File.join(dir, 'out.txt'), out)
-      efm = "%f:%l:%c:\\ %t%*[^:]:\\ %m,%f:%l:\\ %t%*[^:]:\\ %m,%f:%l:\\ %m,%-G%.%#"
-      cmd = %(vim -N -u NONE -es -c "set efm=#{efm}" -c "cfile out.txt" -c "redir! > qf.txt | echom string(getqflist()) | redir END" -c "qall!")
-      system(cmd, chdir: dir)
+      efm = '%f:%l:%c:\\ %t%*[^:]:\\ %m,%f:%l:\\ %t%*[^:]:\\ %m,%f:%l:\\ %m,%-G%.%#'
+      cmd = ['vim', '-N', '-u', 'NONE', '-es', '-c', "set efm=#{efm}", '-c', 'cfile out.txt',
+             '-c', 'redir! > qf.txt | echom string(getqflist()) | redir END', '-c', 'qall!']
+      system(*cmd, chdir: dir)
 
-      qf_content = File.read(File.join(dir, 'qf.txt')) rescue ''
+      qf_content = begin
+        File.read(File.join(dir, 'qf.txt'))
+      rescue StandardError
+        ''
+      end
       assert_includes qf_content, "'valid': 1"
       assert_includes qf_content, "'type': 'w'"
       assert_includes qf_content, "'lnum': 3"

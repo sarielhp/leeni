@@ -122,7 +122,7 @@ class TestSampleArxivReview < Minitest::Test
     replies = [redirect, success]
     connection = Object.new
     %i[use_ssl= open_timeout= read_timeout= max_retries=].each do |setter|
-      connection.define_singleton_method(setter) { |_value| }
+      connection.define_singleton_method(setter) { |_value| nil }
     end
     connection.define_singleton_method(:start) { |&block| block.call(connection) }
     connection.define_singleton_method(:request) do |_request, &block|
@@ -150,7 +150,7 @@ class TestSampleArxivReview < Minitest::Test
     responses.each { |response| response.define_singleton_method(:read_body) { |&block| block.call('body') } }
     connection = Object.new
     %i[use_ssl= open_timeout= read_timeout= max_retries=].each do |setter|
-      connection.define_singleton_method(setter) { |_value| }
+      connection.define_singleton_method(setter) { |_value| nil }
     end
     connection.define_singleton_method(:start) { |&block| block.call(connection) }
     connection.define_singleton_method(:request) do |_request, &block|
@@ -167,7 +167,7 @@ class TestSampleArxivReview < Minitest::Test
     assert_equal [7.0], sleeps
 
     retries = Array.new(4) { Net::HTTPTooManyRequests.new('1.1', '429', 'Too Many Requests') }
-    retries.each { |response| response.define_singleton_method(:read_body) {} }
+    retries.each { |response| response.define_singleton_method(:read_body) { nil } }
     responses.replace(retries)
     assert_raises(ArxivSampler::HttpError) { client.get('https://export.arxiv.org/api/query') }
     assert_equal [7.0, 3, 6, 12], sleeps

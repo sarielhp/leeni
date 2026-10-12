@@ -8,7 +8,7 @@
 # ==============================================================================
 
 module LaTeXMacroHarvester
-  MACRO_DEF_PATTERN = %r{
+  MACRO_DEF_PATTERN = /
     \\(?:
       (?:renew|new|provide)command|
       DeclareRobustCommand|
@@ -17,7 +17,7 @@ module LaTeXMacroHarvester
     )\*?\s*\{?\\([a-zA-Z@]+)
     |
     \\(?:[gex]?def|let)\s*\\([a-zA-Z@]+)
-  }x.freeze
+  /x
 
   EXCLUDED_DIRS = %w[junk .junk .git .bws .gemini node_modules].freeze
 
@@ -126,9 +126,7 @@ module LaTeXMacroHarvester
       artifact_dirs.each { |dir| fls_candidates << File.expand_path(File.join(dir, "#{stem}.fls"), root) }
       fls_candidates << File.join(root, "#{stem}.fls")
     end
-    unless junk_dir
-      fls_candidates.concat(Dir.glob(File.join(root, '{junk,.junk}', '*.fls')))
-    end
+    fls_candidates.concat(Dir.glob(File.join(root, '{junk,.junk}', '*.fls'))) unless junk_dir
 
     files = []
     fls_candidates.uniq.each do |fls|
@@ -156,7 +154,7 @@ module LaTeXMacroHarvester
 
   def self.excluded_dir?(path, excluded = EXCLUDED_DIRS)
     parts = path.split(File::SEPARATOR)
-    (parts & excluded).any?
+    parts.intersect?(excluded)
   end
 
   def self.scan_file_for_macros(file_path, macros)

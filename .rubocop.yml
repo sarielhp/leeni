@@ -1,21 +1,128 @@
-AllCops:
-  TargetRubyVersion: 3.3
-  NewCops: enable
-  DisabledByDefault: true
-  SuggestExtensions: false
+# Balanced RuboCop configuration aligned with ~/prog/standards/ruby/GUIDELINES.md
+# Cognitive metrics (complexity, method length, depth) are enforced via `ruby-audit`.
 
-Lint:
+AllCops:
+  # TargetRubyVersion is intentionally not set: RuboCop reads it from the project
+  # .ruby-version file (also honoured by mise/rbenv). Create that file during onboarding.
+  NewCops: enable
+  SuggestExtensions: false
+  Exclude:
+    - 'vendor/**/*'
+    - 'junk/**/*'
+    - '.bundle/**/*'
+    - 'tmp/**/*'
+    - 'reviews/**/*'     # review-cycle artifacts
+
+# Metric thresholds: Defer to `ruby-audit` for cognitive complexity & tiered sizing
+Metrics/MethodLength:
+  Enabled: false
+
+Metrics/BlockLength:
+  Exclude:
+    - 'test/**/*'
+    - 'spec/**/*'
+    - 'Rakefile'
+    - '*.gemspec'
+    - 'lib/leeni/error_catalog.rb' # Static diagnostic definitions.
+
+Metrics/CyclomaticComplexity:
+  Enabled: false
+
+Metrics/PerceivedComplexity:
+  Enabled: false
+
+Metrics/AbcSize:
+  Enabled: false
+
+Metrics/ClassLength:
+  Max: 800
+  Exclude:
+    - 'test/test_leeni_diagnostics.rb' # Integration fixtures dominate this test class.
+
+Metrics/ModuleLength:
+  Max: 800
+  Exclude:
+    - 'lib/leeni/diagnostics.rb' # Existing diagnostic engine is split into cohesive modules over time.
+    - 'lib/leeni/error_catalog.rb' # Diagnostic catalog is mostly static data.
+
+Metrics/ParameterLists:
+  Max: 8
+  CountKeywordArgs: false # Named options remain readable at call sites.
+
+Metrics/CollectionLiteralLength:
+  Exclude:
+    - 'lib/leeni/error_catalog.rb'
+
+# String allocation hygiene
+Style/FrozenStringLiteralComment:
+  Enabled: true
+  EnforcedStyle: always
+
+Style/StringConcatenation:
+  Enabled: false # Permit string concatenation where appropriate
+
+# Control flow & happy path line-of-sight
+Metrics/BlockNesting:
+  Max: 4 # Aligned with GUIDELINES.md Nesting Depth <= 4
+
+Style/Documentation:
+  Enabled: false # Permit lean classes, structs, and CLI scripts without docstring ceremony
+
+Style/GlobalVars:
+  AllowedVariables:
+    - $PROGRAM_NAME
+    - $0
+    - $stdin
+    - $stdout
+    - $stderr
+    - $?
+
+Style/GuardClause:
+  Enabled: true
+
+Style/IfUnlessModifier:
+  Enabled: true
+
+Style/EmptyElse:
+  EnforcedStyle: empty
+
+Style/StderrPuts:
+  Enabled: false # Allow both warn and $stderr.puts in scripts
+
+Naming/PredicateMethod:
+  Enabled: false # Action methods return success booleans without being predicates.
+
+Naming/MethodParameterName:
+  AllowedNames: [r, g, b, i, j, c, l, re, st, c1, c2, io, id, cc]
+
+Naming/MethodName:
+  AllowedPatterns:
+    - '^Rainbow$' # Compatibility with Rainbow's public constructor helper.
+
+Style/OptionalBooleanParameter:
+  AllowedMethods:
+    - clean_directory # Existing library callers pass the verbosity argument positionally.
+
+Layout/LineLength:
+  Max: 140
+  AllowedPatterns:
+    - '^\s*#'
+    - '^\s*opts\.on'
+    - '^\s*[A-Z_]+\s*=\s*/' # Dense static regular-expression declarations.
+  Exclude:
+    - 'lib/leeni/error_catalog.rb' # Static diagnostic prose and lookup data.
+    - 'tools/generate_gallery' # Published example copy.
+
+# Safety & Exception Handling
+Lint/RescueException:
+  Enabled: true
+
+Lint/SuppressedException:
   Enabled: true
 
 Lint/ScriptPermission:
-  Enabled: false
+  Enabled: false # Permit drafting scripts prior to chmod +x or deployment to bin/
 
-Lint/EmptyBlock:
-  Enabled: false
-
-Lint/AmbiguousBlockAssociation:
-  Enabled: false
-
-Lint/RescueException:
-  Exclude:
-    - 'tools/arxiv_test_worker.rb'
+# Process Execution Safety
+Security/Open:
+  Enabled: true

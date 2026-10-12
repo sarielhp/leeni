@@ -26,118 +26,116 @@ def escape_xml(str)
 end
 
 def render_png(svg_path, png_path)
-  if system('which', 'rsvg-convert', out: File::NULL, err: File::NULL)
-    return system('rsvg-convert', '-o', png_path, svg_path)
-  end
+  return system('rsvg-convert', '-o', png_path, svg_path) if system('which', 'rsvg-convert', out: File::NULL, err: File::NULL)
 
   system('convert', '-density', '150', svg_path, png_path)
 end
 
 # Left panel lines (latexmk)
 LEFT_LINES = [
-  { text: "$ latexmk -xelatex paper.tex", color: "#7dcfff", bold: true },
-  { text: "Latexmk: This is Latexmk, version 4.88.", color: "#565f89" },
-  { text: "Latexmk: applying rule 'xelatex'...", color: "#565f89" },
-  { text: "Running 'xelatex -no-pdf -recorder paper.tex'", color: "#565f89" },
-  { text: "This is XeTeX, Version 3.141592653 (TeX Live)...", color: "#565f89" },
-  { text: "(./paper.tex LaTeX2e <2026-06-01>", color: "#565f89" },
-  { text: "(/usr/share/texlive/.../article.cls)", color: "#565f89" },
-  { text: "(/usr/share/texlive/.../l3backend-xetex.def)", color: "#565f89" },
-  { text: "(junk/paper.aux))", color: "#565f89" },
-  { text: "Runaway argument?", color: "#ff9e64", bold: true },
-  { text: "{that forgot the closing brace. \\par And here... \\ETC.", color: "#c0caf5" },
-  { text: "! File ended while scanning use of \\textbf .", color: "#ff6b6b", bold: true },
-  { text: "<inserted text>", color: "#565f89" },
-  { text: "                \\par", color: "#565f89" },
-  { text: "<*> .../paper.tex", color: "#ff6b6b" },
-  { text: "! Emergency stop.", color: "#ff6b6b", bold: true },
-  { text: "Transcript written on junk/paper.log.", color: "#565f89" },
-  { text: "Latexmk: Errors, so I did not complete making targets", color: "#ff9e64" },
-  { text: "Collected error summary: 'xelatex' return code 1", color: "#ff6b6b" }
+  { text: '$ latexmk -xelatex paper.tex', color: '#7dcfff', bold: true },
+  { text: 'Latexmk: This is Latexmk, version 4.88.', color: '#565f89' },
+  { text: "Latexmk: applying rule 'xelatex'...", color: '#565f89' },
+  { text: "Running 'xelatex -no-pdf -recorder paper.tex'", color: '#565f89' },
+  { text: 'This is XeTeX, Version 3.141592653 (TeX Live)...', color: '#565f89' },
+  { text: '(./paper.tex LaTeX2e <2026-06-01>', color: '#565f89' },
+  { text: '(/usr/share/texlive/.../article.cls)', color: '#565f89' },
+  { text: '(/usr/share/texlive/.../l3backend-xetex.def)', color: '#565f89' },
+  { text: '(junk/paper.aux))', color: '#565f89' },
+  { text: 'Runaway argument?', color: '#ff9e64', bold: true },
+  { text: '{that forgot the closing brace. \\par And here... \\ETC.', color: '#c0caf5' },
+  { text: '! File ended while scanning use of \\textbf .', color: '#ff6b6b', bold: true },
+  { text: '<inserted text>', color: '#565f89' },
+  { text: '                \\par', color: '#565f89' },
+  { text: '<*> .../paper.tex', color: '#ff6b6b' },
+  { text: '! Emergency stop.', color: '#ff6b6b', bold: true },
+  { text: 'Transcript written on junk/paper.log.', color: '#565f89' },
+  { text: 'Latexmk: Errors, so I did not complete making targets', color: '#ff9e64' },
+  { text: "Collected error summary: 'xelatex' return code 1", color: '#ff6b6b' }
 ].freeze
 
 # Right panel lines (leeni)
 RIGHT_LINES = [
-  { text: "$ l paper.tex", color: "#7dcfff", bold: true },
-  { text: "      xelatex (1): Latex compilation failed! (Status: 1)", color: "#ff6b6b", bold: true },
-  { text: "", color: "#c0caf5" },
-  { text: "── paper.tex (2 errors) ──────────────────────────────────", color: "#ff6b6b", bold: true },
-  { text: "6: ! Unclosed open brace '{' (opened on line 6, col 34)", color: "#ff6b6b", bold: true },
-  { text: "   inside environment 'document' (ended at line 9)", color: "#ff6b6b" },
-  { text: "   l.6 Here is an unclosed macro \\textbf{that forgot...", color: "#c0caf5", bold: true },
-  { text: " : Runaway argument?", color: "#ff9e64", bold: true },
-  { text: "   {that forgot the closing brace. \\par And here...", color: "#c0caf5" },
-  { text: "   ▸ Hint: Unclosed brace across paragraph; insert '}'", color: "#9ece6a", bold: true },
-  { text: "See junk/err_xelatex_1 for full error details.", color: "#565f89" },
-  { text: "", color: "#c0caf5" },
-  { text: "Errors: 2, Alerts: 0, Warnings: 0, Whatevers: 0", color: "#7aa2f7" }
+  { text: '$ l paper.tex', color: '#7dcfff', bold: true },
+  { text: '      xelatex (1): Latex compilation failed! (Status: 1)', color: '#ff6b6b', bold: true },
+  { text: '', color: '#c0caf5' },
+  { text: '── paper.tex (2 errors) ──────────────────────────────────', color: '#ff6b6b', bold: true },
+  { text: "6: ! Unclosed open brace '{' (opened on line 6, col 34)", color: '#ff6b6b', bold: true },
+  { text: "   inside environment 'document' (ended at line 9)", color: '#ff6b6b' },
+  { text: '   l.6 Here is an unclosed macro \\textbf{that forgot...', color: '#c0caf5', bold: true },
+  { text: ' : Runaway argument?', color: '#ff9e64', bold: true },
+  { text: '   {that forgot the closing brace. \\par And here...', color: '#c0caf5' },
+  { text: "   ▸ Hint: Unclosed brace across paragraph; insert '}'", color: '#9ece6a', bold: true },
+  { text: 'See junk/err_xelatex_1 for full error details.', color: '#565f89' },
+  { text: '', color: '#c0caf5' },
+  { text: 'Errors: 2, Alerts: 0, Warnings: 0, Whatevers: 0', color: '#7aa2f7' }
 ].freeze
 
 def render_svg(left_subset, right_subset, show_left_pill: true, show_right_pill: true)
   <<~SVG
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 #{WIDTH} #{HEIGHT}" width="#{WIDTH}" height="#{HEIGHT}">
-    <defs>
-      <style>
-        .code { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace; font-size: 13px; line-height: 21px; }
-        .title { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; font-size: 14px; font-weight: 600; }
-        .badge { font-family: ui-monospace, monospace; font-size: 12px; font-weight: 700; }
-      </style>
-      <filter id="shadow" x="-5%" y="-5%" width="110%" height="110%">
-        <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#000000" flood-opacity="0.45"/>
-      </filter>
-    </defs>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 #{WIDTH} #{HEIGHT}" width="#{WIDTH}" height="#{HEIGHT}">
+      <defs>
+        <style>
+          .code { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace; font-size: 13px; line-height: 21px; }
+          .title { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; font-size: 14px; font-weight: 600; }
+          .badge { font-family: ui-monospace, monospace; font-size: 12px; font-weight: 700; }
+        </style>
+        <filter id="shadow" x="-5%" y="-5%" width="110%" height="110%">
+          <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#000000" flood-opacity="0.45"/>
+        </filter>
+      </defs>
 
-    <!-- Background -->
-    <rect width="#{WIDTH}" height="#{HEIGHT}" rx="14" fill="#13141c"/>
+      <!-- Background -->
+      <rect width="#{WIDTH}" height="#{HEIGHT}" rx="14" fill="#13141c"/>
 
-    <!-- Left Panel: latexmk -->
-    <g transform="translate(24, 24)" filter="url(#shadow)">
-      <rect width="528" height="530" rx="10" fill="#1a1b26" stroke="#2f334d" stroke-width="1.5"/>
-      <path d="M 0,10 A 10,10 0 0,1 10,0 L 518,0 A 10,10 0 0,1 528,10 L 528,40 L 0,40 Z" fill="#16161e"/>
-      <circle cx="20" cy="20" r="6" fill="#ff6b6b"/>
-      <circle cx="38" cy="20" r="6" fill="#e0af68"/>
-      <circle cx="56" cy="20" r="6" fill="#414868"/>
-      <text x="264" y="25" fill="#787c99" text-anchor="middle" class="title">latexmk (Standard TeX Log)</text>
+      <!-- Left Panel: latexmk -->
+      <g transform="translate(24, 24)" filter="url(#shadow)">
+        <rect width="528" height="530" rx="10" fill="#1a1b26" stroke="#2f334d" stroke-width="1.5"/>
+        <path d="M 0,10 A 10,10 0 0,1 10,0 L 518,0 A 10,10 0 0,1 528,10 L 528,40 L 0,40 Z" fill="#16161e"/>
+        <circle cx="20" cy="20" r="6" fill="#ff6b6b"/>
+        <circle cx="38" cy="20" r="6" fill="#e0af68"/>
+        <circle cx="56" cy="20" r="6" fill="#414868"/>
+        <text x="264" y="25" fill="#787c99" text-anchor="middle" class="title">latexmk (Standard TeX Log)</text>
 
-      <g transform="translate(20, 66)" class="code">
-        #{left_subset.map.with_index { |l, i|
-          weight = l[:bold] ? 'font-weight="bold"' : ''
-          %(<text x="0" y="#{i * 21}" fill="#{l[:color]}" #{weight}>#{escape_xml(l[:text])}</text>)
-        }.join("\n        ")}
+        <g transform="translate(20, 66)" class="code">
+          #{left_subset.map.with_index do |l, i|
+            weight = l[:bold] ? 'font-weight="bold"' : ''
+            %(<text x="0" y="#{i * 21}" fill="#{l[:color]}" #{weight}>#{escape_xml(l[:text])}</text>)
+          end.join("\n        ")}
+        </g>
+
+        #{if show_left_pill
+            %(<g transform="translate(20, 478)">
+              <rect width="488" height="34" rx="6" fill="#2d1c24" stroke="#ff6b6b" stroke-width="1.2"/>
+              <text x="244" y="21" fill="#ff6b6b" text-anchor="middle" class="badge">❌ 50+ lines of noise — line of unclosed brace is unknown!</text>
+            </g>)
+          end}
       </g>
 
-      #{if show_left_pill
-          %(<g transform="translate(20, 478)">
-            <rect width="488" height="34" rx="6" fill="#2d1c24" stroke="#ff6b6b" stroke-width="1.2"/>
-            <text x="244" y="21" fill="#ff6b6b" text-anchor="middle" class="badge">❌ 50+ lines of noise — line of unclosed brace is unknown!</text>
-          </g>)
-        end}
-    </g>
+      <!-- Right Panel: leeni -->
+      <g transform="translate(588, 24)" filter="url(#shadow)">
+        <rect width="528" height="530" rx="10" fill="#1a1b26" stroke="#384a68" stroke-width="1.5"/>
+        <path d="M 0,10 A 10,10 0 0,1 10,0 L 518,0 A 10,10 0 0,1 528,10 L 528,40 L 0,40 Z" fill="#16161e"/>
+        <circle cx="20" cy="20" r="6" fill="#ff6b6b"/>
+        <circle cx="38" cy="20" r="6" fill="#e0af68"/>
+        <circle cx="56" cy="20" r="6" fill="#9ece6a"/>
+        <text x="264" y="25" fill="#c0caf5" text-anchor="middle" class="title">leeni (l)</text>
 
-    <!-- Right Panel: leeni -->
-    <g transform="translate(588, 24)" filter="url(#shadow)">
-      <rect width="528" height="530" rx="10" fill="#1a1b26" stroke="#384a68" stroke-width="1.5"/>
-      <path d="M 0,10 A 10,10 0 0,1 10,0 L 518,0 A 10,10 0 0,1 528,10 L 528,40 L 0,40 Z" fill="#16161e"/>
-      <circle cx="20" cy="20" r="6" fill="#ff6b6b"/>
-      <circle cx="38" cy="20" r="6" fill="#e0af68"/>
-      <circle cx="56" cy="20" r="6" fill="#9ece6a"/>
-      <text x="264" y="25" fill="#c0caf5" text-anchor="middle" class="title">leeni (l)</text>
+        <g transform="translate(20, 66)" class="code">
+          #{right_subset.map.with_index do |l, i|
+            weight = l[:bold] ? 'font-weight="bold"' : ''
+            %(<text x="0" y="#{i * 21}" fill="#{l[:color]}" #{weight}>#{escape_xml(l[:text])}</text>)
+          end.join("\n        ")}
+        </g>
 
-      <g transform="translate(20, 66)" class="code">
-        #{right_subset.map.with_index { |l, i|
-          weight = l[:bold] ? 'font-weight="bold"' : ''
-          %(<text x="0" y="#{i * 21}" fill="#{l[:color]}" #{weight}>#{escape_xml(l[:text])}</text>)
-        }.join("\n        ")}
+        #{if show_right_pill
+            %(<g transform="translate(20, 478)">
+              <rect width="488" height="34" rx="6" fill="#1c2d24" stroke="#9ece6a" stroke-width="1.2"/>
+              <text x="244" y="21" fill="#9ece6a" text-anchor="middle" class="badge">✔ Pinpoints opened line 6, col 34 instantly with actionable hint!</text>
+            </g>)
+          end}
       </g>
-
-      #{if show_right_pill
-          %(<g transform="translate(20, 478)">
-            <rect width="488" height="34" rx="6" fill="#1c2d24" stroke="#9ece6a" stroke-width="1.2"/>
-            <text x="244" y="21" fill="#9ece6a" text-anchor="middle" class="badge">✔ Pinpoints opened line 6, col 34 instantly with actionable hint!</text>
-          </g>)
-        end}
-    </g>
-  </svg>
+    </svg>
   SVG
 end
 
@@ -175,7 +173,8 @@ if system('which', 'convert', out: File::NULL, err: File::NULL)
     f4_png = PNG_FILE
 
     # Assemble into animated GIF: Frame 1 (1.2s), Frame 2 (0.8s), Frame 3 (1.2s), Frame 4 (4.5s)
-    system('convert', '-delay', '120', f1_png, '-delay', '80', f2_png, '-delay', '120', f3_png, '-delay', '450', f4_png, '-loop', '0', GIF_FILE)
+    system('convert', '-delay', '120', f1_png, '-delay', '80', f2_png, '-delay', '120', f3_png, '-delay', '450', f4_png, '-loop', '0',
+           GIF_FILE)
     puts "Wrote #{GIF_FILE}" if File.exist?(GIF_FILE)
   end
 end

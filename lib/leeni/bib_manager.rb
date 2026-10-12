@@ -42,11 +42,17 @@ class LaTeXBibManager
 
   def bib_files_newer_than_bbl?
     fnbbl = File.join(junk_dir, "#{bfilename}.bbl")
-    return false unless File.exist?(fnbbl) && File.size(fnbbl) > 0
+    return false unless File.exist?(fnbbl) && File.size(fnbbl).positive?
     return false unless File.exist?(File.join(junk_dir, "#{bfilename}.aux")) || File.exist?(File.join(junk_dir, "#{bfilename}.bcf"))
 
     bbl_mtime = File.mtime(fnbbl)
-    discover_bib_files.any? { |b| (File.mtime(b) rescue 0) > bbl_mtime }
+    discover_bib_files.any? do |b|
+      begin
+        File.mtime(b)
+      rescue StandardError
+        0
+      end > bbl_mtime
+    end
   end
 
   def detect_bib_tool(aux_contents = nil)
@@ -157,7 +163,7 @@ class LaTeXBibManager
     bib_out, status = invoke_bibliography_command(tool, fnbbl, previous)
     return false unless bib_out
 
-    status_ok = status.respond_to?(:success?) ? status.success? : (status == 0)
+    status_ok = status.respond_to?(:success?) ? status.success? : status.zero?
     has_entries = LaTeXUtils.bbl_has_entries?(fnbbl)
     if LaTeXUtils.bib_fatal_error?(tool, bib_out, status_ok)
       restore_bibliography(fnbbl, previous)
@@ -225,7 +231,9 @@ class LaTeXBibManager
     return [] unless File.exist?(bcf_path)
 
     files = []
-    LaTeXUtils.safe_read(bcf_path).scan(/<bcf:datasource[^>]*>(.*?)<\/bcf:datasource>/) { |m| collect_bib_candidates(m.first.strip, files) }
+    LaTeXUtils.safe_read(bcf_path).scan(%r{<bcf:datasource[^>]*>(.*?)</bcf:datasource>}) do |m|
+      collect_bib_candidates(m.first.strip, files)
+    end
     files
   end
 
@@ -264,7 +272,7 @@ class LaTeXBibManager
     FileUtils.mkdir_p(File.join(junk_dir, 'styles'))
     Dir['styles/*'].each do |s|
       base = File.basename(s)
-      FileUtils.cp_r(s, File.join(junk_dir, 'styles/')) unless base == junk_dir || base == 'junk' || base == '.junk'
+      FileUtils.cp_r(s, File.join(junk_dir, 'styles/')) unless base == junk_dir || ['junk', '.junk'].include?(base)
     end
   end
 
@@ -288,18 +296,30 @@ class LaTeXBibManager
   end
 
   def fresh_file?(path, since)
-    (File.mtime(path) rescue Time.at(0)) >= since - AUX_MTIME_SLACK
+    begin
+      File.mtime(path)
+    rescue StandardError
+      Time.at(0)
+    end >= since - AUX_MTIME_SLACK
   end
 
   # Containment is checked on canonical paths so a symlinked directory inside
   # Aux traversal cannot lead the closure to files outside the build directory.
   def linked_aux_files(main)
-    root = (File.realpath(junk_dir) rescue File.expand_path(junk_dir)) + File::SEPARATOR
+    root = begin
+      File.realpath(junk_dir)
+    rescue StandardError
+      File.expand_path(junk_dir)
+    end + File::SEPARATOR
     queue = [File.expand_path(main)]
     found = {}
     until queue.empty?
       file = queue.shift
-      real = (File.realpath(file) rescue nil)
+      real = begin
+        File.realpath(file)
+      rescue StandardError
+        nil
+      end
       next if real.nil? || found.key?(real) || !real.start_with?(root) || !File.file?(real)
 
       found[real] = File.join(junk_dir, file.delete_prefix(File.expand_path(junk_dir) + File::SEPARATOR))
@@ -334,7 +354,7 @@ class LaTeXBibManager
   end
 
   def bbl_satisfies_citations?(fnbbl, aux_contents = nil)
-    return false unless File.file?(fnbbl) && File.size(fnbbl) > 0
+    return false unless File.file?(fnbbl) && File.size(fnbbl).positive?
 
     cites = current_citation_keys(aux_contents).reject { |k| k == '*' }.to_set
     return true if cites.empty?
@@ -385,12 +405,20 @@ class LaTeXBibManager
   end
 
   def bib_file_changed?(path, bbl_mtime)
-    return true if (File.mtime(path) rescue 0) > bbl_mtime
+    return true if begin
+      File.mtime(path)
+    rescue StandardError
+      0
+    end > bbl_mtime
 
     last_sha = @last_bib_sources&.dig(path, 'sha')
     return false unless last_sha
 
-    current_sha = @builder.input_snapshots&.dig(path, :sha) || (Digest::SHA256.file(path).hexdigest rescue nil)
+    current_sha = @builder.input_snapshots&.dig(path, :sha) || begin
+      Digest::SHA256.file(path).hexdigest
+    rescue StandardError
+      nil
+    end
     current_sha != last_sha
   end
 end

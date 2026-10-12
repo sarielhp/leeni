@@ -108,7 +108,7 @@ class TestFlattener < Minitest::Test
 
       out = LaTeXFlattener.flatten(main, dir)
       assert_includes out, '\\verb|\\input{a}|',
-                       'a real \\verb span must not be rewritten'
+                      'a real \\verb span must not be rewritten'
       refute_includes out, 'INCLUDED'
     end
   end
@@ -186,7 +186,7 @@ class TestFlattener < Minitest::Test
       TEX
 
       out = LaTeXFlattener.flatten(main, proj)
-      assert_includes out, "\\def\\foo{bar}"
+      assert_includes out, '\\def\\foo{bar}'
       assert_includes out, 'SECTION_BODY'
       refute_includes out, '\\input{macros}'
       refute_includes out, '\\input{content}'

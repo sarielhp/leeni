@@ -341,7 +341,7 @@ module Tooling
     raise "installed permissions mismatch: #{destination}" unless File.stat(built).mode == File.stat(destination).mode
   end
 
-  def release(message, install_requested)
+  def release(message, install_requested: true)
     published = false
     upstream
     version

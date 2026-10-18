@@ -193,10 +193,10 @@ Always execute quality workflows through the provided scripts:
   ```
 
 ### 8. `tools/release` (Full Release & Publication Workflow)
-- Runs `tools/commit`, followed by `tools/bump` (which runs `tools/gate --full`, tags, and pushes upstream), and optionally runs `tools/install` if `--install` is supplied.
+- Runs `tools/commit`, followed by `tools/bump` (which runs `tools/gate --full`, tags, and pushes upstream), and automatically installs the binary to `~/bin/` (`tools/install`).
 - **Trigger**:
   ```bash
-  rtk proxy tools/release [--install] "Your release commit message"
+  rtk proxy tools/release "Your release commit message"
   ```
 
 ---

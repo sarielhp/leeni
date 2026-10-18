@@ -91,9 +91,9 @@ module Leeni
       end
 
       # 3. Suppress all diagnostics if clean (no alerts or warnings)
-      active_warnings = (@options[:suppress_alerts] ? [] : alerts) +
-                        (@options[:suppress_warnings] ? [] : warnings)
-      whatevers = [] if @options[:suppress_whatevers]
+      active_warnings = sort_by_location((@options[:suppress_alerts] ? [] : alerts) +
+                                         (@options[:suppress_warnings] ? [] : warnings))
+      whatevers = @options[:suppress_whatevers] ? [] : sort_by_location(whatevers)
       return if active_warnings.empty? && (!@options[:all] || whatevers.empty?)
 
       # 4. Render folded warnings and alerts
@@ -132,7 +132,7 @@ module Leeni
         if should_fold_category?(cat) && !show_all
           visible = items.first(@fold_threshold)
           remainder = items.size - visible.size
-          visible.each { |rec| io.puts LaTeXCompileFormat.render(rec, color: false, link: false) }
+          visible.each { |rec| io.puts render_line(rec) }
           if remainder.positive?
             file_name = items.first[:file] || 'document.tex'
             name = Presenters.category_name(cat)
@@ -140,14 +140,36 @@ module Leeni
             folds[cat] = remainder
           end
         else
-          items.each { |rec| io.puts LaTeXCompileFormat.render(rec, color: false, link: false) }
+          items.each { |rec| io.puts render_line(rec) }
         end
       end
 
       # Whatevers (underfull boxes) are emitted only if show_all is true
-      whatevers.each { |rec| io.puts LaTeXCompileFormat.render(rec, color: false, link: false) } if show_all
+      whatevers.each { |rec| io.puts render_line(rec) } if show_all
 
       folds
+    end
+
+    # Alerts before warnings, then by file and line, so a fix pass can walk the list top to bottom.
+    def sort_by_location(records)
+      records.each_with_index.sort_by do |rec, idx|
+        [rec[:tier].to_s == 'alerts' ? 0 : 1, rec[:file].to_s, rec[:line].to_i, idx]
+      end.map(&:first)
+    end
+
+    def render_line(rec)
+      line = LaTeXCompileFormat.render(rec, color: false, link: false)
+      box = box_suffix(rec)
+      box ? "#{line} #{box}" : line
+    end
+
+    # TeX reports display/alignment rows as "detected at line N" and running
+    # text as "in paragraph at lines N--M"; the span and echoed text say where to look.
+    def box_suffix(rec)
+      return nil unless rec[:box_kind]
+
+      span = rec[:line_end] ? "#{rec[:box_kind]} #{rec[:line]}-#{rec[:line_end]}" : rec[:box_kind].tr('_', '-')
+      rec[:snippet] ? "[box: #{span}] \"#{rec[:snippet]}\"" : "[box: #{span}]"
     end
 
     def should_fold_category?(cat)

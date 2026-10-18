@@ -180,6 +180,10 @@ Global file: `~/.config/leeni/config.jsonc`.
 }
 ```
 
+Overfull/underfull box diagnostics also carry `box_kind` (`paragraph`, `alignment`, `detected_line` or `other`, from the TeX header form: `in paragraph at lines N--M` vs `detected at line N`, which is how display math and alignment rows are reported), `line_end` (span end, when the header gives one) and `snippet` (cleaned echo of the offending text, when TeX printed any).
+
+In `-llm` text output, alerts and warnings are sorted alerts-first, then by file and line, and box lines end with `[box: paragraph 87-95] "snippet"` or `[box: detected-line]`.
+
 ---
 
 ## 8. Common LaTeX Errors & Agent Remediations

@@ -2,6 +2,7 @@
 # frozen_string_literal: true
 
 require 'minitest/autorun'
+require 'json'
 require 'open3'
 require 'tmpdir'
 require 'fileutils'
@@ -111,6 +112,51 @@ class TestLLMMode < Minitest::Test
       assert_includes out, "undefined citation 'refB'"
       assert_includes out, "undefined citation 'refC'"
       refute_includes out, 'more undefined citations'
+    end
+  end
+
+  OVERFULL_TEX = <<~'TEX'
+    \documentclass{article}
+    \begin{document}
+    Text \rule{1.5\textwidth}{1pt} done.
+
+    \[
+    \rule{1.5\textwidth}{1pt}
+    \]
+    \end{document}
+  TEX
+
+  def run_overfull(dir, *flags)
+    File.write(File.join(dir, 'box.tex'), OVERFULL_TEX)
+    Open3.capture3(@bin_path, *flags, '-f', 'box.tex', chdir: dir)
+  end
+
+  def test_llm_mode_sorts_boxes_and_tags_header_kind
+    Dir.mktmpdir('llm_box') do |dir|
+      _out, err, = run_overfull(dir, '-llm', '-a')
+      lines = err.lines.grep(/too wide/)
+      refute_empty lines, "Expected overfull diagnostics: #{err}"
+      assert_equal lines.sort_by { |l| l[/box.tex:(\d+)/, 1].to_i }, lines
+      assert(lines.all? { |l| l.include?('[box: ') }, "Expected [box: ...] tags: #{err}")
+      assert(lines.any? { |l| l.include?('detected-line') }, "Expected a display-math box: #{err}")
+    end
+  end
+
+  def test_json_mode_carries_box_fields
+    Dir.mktmpdir('json_box') do |dir|
+      out, = run_overfull(dir, '--json')
+      boxes = JSON.parse(out)['diagnostics'].select { |d| d['box_kind'] }
+      refute_empty boxes, "Expected box diagnostics in JSON: #{out}"
+      assert(boxes.all? { |d| %w[paragraph alignment detected_line other].include?(d['box_kind']) })
+      spans = boxes.select { |d| d['box_kind'] == 'paragraph' }
+      assert(spans.all? { |d| d['line_end'].to_i >= d['line'].to_i })
+    end
+  end
+
+  def test_regular_mode_output_has_no_box_tags
+    Dir.mktmpdir('plain_box') do |dir|
+      out, err, = run_overfull(dir, '-a')
+      refute_includes out + err, '[box: '
     end
   end
 

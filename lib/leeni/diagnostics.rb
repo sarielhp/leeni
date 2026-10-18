@@ -1381,7 +1381,34 @@ module LaTeXDiagnostics
       hint: item.dig(:catalog, :hint),
       index: item[:index] || 0,
       repeat_count: item[:repeat_count] || 1
-    }
+    }.merge(box_fields(item))
+  end
+
+  BOX_HEADER_KINDS = [
+    [/ in paragraph at lines /, 'paragraph'],
+    [/ in alignment at lines /, 'alignment'],
+    [/ detected at line /, 'detected_line']
+  ].freeze
+  FONT_SWITCH_PATTERN = %r{\\[A-Za-z0-9]+/[^\s/]+/[a-z]+/[a-z]+/\d+(?:\.\d+)?\s?}
+  BOX_SNIPPET_MAX = 90
+
+  # Box-specific fields for JSON and -llm output: the span end, which TeX header
+  # form produced the box (a display or alignment row is reported "detected at
+  # line N", running text "in paragraph at lines N--M"), and the echoed text.
+  def box_fields(item)
+    return {} unless item[:type].is_a?(String) && item[:type] =~ /\A(?:Overfull|Underfull)/
+
+    header = item[:raw_text].to_s
+    kind = BOX_HEADER_KINDS.find { |pattern, _| header =~ pattern }&.last || 'other'
+    { line_end: item[:line_end], box_kind: kind, snippet: box_snippet(item[:extra_lines]) }.compact
+  end
+
+  def box_snippet(extra_lines)
+    echo = Array(extra_lines).first.to_s
+    text = echo.gsub(FONT_SWITCH_PATTERN, '').gsub('[]', '').gsub(/\s+/, ' ').strip
+    return nil if text.empty?
+
+    text.length > BOX_SNIPPET_MAX ? "#{text[0, BOX_SNIPPET_MAX]}..." : text
   end
 
   def normalized_line(item)

@@ -38,6 +38,7 @@ module LatexBundler
     macro_harvester.rb
     diagnostic_record.rb
     error_catalog.rb
+    box_context.rb
     compile_format.rb
     presenters.rb
     diagnostics.rb

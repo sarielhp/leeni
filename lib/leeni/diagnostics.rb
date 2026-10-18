@@ -8,6 +8,7 @@
 # ==============================================================================
 
 require_relative 'error_catalog'
+require_relative 'box_context'
 require_relative 'compile_format'
 
 module LaTeXDiagnostics
@@ -1400,7 +1401,8 @@ module LaTeXDiagnostics
 
     header = item[:raw_text].to_s
     kind = BOX_HEADER_KINDS.find { |pattern, _| header =~ pattern }&.last || 'other'
-    { line_end: item[:line_end], box_kind: kind, snippet: box_snippet(item[:extra_lines]) }.compact
+    fields = { line_end: item[:line_end], box_kind: kind, snippet: box_snippet(item[:extra_lines]) }.compact
+    fields.merge(LaTeXBoxContext.describe(item[:file], item[:line], kind))
   end
 
   def box_snippet(extra_lines)

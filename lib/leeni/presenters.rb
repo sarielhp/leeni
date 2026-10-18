@@ -168,8 +168,22 @@ module Leeni
     def box_suffix(rec)
       return nil unless rec[:box_kind]
 
-      span = rec[:line_end] ? "#{rec[:box_kind]} #{rec[:line]}-#{rec[:line_end]}" : rec[:box_kind].tr('_', '-')
-      rec[:snippet] ? "[box: #{span}] \"#{rec[:snippet]}\"" : "[box: #{span}]"
+      label = "[box: #{[box_span(rec), box_env(rec), box_rows(rec)].compact.join(' ')}]"
+      rec[:snippet] ? "#{label} \"#{rec[:snippet]}\"" : label
+    end
+
+    def box_span(rec)
+      rec[:line_end] ? "#{rec[:box_kind]} #{rec[:line]}-#{rec[:line_end]}" : rec[:box_kind].tr('_', '-')
+    end
+
+    def box_env(rec)
+      return nil unless rec[:env]
+
+      rec[:line_end] ? "in #{rec[:env]} from #{rec[:env_start]}" : "in #{rec[:env]} #{rec[:env_start]}-#{rec[:line]}"
+    end
+
+    def box_rows(rec)
+      rec[:rows] ? "(#{rec[:rows]} rows, widest #{rec[:widest]})" : nil
     end
 
     def should_fold_category?(cat)

@@ -180,9 +180,9 @@ Global file: `~/.config/leeni/config.jsonc`.
 }
 ```
 
-Overfull/underfull box diagnostics also carry `box_kind` (`paragraph`, `alignment`, `detected_line` or `other`, from the TeX header form: `in paragraph at lines N--M` vs `detected at line N`, which is how display math and alignment rows are reported), `line_end` (span end, when the header gives one) and `snippet` (cleaned echo of the offending text, when TeX printed any).
+Overfull/underfull box diagnostics also carry `box_kind` (`paragraph`, `alignment`, `detected_line` or `other`, from the TeX header form: `in paragraph at lines N--M` vs `detected at line N`, which is how display math and alignment rows are reported), `line_end` (span end, when the header gives one) and `snippet` (cleaned echo of the offending text, when TeX printed any). Source-side hints (heuristic, from `lib/leeni/box_context.rb`): `env` and `env_start` (for `detected_line` boxes, the display that closes on that line: `align*`, `equation*`, `\[ ... \]` or `$$`; for paragraph boxes, the innermost enclosing environment other than `document`), and for displays with several rows `rows` and `widest` (line range of the row with the most source characters; a rough guess).
 
-In `-llm` text output, alerts and warnings are sorted alerts-first, then by file and line, and box lines end with `[box: paragraph 87-95] "snippet"` or `[box: detected-line]`.
+In `-llm` text output, alerts and warnings are sorted alerts-first, then by file and line, and box lines end with `[box: paragraph 87-95] "snippet"` or `[box: detected-line in align* 74-84 (3 rows, widest 80-83)]`.
 
 ---
 

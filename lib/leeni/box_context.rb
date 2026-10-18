@@ -15,6 +15,15 @@ require_relative 'error_catalog'
 module LaTeXBoxContext
   MAX_SCAN_LINES = 400
   IGNORED_ENVS = %w[document].freeze
+  SECTION_PATTERN = /\A\s*\\(?:chapter|section|subsection|subsubsection)\*?\s*(?:\[[^\]]*\])?\s*\{/
+  THEOREM_ENVS = %w[
+    theorem lemma defn definition proposition corollary claim conjecture remark
+    observation example exercise problem fact property assumption question
+  ].freeze
+  HEAD_PRELUDE = /\A\s*(?:%.*|\\(?:index|label|thmlab|lemlab|deflab|exelab|clmlab|seclab|eqlab)\b.*)?\s*\z/
+  MATH_ENV_PATTERN = /\\begin\{math\}(.*?)\\end\{math\}/m
+  PAREN_MATH_PATTERN = /\\\((.*?)\\\)/m
+  MIN_MATH_CHARS = 20
   ROW_TOKEN = /\\\\|\\begin\{[^}]*\}|\\end\{[^}]*\}|\\[{}]|[{}]|\\[A-Za-z@]+|\\.|[^\\{}]+/m
 
   # Splits the body of one environment into rows at top-level `\\`, ignoring
@@ -30,7 +39,7 @@ module LaTeXBoxContext
     end
 
     def feed(raw_line, line_no)
-      raw_line.sub(/(?<!\\)%.*\z/, '').scan(ROW_TOKEN) { handle(Regexp.last_match(0), line_no) }
+      raw_line.sub(/(?<!\\)%.*$/, '').scan(ROW_TOKEN) { handle(Regexp.last_match(0), line_no) }
     end
 
     def rows
@@ -96,13 +105,16 @@ module LaTeXBoxContext
     end
   end
 
-  # Returns {env:, env_start:, rows:, widest:} (keys present only when known).
-  def self.describe(file, line, kind)
+  # Returns {env:, env_start:, rows:, widest:, heading:, math_line:, math_chars:}
+  # (keys present only when known). `line_end` is the span end of a paragraph box.
+  def self.describe(file, line, kind, line_end = nil)
     path = LaTeXErrorCatalog.find_source_file(file)
     return {} unless path && line.to_i.positive?
 
     lines = LaTeXUtils.safe_read(path).lines
-    kind == 'detected_line' ? describe_display(lines, line.to_i) : describe_span(lines, line.to_i)
+    return describe_display(lines, line.to_i) if kind == 'detected_line'
+
+    describe_span(lines, line.to_i, (line_end || line).to_i)
   rescue StandardError
     {}
   end
@@ -117,9 +129,57 @@ module LaTeXBoxContext
     { env: last[1], env_start: start }.merge(display_rows(lines, start, line_no, last[1]))
   end
 
-  def self.describe_span(lines, line_no)
+  def self.describe_span(lines, line_no, line_end)
     name, start = enclosing_env(lines, line_no - 1)
-    name ? { env: name, env_start: start } : {}
+    info = name ? { env: name, env_start: start } : {}
+    heading = heading_kind(lines, line_no, name, start)
+    return info.merge(heading: heading) if heading
+
+    info.merge(longest_inline_math(lines, line_no, [line_end, line_no].max))
+  end
+
+  # The head line of a section, or of a theorem-like environment that has a
+  # title (`\begin{theorem}[Title]`) and whose text starts right after the
+  # opening lines: TeX typesets "Theorem N (Title). text" as one unbreakable
+  # head, so the title is the likely culprit and `\\` cannot fix it.
+  def self.heading_kind(lines, first, env, env_start)
+    return 'section' if lines[first - 1].to_s.match?(SECTION_PATTERN)
+    return nil unless env && env_start && THEOREM_ENVS.include?(env.delete_suffix('*'))
+    return nil unless lines[env_start - 1].to_s.match?(/\\begin\{#{Regexp.escape(env)}\}\s*\[/)
+    return nil unless lines[env_start...[first - 1, env_start].max].all? { |l| l.match?(HEAD_PRELUDE) }
+
+    env
+  end
+
+  # Longest inline math span (`$..$`, `\(..\)`, `\begin{math}`) in the box's
+  # source lines. `$` pairing is claimed only for an even count without `$$`.
+  def self.longest_inline_math(lines, first, last)
+    spans = inline_math_spans(lines, first, last)
+    best = spans.max_by { |s| s[:chars] }
+    return {} unless best && best[:chars] >= MIN_MATH_CHARS
+
+    { math_line: best[:line], math_chars: best[:chars] }
+  end
+
+  def self.inline_math_spans(lines, first, last)
+    code = (first..last).map { |n| lines[n - 1].to_s.sub(/(?<!\\)%.*$/, '') }
+    offset = 0
+    starts = code.map { |src_line| offset.tap { offset += src_line.length } }
+    text = code.join
+    found = []
+    text.scan(MATH_ENV_PATTERN) { found << [Regexp.last_match.begin(1), Regexp.last_match(1)] }
+    text.scan(PAREN_MATH_PATTERN) { found << [Regexp.last_match.begin(1), Regexp.last_match(1)] }
+    found.concat(dollar_spans(text))
+    found.map { |pos, body| { line: first + starts.rindex { |s| s <= pos }, chars: body.gsub(/\s+/, '').length } }
+  end
+
+  def self.dollar_spans(text)
+    return [] if text.include?('$$')
+
+    marks = text.enum_for(:scan, /(?<!\\)\$/).map { Regexp.last_match.begin(0) }
+    return [] if marks.size.odd?
+
+    marks.each_slice(2).map { |open_pos, close_pos| [open_pos + 1, text[(open_pos + 1)...close_pos]] }
   end
 
   # `$$ ... $$`: paired only inside the paragraph around the box; an odd count
@@ -135,7 +195,7 @@ module LaTeXBoxContext
 
   def self.dollar_display_marks(lines, first, last)
     (first..last).flat_map do |idx|
-      code = lines[idx].to_s.sub(/(?<!\\)%.*\z/, '')
+      code = lines[idx].to_s.sub(/(?<!\\)%.*$/, '')
       Array.new(code.scan(/(?<!\\)\$\$/).size, idx + 1)
     end
   end
@@ -143,7 +203,7 @@ module LaTeXBoxContext
   # Environment/bracket tags on a line, with `\\` removed first so that
   # `\\[1ex]` is not read as the display opener `\[`.
   def self.tags_of(raw_line)
-    clean = raw_line.sub(/(?<!\\)%.*\z/, '').gsub('\\\\', '  ')
+    clean = raw_line.sub(/(?<!\\)%.*$/, '').gsub('\\\\', '  ')
     LaTeXErrorCatalog.parse_env_tags(clean)
   end
 

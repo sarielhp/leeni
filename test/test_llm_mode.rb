@@ -131,6 +131,26 @@ class TestLLMMode < Minitest::Test
     Open3.capture3(@bin_path, *flags, '-f', 'box.tex', chdir: dir)
   end
 
+  HEADING_AND_MATH_TEX = <<~'TEX'
+    \documentclass{article}
+    \usepackage{amsthm}
+    \newtheorem{theorem}{Theorem}
+    \begin{document}
+    \section{AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA}
+
+    The value is $\mathrm{BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB}$ here.
+    \end{document}
+  TEX
+
+  def test_heading_and_longest_math_hints
+    Dir.mktmpdir('llm_heading') do |dir|
+      File.write(File.join(dir, 'head.tex'), HEADING_AND_MATH_TEX)
+      _out, err, = Open3.capture3(@bin_path, '-llm', '-a', '-f', 'head.tex', chdir: dir)
+      assert_match(/\[box: heading \d+\]/, err, "Expected a heading box: #{err}")
+      assert_match(/\(longest inline math: line 7, \d+ chars\)/, err, "Expected the math hint: #{err}")
+    end
+  end
+
   def test_llm_mode_sorts_boxes_and_tags_header_kind
     Dir.mktmpdir('llm_box') do |dir|
       _out, err, = run_overfull(dir, '-llm', '-a')

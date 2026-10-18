@@ -1401,8 +1401,10 @@ module LaTeXDiagnostics
 
     header = item[:raw_text].to_s
     kind = BOX_HEADER_KINDS.find { |pattern, _| header =~ pattern }&.last || 'other'
+    context = LaTeXBoxContext.describe(item[:file], item[:line], kind, item[:line_end])
+    kind = 'heading' if context[:heading]
     fields = { line_end: item[:line_end], box_kind: kind, snippet: box_snippet(item[:extra_lines]) }.compact
-    fields.merge(LaTeXBoxContext.describe(item[:file], item[:line], kind))
+    fields.merge(context)
   end
 
   def box_snippet(extra_lines)

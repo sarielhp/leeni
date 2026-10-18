@@ -168,22 +168,31 @@ module Leeni
     def box_suffix(rec)
       return nil unless rec[:box_kind]
 
-      label = "[box: #{[box_span(rec), box_env(rec), box_rows(rec)].compact.join(' ')}]"
+      parts = [box_span(rec), box_env(rec), box_rows(rec), box_math(rec)]
+      label = "[box: #{parts.compact.join(' ')}]"
       rec[:snippet] ? "#{label} \"#{rec[:snippet]}\"" : label
     end
 
     def box_span(rec)
-      rec[:line_end] ? "#{rec[:box_kind]} #{rec[:line]}-#{rec[:line_end]}" : rec[:box_kind].tr('_', '-')
+      kind = rec[:box_kind].tr('_', '-')
+      return "#{kind} #{rec[:line]}-#{rec[:line_end]}" if rec[:line_end]
+
+      rec[:box_kind] == 'detected_line' ? kind : "#{kind} #{rec[:line]}"
     end
 
     def box_env(rec)
       return nil unless rec[:env]
 
-      rec[:line_end] ? "in #{rec[:env]} from #{rec[:env_start]}" : "in #{rec[:env]} #{rec[:env_start]}-#{rec[:line]}"
+      display = rec[:box_kind] == 'detected_line'
+      display ? "in #{rec[:env]} #{rec[:env_start]}-#{rec[:line]}" : "in #{rec[:env]} from #{rec[:env_start]}"
     end
 
     def box_rows(rec)
       rec[:rows] ? "(#{rec[:rows]} rows, widest #{rec[:widest]})" : nil
+    end
+
+    def box_math(rec)
+      rec[:math_chars] ? "(longest inline math: line #{rec[:math_line]}, #{rec[:math_chars]} chars)" : nil
     end
 
     def should_fold_category?(cat)

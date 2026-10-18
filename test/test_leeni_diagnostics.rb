@@ -960,7 +960,7 @@ class TestLeeniDiagnostics < LeeniTestBase
       File.write(tex, "\\documentclass{article}\n\\begin{document}\n\\loop\\iftrue\\repeat\n\\end{document}\n")
       cmd = [BIN, '-f', 'slow.tex']
       Open3.popen2e(*cmd, chdir: dir) do |_stdin, stdout_err, wait_thr|
-        sleep 0.25
+        sleep 0.6
         begin
           Process.kill('INT', wait_thr.pid)
         rescue StandardError

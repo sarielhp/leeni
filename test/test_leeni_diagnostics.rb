@@ -968,7 +968,8 @@ class TestLeeniDiagnostics < LeeniTestBase
         end
         output = stdout_err.read
         status = wait_thr.value
-        assert_equal 130, status.exitstatus
+        exit_code = status.exitstatus || (status.signaled? ? 128 + status.termsig : nil)
+        assert_equal 130, exit_code
         assert_includes output, 'Build cancelled by user (Ctrl-C)'
         refute_includes output, 'Traceback'
         refute_includes output, 'from /'

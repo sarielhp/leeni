@@ -127,7 +127,7 @@ module LaTeXConfig
       // Set junk_dir to junk for project-local compatibility.
 
       // Automatically mirror project subdirectories into the build directory for nested inputs
-      "auto_mirror_subdirs": true,
+      "auto_mirror_subdirs": false,
 
       // Additional subdirectories inside the build directory to pre-create
       "junk_subdirs": ["figs", "fragment"],

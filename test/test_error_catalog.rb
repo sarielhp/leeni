@@ -635,6 +635,24 @@ class TestErrorCatalog < Minitest::Test
     assert_equal 'mybadkey', item[:token]
   end
 
+  def test_classify_cannot_write_file
+    text = '! I can\'t write on file "01_min_disk/junk/page_number.txt".'
+    item = LaTeXErrorCatalog.classify(text, text.lines)
+    assert item
+    assert_equal :cannot_write_file, item[:id]
+    assert_equal '01_min_disk/junk/page_number.txt', item[:token]
+    assert_includes item[:hint], "target directory '01_min_disk/junk' does not exist"
+  end
+
+  def test_classify_cannot_write_file_current_directory
+    text = "! I can't write on file `output.txt'."
+    item = LaTeXErrorCatalog.classify(text, text.lines)
+    assert item
+    assert_equal :cannot_write_file, item[:id]
+    assert_equal 'output.txt', item[:token]
+    assert_includes item[:hint], "Cannot write to 'output.txt'; target directory does not exist, or file is locked/read-only"
+  end
+
   def test_classify_unknown_error_returns_nil
     text = './main.tex:10: Some totally unheard of exotic error message.'
     item = LaTeXErrorCatalog.classify(text, text.lines)
@@ -661,5 +679,25 @@ class TestErrorCatalog < Minitest::Test
     assert_equal :undefined_control_sequence, errors.first[:catalog_id]
     assert errors.first[:catalog]
     assert_equal '\\nonexistentmacro', errors.first[:catalog][:token]
+  end
+
+  def test_extract_errors_cannot_write_file_suppresses_emergency_stop
+    log_content = <<~LOG
+      ! I can't write on file "01_min_disk/junk/page_number.txt".
+      (Press Enter to retry or type a new filename)
+      Please type another input file name:
+      01_min_disk/min_disk.tex:15: Emergency stop.
+      <to be read again>
+      \\relax
+      l.15 \\ChapterGen
+                     {Minimum Enclosing Disk}{min_disk}{
+      01_min_disk/min_disk.tex:15:  ==> Fatal error occurred, no output PDF file produced!
+    LOG
+
+    builder = LatexBuilder.new('main.tex', {})
+    errors = builder.send(:extract_errors, log_content)
+    assert_equal 1, errors.size
+    assert_equal :cannot_write_file, errors.first[:catalog_id]
+    assert_equal '01_min_disk/junk/page_number.txt', errors.first[:catalog][:token]
   end
 end

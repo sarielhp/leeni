@@ -28,6 +28,7 @@ module LaTeXDiagnostics
   # into a tier suppressed by default. luatex.def, xetex.def, dvips.def and
   # epstopdf-base all shared the fate.
   WARNING_LINE_PATTERN = /^(?:LaTeX|Class|Package|\*)(?:\s+[-\w.@*]+)*\s+[Ww]arning:/
+  FATAL_ABORT_PATTERN = /^(?:!\s*|.+?:\d+:\s*)(?:==>\s*)?(?:Emergency stop|Fatal error occurred)/i
 
   # Every pattern here must be anchored. TeX echoes the offending paragraph
   # after each Overfull \hbox, so the document's own prose reaches this log
@@ -46,6 +47,7 @@ module LaTeXDiagnostics
 
   def latex_error_line?(line)
     return false if typeset_source_echo?(line)
+    return false if line =~ FATAL_ABORT_PATTERN
 
     line.match?(/^!\s+\S/) ||
       line.match?(/^Runaway argument\?/) ||
@@ -996,6 +998,7 @@ module LaTeXDiagnostics
 
   def error_line_match(line)
     return [false, nil] if typeset_source_echo?(line)
+    return [false, nil] if line =~ FATAL_ABORT_PATTERN
 
     if line =~ /^(.+?):(\d+):\s+(?!warning\b)(?!\(see\b)\S+/i
       [true, Regexp.last_match(1)]
@@ -1013,7 +1016,7 @@ module LaTeXDiagnostics
     i = start_idx + 1
     while i < lines.size && err_block.size < block_limit
       curr = lines[i]
-      break if curr =~ /^!\s*(?:==>\s*)?(?:Emergency stop|Fatal error occurred)/i ||
+      break if curr =~ FATAL_ABORT_PATTERN ||
                (curr =~ /^.+:\d+:\s+(?!warning\b)/i && !missing_file_location?(curr, missing_file)) ||
                curr =~ /^!\s+\S+/ || curr =~ /^Runaway argument\?/ ||
                curr =~ WARNING_LINE_PATTERN ||
@@ -1028,7 +1031,7 @@ module LaTeXDiagnostics
   end
 
   def missing_file_location?(line, missing_file)
-    missing_file && line.match?(/^.+:\d+:\s+(?:Emergency stop|Fatal error occurred)/i)
+    missing_file && line.match?(FATAL_ABORT_PATTERN)
   end
 
   def extract_argument_token(err_block)
@@ -1070,7 +1073,7 @@ module LaTeXDiagnostics
         next
       end
 
-      if line =~ /^!\s*(?:==>\s*)?(?:Emergency stop|Fatal error occurred)/i
+      if line =~ FATAL_ABORT_PATTERN
         i += 1
         next
       end
@@ -2730,7 +2733,7 @@ module LaTeXDiagnostics
     errors = 0
     clean_content = LaTeXUtils.filter_subcommand_noise(content)
     clean_content.each_line do |line|
-      next if line =~ /^!\s*(?:==>\s*)?(?:Emergency stop|Fatal error occurred)/i
+      next if line =~ FATAL_ABORT_PATTERN
       next if typeset_source_echo?(line)
 
       next unless line =~ /^!\s+\S+/ ||

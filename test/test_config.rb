@@ -61,7 +61,7 @@ class TestLaTeXConfigAndConventions < Minitest::Test
 
     assert_equal %w[refs bib bibliography], cfg['bib_dirs']
     refute cfg.key?('junk_dir')
-    assert_equal true, cfg['auto_mirror_subdirs']
+    assert_equal false, cfg['auto_mirror_subdirs']
     assert_equal %w[figs fragment], cfg['junk_subdirs']
     assert_equal %w[computer local private], cfg.dig('arxiv', 'strip_host_patterns')
   end
@@ -144,6 +144,26 @@ class TestLaTeXConfigAndConventions < Minitest::Test
         assert File.directory?('junk/fragment')
         assert File.directory?('junk/sections')
         assert File.directory?('junk/custom_code')
+      end
+    end
+  end
+
+  def test_builder_junk_subdirs_disabled_by_default
+    Dir.mktmpdir('leeni_junk_no_mirror_test') do |dir|
+      FileUtils.mkdir_p(File.join(dir, 'sections'))
+      FileUtils.mkdir_p(File.join(dir, 'figs'))
+      FileUtils.mkdir_p(File.join(dir, 'custom_code'))
+
+      Dir.chdir(dir) do
+        builder = LatexBuilder.allocate
+        builder.instance_variable_set(:@options, { junk_dir: 'junk', auto_mirror_subdirs: false, junk_subdirs: %w[figs fragment] })
+        builder.send(:junk_dir_create)
+
+        assert File.directory?('junk/junk')
+        assert File.directory?('junk/figs')
+        assert File.directory?('junk/fragment')
+        refute File.directory?('junk/sections')
+        refute File.directory?('junk/custom_code')
       end
     end
   end

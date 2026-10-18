@@ -267,7 +267,7 @@ module LatexCLI
       exclude_main_tex: cfg['exclude_main_tex'] || LaTeXUtils::DEFAULT_EXCLUDE_MAIN_PATTERNS,
       exclude_source_tex: cfg['exclude_source_tex'] || LaTeXUtils::DEFAULT_EXCLUDE_SOURCE_PATTERNS,
       bib_dirs: cfg['bib_dirs'] || LaTeXUtils::DEFAULT_BIB_DIRS,
-      auto_mirror_subdirs: cfg.key?('auto_mirror_subdirs') ? (cfg['auto_mirror_subdirs'] == true) : true,
+      auto_mirror_subdirs: cfg['auto_mirror_subdirs'] == true,
       junk_subdirs: cfg['junk_subdirs'] || LaTeXUtils::DEFAULT_JUNK_SUBDIRS,
       junk_dir: nil,
       config_junk_dir: cfg['junk_dir'],
@@ -444,6 +444,12 @@ module LatexCLI
     opts.on('--update-if-changed', 'Only replace target PDF if extracted text changed (prevents viewer reloads)') do
       options[:update_on_diff] = true
       options[:explicit_update_on_diff] = true
+    end
+    opts.on('--[no-]mirror-subdirs', 'Mirror project subdirectories into build directory (default: false)') do |v|
+      options[:auto_mirror_subdirs] = v
+    end
+    opts.on('--[no-]copy-subdirs', 'Alias for --[no-]mirror-subdirs') do |v|
+      options[:auto_mirror_subdirs] = v
     end
   end
 

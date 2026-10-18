@@ -116,7 +116,7 @@ module LatexBuildRuntime
     File.write(File.join(dir, '.leeni_workspace'), LeeniBuildWorkspace.project_root)
     target_subdirs = (@options && @options[:junk_subdirs]) || LaTeXUtils::DEFAULT_JUNK_SUBDIRS
     target_subdirs.each { |subdir| FileUtils.mkdir_p(File.join(dir, subdir), mode: 0o700) }
-    mirror_project_subdirs_to_junk if @options.nil? || @options[:auto_mirror_subdirs] != false
+    mirror_project_subdirs_to_junk if @options && @options[:auto_mirror_subdirs] == true
   end
 
   def mirror_project_subdirs_to_junk

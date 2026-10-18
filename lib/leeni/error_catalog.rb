@@ -1041,6 +1041,25 @@ module LaTeXErrorCatalog
       why: 'An unknown key was passed to a package setup command (e.g. \\hypersetup).',
       fix: 'Verify option name spelling in the setup declaration.',
       doc_slug: '55_package_kvsetkeys_undefined_key'
+    },
+    {
+      id: :cannot_write_file,
+      pattern: /I can't write on file\s+[`"'](?:"?)([^'"`]+?)(?:"?)['"`]/i,
+      title: 'Cannot write to file',
+      token_extractor: lambda do |match, _err_block, _file = nil, _line = nil|
+        match[1]
+      end,
+      hint: lambda do |tok|
+        dir = tok ? File.dirname(tok) : nil
+        if dir && dir != '.'
+          "Cannot write to '#{tok}'; target directory '#{dir}' does not exist or is not writable"
+        else
+          "Cannot write to '#{tok}'; target directory does not exist, or file is locked/read-only"
+        end
+      end,
+      why: "TeX attempted to write an auxiliary file ('\\openout'), but the target path cannot be created because the directory does not exist or lacks write permissions.",
+      fix: 'Ensure the target directory exists and is writable, or adjust the path in your LaTeX source.',
+      doc_slug: '56_cannot_write_file'
     }
   ].freeze
 

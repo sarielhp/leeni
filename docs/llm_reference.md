@@ -76,6 +76,7 @@ l --json paper.tex
 | `--alert-hbox` | float (pt) | `24.0` | Overfull `\hbox` size in pt promoted to **Alert**. |
 | `--whatever-pt` | float (pt) | `2.5` | Overfull `\hbox` size in pt demoted to **Whatever** (suppressed). |
 | `-cc` | `--compile` | flag | `false` | GNU standard compiler output (`file:line:col: severity: msg`). |
+| *(none)* | `--[no-]mirror-subdirs` | boolean | `false` | Mirror project subdirectories into build directory (alias: `--[no-]copy-subdirs`). |
 | *(none)* | `--gitignore-init` | flag | `false` | Additive setup: create or add standard LaTeX & `junk/` rules to `.gitignore`. |
 
 ---
@@ -107,7 +108,7 @@ Global file: `~/.config/leeni/config.jsonc`.
   "suppress_alerts": false,          // boolean (hide structural alerts)
   "bib_dirs": ["refs", "bib"],       // string[] (directories to scan for .bib files)
   "junk_subdirs": ["figs"],          // string[] (subdirs to pre-create in junk_dir)
-  "auto_mirror_subdirs": true,       // boolean (mirror project subdirs into junk_dir)
+  "auto_mirror_subdirs": false,      // boolean (mirror project subdirs into junk_dir)
   "exclude_main_tex": ["preamble*"], // string[] (globs ignored for main file detection)
   "exclude_source_tex": ["styles/*"] // string[] (globs ignored for brace/syntax audit)
 }

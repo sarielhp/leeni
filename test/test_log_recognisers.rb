@@ -287,4 +287,21 @@ class TestLogRecognisers < Minitest::Test
     refute_includes item[:text], 'Package biblatex Warning'
     keys.each { |k| assert_includes item[:text], "'#{k}'" }
   end
+
+  def test_cannot_write_file_counts_as_single_error
+    log = <<~LOG
+      ! I can't write on file "01_min_disk/junk/page_number.txt".
+      (Press Enter to retry or type a new filename)
+      Please type another input file name:
+      01_min_disk/min_disk.tex:15: Emergency stop.
+      <to be read again>
+      \\relax
+      l.15 \\ChapterGen
+                     {Minimum Enclosing Disk}{min_disk}{
+      01_min_disk/min_disk.tex:15:  ==> Fatal error occurred, no output PDF file produced!
+    LOG
+
+    b = builder
+    assert_equal 1, b.send(:count_latex_errors, log, 0)
+  end
 end

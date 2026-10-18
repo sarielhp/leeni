@@ -73,7 +73,7 @@ This creates `.l.jsonc` pre-populated with default settings and comments:
   "bib_dirs": ["refs", "bib", "bibliography"],
 
   // Automatically mirror project subdirectories into the build directory for nested inputs
-  "auto_mirror_subdirs": true,
+  "auto_mirror_subdirs": false,
 
   // Additional subdirectories inside the build directory to pre-create
   "junk_subdirs": ["figs", "fragment"],

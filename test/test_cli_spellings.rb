@@ -116,4 +116,29 @@ class TestCLISpellings < Minitest::Test
     output, status = Open3.capture2e(BIN, '-version')
     assert status.success?, output
   end
+
+  def test_mirror_subdirs_cli_options
+    options = LatexCLI.build_default_options({}, 'l', [])
+    assert_equal false, options[:auto_mirror_subdirs]
+
+    argv = %w[-mirrorsubdirs]
+    LatexCLI.normalize_argv!(argv)
+    LatexCLI.build_option_parser(options).parse!(argv)
+    assert_equal true, options[:auto_mirror_subdirs]
+
+    argv = %w[--no-mirror-subdirs]
+    LatexCLI.normalize_argv!(argv)
+    LatexCLI.build_option_parser(options).parse!(argv)
+    assert_equal false, options[:auto_mirror_subdirs]
+
+    argv = %w[-copysubdirs]
+    LatexCLI.normalize_argv!(argv)
+    LatexCLI.build_option_parser(options).parse!(argv)
+    assert_equal true, options[:auto_mirror_subdirs]
+
+    argv = %w[--no-copy-subdirs]
+    LatexCLI.normalize_argv!(argv)
+    LatexCLI.build_option_parser(options).parse!(argv)
+    assert_equal false, options[:auto_mirror_subdirs]
+  end
 end

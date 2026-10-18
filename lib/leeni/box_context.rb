@@ -39,7 +39,7 @@ module LaTeXBoxContext
     end
 
     def feed(raw_line, line_no)
-      raw_line.sub(/(?<!\\)%.*$/, '').scan(ROW_TOKEN) { handle(Regexp.last_match(0), line_no) }
+      LaTeXUtils.strip_latex_comments(raw_line).scan(ROW_TOKEN) { handle(Regexp.last_match(0), line_no) }
     end
 
     def rows
@@ -162,7 +162,7 @@ module LaTeXBoxContext
   end
 
   def self.inline_math_spans(lines, first, last)
-    code = (first..last).map { |n| lines[n - 1].to_s.sub(/(?<!\\)%.*$/, '') }
+    code = (first..last).map { |n| LaTeXUtils.strip_latex_comments(lines[n - 1].to_s) }
     offset = 0
     starts = code.map { |src_line| offset.tap { offset += src_line.length } }
     text = code.join
@@ -195,7 +195,7 @@ module LaTeXBoxContext
 
   def self.dollar_display_marks(lines, first, last)
     (first..last).flat_map do |idx|
-      code = lines[idx].to_s.sub(/(?<!\\)%.*$/, '')
+      code = LaTeXUtils.strip_latex_comments(lines[idx].to_s)
       Array.new(code.scan(/(?<!\\)\$\$/).size, idx + 1)
     end
   end
@@ -203,7 +203,7 @@ module LaTeXBoxContext
   # Environment/bracket tags on a line, with `\\` removed first so that
   # `\\[1ex]` is not read as the display opener `\[`.
   def self.tags_of(raw_line)
-    clean = raw_line.sub(/(?<!\\)%.*$/, '').gsub('\\\\', '  ')
+    clean = LaTeXUtils.strip_latex_comments(raw_line).gsub('\\\\', '  ')
     LaTeXErrorCatalog.parse_env_tags(clean)
   end
 

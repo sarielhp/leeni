@@ -310,7 +310,7 @@ module LaTeXErrorCatalog
   end
 
   def self.parse_env_tags(line)
-    clean_line = line.sub(/(?<!\\)%.*\z/, '')
+    clean_line = LaTeXUtils.strip_latex_comments(line)
     matches = []
     clean_line.scan(/\\(begin|end)\{([a-zA-Z0-9_*@-]+)\}|(\\\[|\\\])/) do |b_or_e, env, bracket|
       matches << if bracket
@@ -398,7 +398,7 @@ module LaTeXErrorCatalog
   def self.extract_dollars_in_range(lines, start_idx, end_idx)
     dollars = []
     (start_idx..end_idx).each do |l_idx|
-      line = lines[l_idx].sub(/(?<!\\)%.*\z/, '').gsub('$$', '  ')
+      line = LaTeXUtils.strip_latex_comments(lines[l_idx]).gsub('$$', '  ')
       line.enum_for(:scan, /(?<!\\)\$/).each do
         col = Regexp.last_match.begin(0) + 1
         rest = line[col..] || ''
@@ -458,7 +458,7 @@ module LaTeXErrorCatalog
   end
 
   def self.diagnose_text_math_token(line)
-    clean = line.to_s.sub(/(?<!\\)%.*\z/, '')
+    clean = LaTeXUtils.strip_latex_comments(line.to_s)
     if clean =~ /(?<!\\)_/
       "Subscript '_' outside math mode; wrap in $...$ or escape as '\\_'"
     elsif clean =~ /(?<!\\)\^/

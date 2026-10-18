@@ -70,7 +70,7 @@ class LaTeXBraceChecker
         next
       end
 
-      line = raw_line.sub(/(?<!\\)%.*\z/, '')
+      line = LaTeXUtils.strip_latex_comments(raw_line)
       next if line.strip.empty?
 
       if line =~ VERBATIM_START_PATTERN

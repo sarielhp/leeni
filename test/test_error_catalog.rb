@@ -700,4 +700,15 @@ class TestErrorCatalog < Minitest::Test
     assert_equal :cannot_write_file, errors.first[:catalog_id]
     assert_equal '01_min_disk/junk/page_number.txt', errors.first[:catalog][:token]
   end
+
+  def test_env_tags_ignore_commented_tags_on_lines_with_a_newline
+    assert_equal [], LaTeXErrorCatalog.parse_env_tags("a % \\end{align*}\n")
+    assert_equal [%w[begin align*]], LaTeXErrorCatalog.parse_env_tags("\\begin{align*} % \\end{align*}\n")
+  end
+
+  def test_dollar_extraction_ignores_dollars_in_comments
+    lines = ["Cost $x$ and % a stray $ here\n", "more text\n"]
+    dollars = LaTeXErrorCatalog.extract_dollars_in_range(lines, 0, 1)
+    assert_equal 2, dollars.size
+  end
 end

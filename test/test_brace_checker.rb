@@ -160,4 +160,21 @@ class TestBraceChecker < Minitest::Test
     assert_match(/\A! \[leeni\] /, text, 'must start with ! [leeni] for AUCTeX error matching and attribution')
     assert_match(/^l\.\d+ /, text, 'must include standard TeX l.<line> line for AUCTeX navigation')
   end
+
+  # A trailing comment must be ignored even though the line ends with a newline
+  # (an end-of-string anchor misses it everywhere except the last line).
+  def test_commented_out_label_is_not_an_inverted_label
+    source = "\\begin{figure}\n% \\label{old}\n\\caption{c}\n\\label{a}\n\\end{figure}\n"
+    assert_empty LaTeXBraceChecker.scan_inverted_labels('doc.tex', source)
+  end
+
+  def test_trailing_comment_label_is_not_an_inverted_label
+    source = "\\begin{figure}\n\\includegraphics{x} % \\label{old}\n\\caption{c}\n\\label{a}\n\\end{figure}\n"
+    assert_empty LaTeXBraceChecker.scan_inverted_labels('doc.tex', source)
+  end
+
+  def test_real_inverted_label_is_still_reported
+    source = "\\begin{figure}\n\\label{a}\n\\caption{c}\n\\end{figure}\n"
+    assert_equal 1, LaTeXBraceChecker.scan_inverted_labels('doc.tex', source).size
+  end
 end

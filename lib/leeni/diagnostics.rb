@@ -1142,7 +1142,7 @@ module LaTeXDiagnostics
     /x
     collect_source_candidates.each do |file|
       LaTeXUtils.safe_read(file).each_line.with_index(1) do |line, line_no|
-        return [file, line_no] if line.sub(/(?<!\\)%.*\z/, '').match?(pattern)
+        return [file, line_no] if LaTeXUtils.strip_latex_comments(line).match?(pattern)
       end
     end
     nil

@@ -504,4 +504,29 @@ class TestBibIntegration < Minitest::Test
     out = LaTeXUtils.unwrap_log_lines("#{full}\nBIB_ENTRY: Key9:2020\n")
     assert_includes out.lines.map(&:chomp), 'BIB_ENTRY: Key9:2020'
   end
+
+  # The terminal stream has no blank line after an overfull body, so the box
+  # must stop at the next BIB_ENTRY marker instead of swallowing it.
+  def test_overfull_box_does_not_swallow_following_bib_entry_markers
+    Dir.mktmpdir('bib_swallow_test') do |dir|
+      File.write(File.join(dir, 'refs.bib'), "@article{K1,\n  year = {1}\n}\n@article{K2,\n  year = {2}\n}\n")
+      diag_class = Class.new do
+        include LaTeXDiagnostics
+
+        attr_accessor :options, :filename, :bfilename
+
+        def initialize(bfilename, _dir)
+          @options = {}
+          @filename = 'book.tex'
+          @bfilename = bfilename
+        end
+      end
+      log = "(./book.tex\nBIB_ENTRY: K1\n\nOverfull \\hbox (7.1pt too wide) in paragraph at lines 1--1\nbody text\n" \
+            "BIB_ENTRY: K2\n\nOverfull \\hbox (23.8pt too wide) in paragraph at lines 1--1\nbody two\n)\n"
+      Dir.chdir(dir) do
+        items = diag_class.new('book', dir).extract_warnings(log)
+        assert_equal %w[K1 K2], items.map { |w| w[:text][/\[bib entry (\S+)\]/, 1] }.sort
+      end
+    end
+  end
 end

@@ -734,7 +734,7 @@ module LaTeXDiagnostics
   end
 
   def diagnostic_boundary_line?(line)
-    return true if line.strip.empty? ||
+    return true if line.strip.empty? || line =~ /^(?:BIB_ENTRY|LIT_LBL):/ ||
                    line =~ WARNING_LINE_PATTERN ||
                    line =~ /^(?:Overfull|Underfull)/ || line =~ /^\[\d+\]/ ||
                    line =~ /^!\s+/ || line =~ /^.+:\d+:/ ||

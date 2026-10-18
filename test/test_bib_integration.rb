@@ -496,4 +496,12 @@ class TestBibIntegration < Minitest::Test
       end
     end
   end
+
+  # A 79-column log line is joined with its continuation; the BIB_ENTRY marker
+  # that follows a wrapped overfull body line must not be swallowed by it.
+  def test_unwrap_keeps_bib_entry_marker_after_full_width_line
+    full = 'x' * 79
+    out = LaTeXUtils.unwrap_log_lines("#{full}\nBIB_ENTRY: Key9:2020\n")
+    assert_includes out.lines.map(&:chomp), 'BIB_ENTRY: Key9:2020'
+  end
 end

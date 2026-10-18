@@ -705,7 +705,7 @@ module LaTeXDiagnostics
   def track_log_file(line, file_stack)
     return if line =~ WARNING_LINE_PATTERN ||
               line =~ /^(?:Overfull|Underfull)/ || line =~ /^!\s+/ ||
-              line =~ /^Missing character:/
+              line =~ /^Missing character:/ || line =~ /^(?:LIT_LBL|BIB_ENTRY):/
 
     pos = 0
     len = line.length
@@ -913,7 +913,16 @@ module LaTeXDiagnostics
     end
   end
 
-  def parse_box_warning(lines, i, file_stack, verbose)
+  # An overfull box while typesetting a bibliography entry reports the line of
+  # the \\printbibliography call, not the entry. BIB_ENTRY markers name the entry,
+  # so point the box at its position in the .bib file instead.
+  def locate_bib_box(bib_key)
+    return nil unless bib_key
+
+    LaTeXBibLocator.locate(bib_key, nil, @bfilename, Dir.pwd, junk_dir: diagnostics_junk_dir)
+  end
+
+  def parse_box_warning(lines, i, file_stack, verbose, bib_key: nil)
     l = lines[i]
     start_idx = i
     box_type = l =~ /^(Overfull|Underfull) \\(hbox|vbox)/ ? "#{Regexp.last_match(1)} \\#{Regexp.last_match(2)}" : 'Overfull \\hbox'
@@ -929,6 +938,12 @@ module LaTeXDiagnostics
     line_no, line_str, line_end = parse_box_line_span(box_line)
     file_name = current_log_file(file_stack)
     severity = extract_box_severity(box_line)
+    if (loc = locate_bib_box(bib_key))
+      file_name = loc[:file]
+      line_no = loc[:line]
+      line_str = line_no.to_s
+      line_end = nil
+    end
 
     base_color = :yellow
     clean_text = if @options[:emacs]
@@ -936,6 +951,7 @@ module LaTeXDiagnostics
                  else
                    clean_box_diagnostic(box_line, is_overfull ? :warning : :note)
                  end
+    clean_text = "#{clean_text} [bib entry #{bib_key}]" if bib_key
     formatted = format_diagnostic_line(line_str, clean_text, base_color, file: file_name)
     if verbose && !extra_lines.empty?
       formatted += "\n" + extra_lines.map { |line| @options[:emacs] ? line : highlight_line_numbers(line, base_color) }.join("\n")
@@ -971,11 +987,21 @@ module LaTeXDiagnostics
     seen_warnings = {}
     lines = content.lines
     file_stack = [@filename]
+    bib_key = nil
+    bib_file = nil
     i = 0
 
     while i < lines.size
       l = lines[i]
       track_log_file(l, file_stack)
+
+      if l =~ /^BIB_ENTRY:\s*(\S+)/
+        bib_key = Regexp.last_match(1)
+        bib_file = current_log_file(file_stack)
+        i += 1
+        next
+      end
+      bib_key = nil if bib_key && current_log_file(file_stack) != bib_file
 
       if l =~ WARNING_LINE_PATTERN
         item, i = parse_package_warning(lines, i, file_stack)
@@ -987,7 +1013,7 @@ module LaTeXDiagnostics
           end
         end
       elsif l =~ /^(?:Overfull|Underfull) \\(?:hbox|vbox)/
-        item, i = parse_box_warning(lines, i, file_stack, verbose)
+        item, i = parse_box_warning(lines, i, file_stack, verbose, bib_key: bib_key)
         raw_warnings << item if item
       else
         i += 1

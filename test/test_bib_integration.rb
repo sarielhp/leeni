@@ -457,4 +457,43 @@ class TestBibIntegration < Minitest::Test
       assert_includes out2, 'biber', 'Biber must rerun when .bcf configuration options change'
     end
   end
+
+  # An overfull box while typesetting a bibliography entry names the
+  # \printbibliography line, not the entry; it must point into the .bib file.
+  def test_overfull_box_in_bibliography_is_attributed_to_bib_entry
+    Dir.mktmpdir('bib_box_test') do |dir|
+      bib_file = File.join(dir, 'refs.bib')
+      File.write(bib_file, "@article{Key1:2020,\n  title = {A Title},\n  year = {2020}\n}\n" \
+                           "@article{Key2:2021,\n  title = {Another},\n  year = {2021}\n}\n")
+      diag_class = Class.new do
+        include LaTeXDiagnostics
+
+        attr_accessor :options, :filename, :bfilename
+
+        def initialize(bfilename, search_dir)
+          @options = {}
+          @filename = 'book.tex'
+          @bfilename = bfilename
+          @search_dir = search_dir
+        end
+      end
+      diag = diag_class.new('book', dir)
+      log = <<~LOG
+        (./book.tex
+        LIT_LBL:9:\\string \\@writefile {toc}{(unbalanced}
+        BIB_ENTRY: Key2:2021
+        Overfull \\hbox (42.9413pt too wide) in paragraph at lines 141--141
+         []
+
+        )
+      LOG
+
+      Dir.chdir(dir) do
+        item = diag.extract_warnings(log).first
+        assert_equal bib_file, File.expand_path(item[:file])
+        assert_equal 5, item[:line]
+        assert_includes item[:text], 'Key2:2021'
+      end
+    end
+  end
 end

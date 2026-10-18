@@ -120,9 +120,21 @@ Any modifications to compilation logic must honor the following invariants:
 > - `"Make audit"` or `"make audit"` ➔ `./tools/gate_audit_code`
 > There is no Makefile in this repository; do not create one.
 
+> [!IMPORTANT]
+> **Black-Box Repository Tooling (No Source Reading)**:
+> The scripts in `tools/` (`tools/check`, `tools/build`, `tools/lint`, `tools/gate`, `tools/commit`, `tools/bump`, `tools/release`, `tools/install`) are fixed repository contracts.
+> Do NOT read, parse, or reverse-engineer the source code of `tools/` scripts when executing workflows. Invoke them directly using their documented CLI options.
+
 Always execute quality workflows through the provided scripts:
 
-### 1. `tools/gate` (Tiered Quality Gate)
+### 1. `tools/check` (Repository Quality Gate)
+- Runs the default quality gate (`tools/gate --fast`) ensuring syntax, code metrics, and fast unit tests pass.
+- **Trigger**:
+  ```bash
+  rtk proxy tools/check
+  ```
+
+### 2. `tools/gate` (Tiered Quality Gate)
 - `--fast` (default) checks Ruby syntax and deterministic unit tests. Run it after every edit.
 - `--medium` adds practical real-LaTeX integration tests. Run it after roughly ten fast checks and before committing or changing build logic.
 - `--full` adds long-running integration, BWS, archive/visual verification, and ArXiv corpus tests. Run it before bumping or pushing, and in CI.
@@ -134,7 +146,7 @@ Always execute quality workflows through the provided scripts:
   rtk ./tools/gate --full
   ```
 
-### 2. `tools/setup_ruby_dev` (Environment & Tooling Auditor)
+### 3. `tools/setup_ruby_dev` (Environment & Tooling Auditor)
 - Audits and provisions local gems and system binaries.
 - **Audit mode**:
   ```bash
@@ -145,7 +157,7 @@ Always execute quality workflows through the provided scripts:
   ./tools/setup_ruby_dev
   ```
 
-### 3. Static Analysis & Linting
+### 4. Static Analysis & Linting
 - Verify code style and syntax offenses:
   ```bash
   rtk rubocop leeni tools/ test/
@@ -155,7 +167,14 @@ Always execute quality workflows through the provided scripts:
   rtk rubocop -A leeni tools/ test/
   ```
 
-### 4. `tools/install` (Local Binary Installation)
+### 5. `tools/commit` (Checked Commit Workflow)
+- Runs the gate verification and creates a validated commit with the specified commit message.
+- **Trigger**:
+  ```bash
+  rtk proxy tools/commit "Your descriptive commit message"
+  ```
+
+### 6. `tools/install` (Local Binary Installation)
 - Copies `leeni` to `~/bin/leeni` (setting permissions to `0755`).
 - Creates symbolic link `~/bin/l -> leeni`.
 - **Trigger**:
@@ -163,7 +182,7 @@ Always execute quality workflows through the provided scripts:
   ./tools/install
   ```
 
-### 5. `tools/bump` (Version Bump, Tag & Push Workflow)
+### 7. `tools/bump` (Version Bump, Tag & Push Workflow)
 - Ensures working tree is completely clean (aborts if uncommitted changes exist).
 - Increments version by +0.0.1 (patch by default, or `--major` / `--minor`) in [`lib/leeni/version.rb`](lib/leeni/version.rb).
 - Runs [`tools/gate --full`](tools/gate) against the new version, commits, and atomically pushes the branch and tag to the configured upstream.
@@ -171,6 +190,13 @@ Always execute quality workflows through the provided scripts:
 - **Trigger**:
   ```bash
   ./tools/bump
+  ```
+
+### 8. `tools/release` (Full Release & Publication Workflow)
+- Runs `tools/commit`, followed by `tools/bump` (which runs `tools/gate --full`, tags, and pushes upstream), and optionally runs `tools/install` if `--install` is supplied.
+- **Trigger**:
+  ```bash
+  rtk proxy tools/release [--install] "Your release commit message"
   ```
 
 ---
@@ -189,6 +215,12 @@ The following developer tools are pre-configured in the environment:
 | **`pdftotext`** | `pdftotext` (in `PATH`) | **Poppler PDF text extractor.** Enables text diff verification in `leeni -d`. |
 | **`minitest`** | Ruby gem | **Unit test runner.** Powers `tools/gate` and `test/test_*.rb`. |
 | **`rainbow`** | Ruby gem | **Colorized diagnostics.** ANSI color rendering in terminal output. |
+
+> [!NOTE]
+> **Sandboxing & Host Tool Access**:
+> Developer tools such as `rubocop`, `ruby-lsp`, `rainbow`, `minitest` (user gems in `~/.local/share/gem/`) and CLI binaries like `ast-grep`, `repomix`, `rtk` (in `~/.local/bin/`) reside on the host system.
+> In sandboxed agent environments (e.g. Bubblewrap or Antigravity default sandbox mode), paths outside the repository workspace are isolated, masking `~/.local/bin/` (except `agy`) and `~/.local/share/gem/`.
+> If a required pre-installed tool (such as `rubocop`) is reported missing or if pushing commits/tags upstream fails during `tools/check`, `tools/gate`, `tools/commit`, or `tools/release`, this is an artifact of sandbox filesystem/network isolation. Run the command outside the sandbox (`BypassSandbox: true`) where the host environment tools and network reside, rather than inspecting `tools/` source or attempting to reinstall gems.
 
 ---
 

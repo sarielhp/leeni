@@ -442,6 +442,9 @@ module LatexCLI
       options[:junk_dir] = v
       options[:explicit_junk_dir] = true
     end
+    opts.on('--no-export', 'Leave the working tree untouched: outputs stay in the build directory') do
+      options[:no_export] = true
+    end
     opts.on('--update-if-changed', 'Only replace target PDF if extracted text changed (prevents viewer reloads)') do
       options[:update_on_diff] = true
       options[:explicit_update_on_diff] = true

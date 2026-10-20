@@ -119,4 +119,33 @@ class TestJsonMode < Minitest::Test
       assert_equal 1, data['exit_code']
     end
   end
+
+  # A caller that reuses the build (relatex) builds in its own directory and leaves the
+  # working tree untouched; the JSON names the build directory, the engine and the passes run.
+  def test_no_export_build_reports_its_build_directory
+    Dir.mktmpdir('json_no_export') do |dir|
+      File.write(File.join(dir, 'paper.tex'), <<~'TEX')
+        \documentclass{article}
+        \begin{document}
+        Kept in the cache.
+        \end{document}
+      TEX
+      build = File.join(dir, 'build')
+      arguments = [@bin_path, '--json', '--no-export', '--junk-dir', build, '-e', 'lualatex', 'paper.tex']
+      out, err, status = Open3.capture3(*arguments, chdir: dir)
+      assert_equal 0, status.exitstatus, "stderr: #{err}, stdout: #{out}"
+      data = JSON.parse(out.strip)
+      report = data.fetch('build')
+      assert_equal %w[lualatex], [report.fetch('engine')]
+      assert_equal File.realpath(build), File.realpath(report.fetch('build_dir'))
+      refute report.fetch('up_to_date')
+      assert_operator report.fetch('passes'), :>=, 1
+      assert report.fetch('converged')
+      assert_equal File.join(report.fetch('build_dir'), 'paper.pdf'), data.fetch('pdf_path')
+      assert_equal ['build', 'paper.tex'], Dir.children(dir).sort
+
+      again = JSON.parse(Open3.capture3(*arguments, chdir: dir).first.strip).fetch('build')
+      assert_equal [0, true], again.values_at('passes', 'up_to_date')
+    end
+  end
 end

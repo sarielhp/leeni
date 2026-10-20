@@ -139,6 +139,7 @@ class LatexBuilder
     paper_cleanup
 
     if targets_up_to_date?
+      @up_to_date = true
       handle_cached_up_to_date_build
       return true
     end
@@ -187,9 +188,11 @@ class LatexBuilder
     junk_bbl = File.join(@junk_dir, "#{@bfilename}.bbl")
     junk_synctex = File.join(@junk_dir, "#{@bfilename}.synctex.gz")
 
-    update_target_file(junk_pdf, "#{@bfilename}.pdf", update_on_diff: @options[:update_on_diff])
-    update_target_file(junk_bbl, "#{@bfilename}.bbl") if LaTeXUtils.bbl_has_entries?(junk_bbl)
-    update_target_file(junk_synctex, "#{@bfilename}.synctex.gz")
+    unless @options[:no_export]
+      update_target_file(junk_pdf, "#{@bfilename}.pdf", update_on_diff: @options[:update_on_diff])
+      update_target_file(junk_bbl, "#{@bfilename}.bbl") if LaTeXUtils.bbl_has_entries?(junk_bbl)
+      update_target_file(junk_synctex, "#{@bfilename}.synctex.gz")
+    end
 
     if @options[:time]
       total_t1 = Process.clock_gettime(Process::CLOCK_MONOTONIC)
@@ -207,13 +210,25 @@ class LatexBuilder
     @options[:all] || @options[:explain] || @options[:verbose] || @options[:emacs] || @options[:compile]
   end
 
+  # The PDF a build delivers: the working-tree copy, or with --no-export the build directory's.
+  def delivered_pdf
+    @options[:no_export] ? File.join(@junk_dir, "#{@bfilename}.pdf") : "#{@bfilename}.pdf"
+  end
+
+  # What a caller (--json) needs to reuse the build: the engine that ran, the build directory,
+  # the LaTeX passes run now (0 when up to date) and whether the passes converged.
+  def build_report
+    { engine: @engine_name, build_dir: @junk_dir && File.expand_path(@junk_dir), passes: @latex_passes.to_i,
+      up_to_date: @up_to_date == true, converged: @cacheable_build != false }
+  end
+
   def targets_up_to_date?
     if @options[:clean] || @options[:single_pass] || @options[:force] || @options[:score] || @options[:werror] || @options[:raw]
       return false
     end
     return false if @options[:bib] == true
 
-    target_pdf = "#{@bfilename}.pdf"
+    target_pdf = delivered_pdf
     return false unless File.exist?(target_pdf) && File.size(target_pdf).positive?
 
     state_file = File.join(@junk_dir, '.build_state.json')
@@ -224,7 +239,7 @@ class LatexBuilder
     rescue StandardError
       nil
     end
-    return false unless state.is_a?(Hash) && state['target'] == target_pdf
+    return false unless state.is_a?(Hash) && state['target'] == "#{@bfilename}.pdf"
     return false unless state['signature'] == build_signature
     return false if @options[:index] == true && index_stale?(state)
 

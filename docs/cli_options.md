@@ -31,6 +31,7 @@ All long options accept either `-` or `--` and allow internal dashes to be omitt
 | `-e`, `--engine ENG` | Build | Compiler engine: `x` (`xelatex`), `l` (`lualatex`), `p` (`pdflatex`). |
 | `--timeout SEC` | Build | Maximum timeout allowed per compiler pass (default: 180s). |
 | `-T`, `--time` | Build | Show execution wall-clock time breakdown per pass. |
+| `--no-export` | Build | Leave the working tree untouched; outputs stay in the build directory. |
 | `--update-if-changed` | Build | Only replace target PDF if extracted text changed (`pdftotext`). |
 | `-c`, `--clean` | Cleaning | Clean the project cache and regenerable root files before compiling. |
 | `-C`, `--clean-only` | Cleaning | Clean the project cache and root auxiliary files, then exit. |
@@ -144,6 +145,12 @@ Specifies the directory where intermediate build artifacts are isolated. The def
 l --junk-dir=.build paper.tex
 ```
 
+### `--no-export`
+Leaves the working tree untouched: the PDF, `.bbl` and `.synctex.gz` stay in the build directory, and root auxiliary files are neither moved nor removed. The up-to-date check uses the build directory's PDF. With `--junk-dir`, a tool can keep its own build of a paper (another engine, say) without disturbing the author's.
+```bash
+l --no-export --junk-dir ~/.cache/tool/paper -e lualatex --json paper.tex
+```
+
 ---
 
 ## 3. Diagnostics & Error Filtering {#diagnostics}
@@ -206,7 +213,7 @@ l -llm paper.tex
 ```
 
 ### `--json`
-Emits structured JSON output containing pass counts, exit codes, target paths, and all classified diagnostics.
+Emits structured JSON output containing exit codes, target paths, and all classified diagnostics. Its `build` object reports the engine that ran, the absolute build directory (`build_dir`), the LaTeX passes run by this call (`passes`, 0 when up to date), `up_to_date`, and whether the passes converged (`converged`).
 ```bash
 l --json paper.tex
 ```

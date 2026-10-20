@@ -60,6 +60,7 @@ module Leeni
     :summary,
     :folded_counts,
     :log_tail,
+    :build,
     keyword_init: true
   ) do
     def initialize(*)
@@ -77,7 +78,8 @@ module Leeni
         summary: summary,
         diagnostics: records.map(&:to_h),
         folded_counts: folded_counts,
-        log_tail: log_tail
+        log_tail: log_tail,
+        build: build
       }.compact
     end
 

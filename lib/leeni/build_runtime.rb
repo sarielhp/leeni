@@ -139,6 +139,8 @@ module LatexBuildRuntime
   def paper_cleanup
     copy_root_aux_to_junk
     sync_bbl_before_compile
+    return if @options[:no_export]
+
     remove_root_auxiliary_files
 
     root_bbl = "#{@bfilename}.bbl"
@@ -166,9 +168,14 @@ module LatexBuildRuntime
     if File.exist?(root_bbl) && LaTeXUtils.bbl_has_entries?(root_bbl)
       FileUtils.mkdir_p(@junk_dir)
       FileUtils.cp(root_bbl, junk_bbl, preserve: true) if newer_root_bbl?(root_bbl, junk_bbl)
-    elsif @options[:trace] && File.exist?(junk_bbl) && !File.exist?(root_bbl) && LaTeXUtils.bbl_has_entries?(junk_bbl)
+    elsif restore_root_bbl?(root_bbl, junk_bbl)
       FileUtils.cp(junk_bbl, root_bbl, preserve: true)
     end
+  end
+
+  def restore_root_bbl?(root_bbl, junk_bbl)
+    @options[:trace] && !@options[:no_export] && File.exist?(junk_bbl) && !File.exist?(root_bbl) &&
+      LaTeXUtils.bbl_has_entries?(junk_bbl)
   end
 
   def newer_root_bbl?(root_bbl, junk_bbl)
@@ -267,6 +274,7 @@ module LatexBuildRuntime
   end
 
   def run_latex_pass(suffix)
+    @latex_passes = @latex_passes.to_i + 1
     puts '' if @options[:trace] || @options[:raw]
     started = Process.clock_gettime(Process::CLOCK_MONOTONIC) if @options[:time]
     pass_log = "#{@pdferr}#{suffix}"

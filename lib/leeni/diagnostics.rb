@@ -2047,7 +2047,12 @@ module LaTeXDiagnostics
     }]
   end
 
+  def json_build_report
+    respond_to?(:build_report, true) ? build_report : nil
+  end
+
   def resolve_target_pdf
+    return delivered_pdf if @bfilename && respond_to?(:delivered_pdf, true) && File.file?(delivered_pdf)
     return "#{@bfilename}.pdf" if @bfilename && File.file?("#{@bfilename}.pdf")
 
     diagnostic_artifact_candidates('pdf').find { |f| File.file?(f) }
@@ -2361,6 +2366,7 @@ module LaTeXDiagnostics
   def report_json_mode_errors(errors, content, io: $stdout)
     records = errors.map { |e| normalize_diagnostic(e, 'errors') }
     result = LaTeXDiagnosticResult.new(
+      build: json_build_report,
       success: false,
       exit_code: 1,
       pdf_path: nil,
@@ -2650,8 +2656,9 @@ module LaTeXDiagnostics
     all_records += alt_records unless tier_suppressed?(:alerts)
     all_records += wrn_records unless tier_suppressed?(:warnings)
     all_records += wht_records unless @options[:suppress_whatevers] == true
-    pdf_file = "#{@bfilename}.pdf"
+    pdf_file = respond_to?(:delivered_pdf, true) ? delivered_pdf : "#{@bfilename}.pdf"
     result = LaTeXDiagnosticResult.new(
+      build: json_build_report,
       success: !failed,
       exit_code: failed ? 1 : 0,
       pdf_path: !failed && File.exist?(pdf_file) ? pdf_file : nil,

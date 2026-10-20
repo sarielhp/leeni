@@ -529,4 +529,16 @@ class TestBibIntegration < Minitest::Test
       end
     end
   end
+
+  # Accent macros (biber --output_safechars) only for pdfLaTeX: under LuaLaTeX and XeLaTeX a
+  # sentence-cased {\'e} printed as É.
+  def test_biber_writes_utf8_for_unicode_engines
+    builder = Struct.new(:engine_name).new('lualatex')
+    manager = LaTeXBibManager.new(builder)
+    assert_empty manager.send(:biber_encoding_options)
+    builder.engine_name = 'xelatex'
+    assert_empty manager.send(:biber_encoding_options)
+    builder.engine_name = 'pdflatex'
+    assert_equal ['--output_safechars'], manager.send(:biber_encoding_options)
+  end
 end

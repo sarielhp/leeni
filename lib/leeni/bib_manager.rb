@@ -258,12 +258,19 @@ class LaTeXBibManager
   def execute_bibliography(tool)
     discover_bib_files.each { |b| FileUtils.cp(b, File.join(junk_dir, '')) }
     cmd = if tool == :biber
-            ['biber', '--output_safechars', '--input-directory', '.', '--output-directory', '.', bfilename]
+            ['biber', *biber_encoding_options, '--input-directory', '.', '--output-directory', '.', bfilename]
           else
             copy_style_files_for_bibtex
             ['bibtex', bfilename]
           end
     Dir.chdir(junk_dir) { @builder.capture_pass_output(cmd) }
+  end
+
+  # pdfLaTeX reads the .bbl best as TeX accent macros. LuaLaTeX and XeLaTeX read UTF-8, and
+  # there the macros break biblatex's case changes: a sentence-cased {\'e} prints as É
+  # ("FrÉchet").
+  def biber_encoding_options
+    @builder.engine_name == 'pdflatex' ? ['--output_safechars'] : []
   end
 
   def copy_style_files_for_bibtex

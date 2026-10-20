@@ -131,7 +131,7 @@ module LaTeXDiagnostics
 
   OSC8_LINK_PATTERN = /(\e\]8;;[^\e]*\e\\.*?\e\]8;;\e\\)/
 
-  def highlight_line_numbers(text, base_color, bright: false)
+  def highlight_line_numbers(text, base_color, bright: false, file: nil)
     return text if @options[:emacs]
     return text if @options && @options[:color] == false
 
@@ -140,20 +140,25 @@ module LaTeXDiagnostics
         if segment.start_with?("\e]8;;")
           segment
         else
-          highlight_line_numbers_segment(segment, base_color, bright: bright)
+          highlight_line_numbers_segment(segment, base_color, bright: bright, file: file)
         end
       end.join
     end
 
-    highlight_line_numbers_segment(text, base_color, bright: bright)
+    highlight_line_numbers_segment(text, base_color, bright: bright, file: file)
   end
 
-  def highlight_line_numbers_segment(text, base_color, bright: false)
+  def highlight_line_numbers_segment(text, base_color, bright: false, file: nil)
     return '' if text.empty?
 
     pattern = /((?:input\s+)?lines?\s+)(\d+(?:--?\d+)?)|(\bl\.)(\d+)\b|(:)(\d+)(:)/i
     parts = []
     last_pos = 0
+
+    num = lambda do |digits|
+      styled = colorize_line_num(digits, base_color)
+      file ? format_terminal_link(file, digits, styled) : styled
+    end
 
     apply_base = lambda do |str|
       r = Rainbow(str).send(base_color)
@@ -165,11 +170,11 @@ module LaTeXDiagnostics
       parts << apply_base.call(text[last_pos...m.begin(0)]) if m.begin(0) > last_pos
 
       if m[1]
-        parts << apply_base.call(m[1]) << colorize_line_num(m[2], base_color)
+        parts << apply_base.call(m[1]) << num.call(m[2])
       elsif m[3]
-        parts << apply_base.call(m[3]) << colorize_line_num(m[4], base_color)
+        parts << apply_base.call(m[3]) << num.call(m[4])
       elsif m[5]
-        parts << apply_base.call(m[5]) << colorize_line_num(m[6], base_color) << apply_base.call(m[7])
+        parts << apply_base.call(m[5]) << num.call(m[6]) << apply_base.call(m[7])
       end
       last_pos = m.end(0)
     end
@@ -266,7 +271,7 @@ module LaTeXDiagnostics
     sub_indent = ' ' * prefix_width
 
     term_width = terminal_columns
-    formatted_msg = highlight_line_numbers(clean_msg, base_color)
+    formatted_msg = highlight_line_numbers(clean_msg, base_color, file: file)
     formatted_msg = highlight_leeni_tag(formatted_msg, base_color)
 
     wrap_diagnostic_message(full_prefix, sub_indent, formatted_msg, term_width)
@@ -309,7 +314,7 @@ module LaTeXDiagnostics
 
     append_repeat_note(lines, repeat_count, line_no, indent) if repeat_count > 1
 
-    append_verbose_error_context(lines, err_block, indent) if @options[:verbose]
+    append_verbose_error_context(lines, err_block, indent, file_path) if @options[:verbose]
 
     lines.join("\n")
   end
@@ -341,7 +346,7 @@ module LaTeXDiagnostics
                     "#{disp_file}: #{badge}#{clean_msg}"
                   end
 
-    colored = highlight_line_numbers(header_text, :red, bright: true)
+    colored = highlight_line_numbers(header_text, :red, bright: true, file: file_path)
     highlight_leeni_tag(colored, :red)
   end
 
@@ -623,7 +628,7 @@ module LaTeXDiagnostics
     end
   end
 
-  def append_verbose_error_context(lines, err_block, indent)
+  def append_verbose_error_context(lines, err_block, indent, file = nil)
     raw_lines = err_block[1..] || []
     return if raw_lines.empty?
 
@@ -632,7 +637,7 @@ module LaTeXDiagnostics
     raw_lines.each do |l|
       next if l.strip.empty?
 
-      lines << "#{indent}  #{highlight_line_numbers(l, :red)}"
+      lines << "#{indent}  #{highlight_line_numbers(l, :red, file: file)}"
     end
   end
 
@@ -685,7 +690,7 @@ module LaTeXDiagnostics
     badge_len = show_tier_badges? ? 3 : 0
     indent = ' ' * (width.positive? ? width + 2 + badge_len : 2 + badge_len)
     formatted = item[:extra_lines].map do |el|
-      @options[:emacs] ? el : "#{indent}#{highlight_line_numbers(el, base_color)}"
+      @options[:emacs] ? el : "#{indent}#{highlight_line_numbers(el, base_color, file: item[:file])}"
     end
     "\n#{formatted.join("\n")}"
   end
@@ -954,7 +959,10 @@ module LaTeXDiagnostics
     clean_text = "#{clean_text} [bib entry #{bib_key}]" if bib_key
     formatted = format_diagnostic_line(line_str, clean_text, base_color, file: file_name)
     if verbose && !extra_lines.empty?
-      formatted += "\n" + extra_lines.map { |line| @options[:emacs] ? line : highlight_line_numbers(line, base_color) }.join("\n")
+      extra = extra_lines.map do |line|
+        @options[:emacs] ? line : highlight_line_numbers(line, base_color, file: file_name)
+      end
+      formatted += "\n#{extra.join("\n")}"
     end
 
     item = {

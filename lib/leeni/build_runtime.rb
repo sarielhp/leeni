@@ -178,8 +178,14 @@ module LatexBuildRuntime
       LaTeXUtils.bbl_has_entries?(junk_bbl)
   end
 
+  # With --no-export the build directory is leeni's own and the working tree only an input:
+  # a root .bbl (one shipped with the sources) seeds a build directory that has none, and
+  # never replaces the bibliography a build made. A caller may hand over a fresh copy of
+  # the sources each time, newer than every build, so a newer root .bbl means nothing there.
   def newer_root_bbl?(root_bbl, junk_bbl)
-    !File.exist?(junk_bbl) || File.mtime(root_bbl) > File.mtime(junk_bbl)
+    return true unless File.exist?(junk_bbl)
+
+    !@options[:no_export] && File.mtime(root_bbl) > File.mtime(junk_bbl)
   end
 
   def sync_bbl_to_root

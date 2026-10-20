@@ -146,6 +146,15 @@ class TestJsonMode < Minitest::Test
 
       again = JSON.parse(Open3.capture3(*arguments, chdir: dir).first.strip).fetch('build')
       assert_equal [0, true], again.values_at('passes', 'up_to_date')
+
+      # A root .bbl newer than the build's (a fresh copy of shipped sources) leaves the
+      # build's bibliography alone.
+      made = File.join(build, 'paper.bbl')
+      File.write(made, "\\begin{thebibliography}{1}\\bibitem{made} Made.\\end{thebibliography}\n")
+      File.write(File.join(dir, 'paper.bbl'), "\\begin{thebibliography}{1}\\bibitem{shipped} Shipped.\\end{thebibliography}\n")
+      File.utime(Time.now + 60, Time.now + 60, File.join(dir, 'paper.bbl'))
+      Open3.capture3(*arguments, chdir: dir)
+      assert_includes File.read(made), 'Made.'
     end
   end
 end

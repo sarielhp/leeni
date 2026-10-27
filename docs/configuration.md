@@ -30,6 +30,9 @@ This creates `.l.jsonc` pre-populated with default settings and comments:
   // Default LaTeX engine: "xelatex", "lualatex", or "pdflatex"
   "engine": "xelatex",
 
+  // Explicit main document file to compile in this directory
+  // "main_file": "paper.tex",
+
   // Maximum number of compilation passes (1-10)
   "passes": 5,
 

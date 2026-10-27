@@ -112,12 +112,13 @@ Any modifications to compilation logic must honor the following invariants:
 ## 4. Development Workflow & Automated Tooling
 
 > [!IMPORTANT]
-> **User Command Convention — "Make <something>"**:
+> **User Command Convention — "Make <something>" & "Release"**:
 > An instruction from the user saying `"Make <something>"` (or `"make <something>"`) is shorthand to run `./tools/<something>`. For example:
 > - `"Make install"` or `"make install"` ➔ `./tools/install -v`
 > - `"Make bump"` or `"make bump"` ➔ `./tools/bump`
 > - `"Make gate"` or `"make gate"` ➔ `./tools/gate --medium`
 > - `"Make audit"` or `"make audit"` ➔ `./tools/gate_audit_code`
+> - `"release"` or `"Release"` (or `"make release"`) ➔ Automatically triggers `./tools/release` (commits current changes, runs `tools/bump` with `tools/gate --full`, tags, pushes upstream, and runs `tools/install` to `~/bin/leeni`). If the user does not specify a commit message, generate a concise descriptive commit message.
 > There is no Makefile in this repository; do not create one.
 
 > [!IMPORTANT]
@@ -193,6 +194,7 @@ Always execute quality workflows through the provided scripts:
   ```
 
 ### 8. `tools/release` (Full Release & Publication Workflow)
+- Triggered automatically whenever the user types `"release"` or `"Release"` (or `"make release"`).
 - Runs `tools/commit`, followed by `tools/bump` (which runs `tools/gate --full`, tags, and pushes upstream), and automatically installs the binary to `~/bin/` (`tools/install`).
 - **Trigger**:
   ```bash

@@ -8,8 +8,28 @@
 
 module LatexCLITargets
   def execute_targets(argv, options)
-    targets = argv.empty? ? [LaTeXUtils.find_main_latex_file('.', options[:exclude_main_tex])] : argv
+    targets = resolve_cli_targets(argv, options)
     targets.each { |target| process_target(target, options) }
+  end
+
+  def resolve_cli_targets(argv, options)
+    patterns = options[:exclude_main_tex]
+    configured = options[:main_file]
+    return [LaTeXUtils.find_main_latex_file('.', patterns, configured)] if argv.empty?
+
+    argv.map { |target| resolve_single_target(target, patterns, configured, options[:force_file]) }.uniq
+  end
+
+  def resolve_single_target(target, patterns, configured, force_file)
+    if !force_file && LaTeXUtils.file_matches_patterns?(target, patterns)
+      warn "Warning: '#{target}' matches exclude_main_tex patterns and was ignored. " \
+           'Auto-detecting main file instead (use --force-file to override).'
+      dir = File.dirname(target)
+      dir = '.' if dir.empty?
+      LaTeXUtils.find_main_latex_file(dir, patterns, configured)
+    else
+      target
+    end
   end
 
   def process_target(target, options)

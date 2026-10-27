@@ -174,7 +174,7 @@ module LatexCLI
     print_help_or_examples(parser, options, prog_name)
 
     if options[:show_main]
-      puts LaTeXUtils.find_main_latex_file(directory_argument_or_abort(argv[0], prog_name), options[:exclude_main_tex])
+      puts LaTeXUtils.find_main_latex_file(directory_argument_or_abort(argv[0], prog_name), options[:exclude_main_tex], options[:main_file])
       exit 0
     elsif options[:clean_only]
       target = directory_argument_or_abort(argv[0], prog_name)
@@ -186,14 +186,62 @@ module LatexCLI
     end
   end
 
+  DETAILED_EXAMPLES_BODY = <<~EXAMPLES.strip.freeze
+    Detailed Examples & Common Workflows:
+
+      1. Standard Compilation:
+         l                              Auto-detect main .tex and compile using xelatex
+         l paper.tex                    Compile specified paper.tex
+         l -f                           Force first pass (skip up-to-date check), continuing if needed
+         l -u                           Fast single pass only (no BibTeX/Biber, no extra passes)
+         l                              Incremental by default; skips passes when nothing changed
+
+      2. Compiler Engines:
+         l -e l paper.tex               Compile using LuaLaTeX (short: -e l, -e p, -e x)
+         l --engine=pdflatex paper.tex  Compile using pdfLaTeX
+         l --engine=xelatex paper.tex   Explicitly compile using XeLaTeX (default)
+
+      3. Diagnostics & Error Handling:
+         l -x                           Display plain-English diagnostic explanations & fixes
+         l -a                           Show all diagnostics (including suppressed Whatevers)
+         l -c                           Clean regenerable artifacts; preserve .bbl and metadata
+         l -C                           Clean directory artifacts and exit without building
+         l -s                           Quiet score mode (prints error/alert/warning counts)
+         l -W                           Treat compilation warnings as fatal errors
+
+      4. Output Protection & Update Guard:
+         l --update-if-changed          Only replace PDF if rendered text layout changed
+
+      5. Portable Paper Bundling & Verification:
+         l -z                           Bundle paper, active styles, and figures into paper.zip
+         l -z -t                        Bundle paper into zip and verify build in /tmp sandbox
+         l --zip-alone                  Bundle styles and verify a clean build with matching PDF
+         l -z -- figs/extra.png         Include extra supplemental files in the portable bundle
+
+      6. arXiv Submission Preparation:
+         l --arxiv                      Flatten inputs, strip comments, and bundle arXiv package
+         l --meta                       Extract title, authors, abstract, and comments metadata
+
+      7. Configuration & Utilities:
+         l -m                           Print detected main LaTeX file and exit
+         l --set-main-file paper.tex    Set main LaTeX document in local .l.jsonc configuration
+         l --config-init                Generate a starter .l.jsonc configuration file
+         l --vscode-init                Generate .vscode/tasks.json and settings.json for VS Code
+         l --gitignore-init             Generate or update .gitignore with standard LaTeX & junk/ rules
+  EXAMPLES
+
+  def self.detailed_examples(banner = nil)
+    banner && !banner.empty? ? "#{banner}\n\n#{DETAILED_EXAMPLES_BODY}" : DETAILED_EXAMPLES_BODY
+  end
+
   def self.help_output_text(parser, options, prog_name)
     manual = options[:show_help_all] ? LaTeXHelpManual.render(prog_name) : condensed_help(prog_name)
     if (options[:show_help_all] || options[:show_help]) && options[:show_examples]
-      "#{manual}\n\n#{LaTeXUtils.detailed_examples}"
+      "#{manual}\n\n#{detailed_examples}"
     elsif options[:show_help_all] || options[:show_help]
       manual
     elsif options[:show_examples]
-      LaTeXUtils.detailed_examples(parser.banner)
+      detailed_examples(parser.banner)
     end
   end
 

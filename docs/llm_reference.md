@@ -45,6 +45,7 @@ l --json paper.tex
 | `-llm` | `--agent` | flag | `false` | **Primary agent profile**: Pure plaintext, folded warnings, silent on clean success. |
 | `--json` | *(none)* | flag | `false` | Emit structured JSON result payload on stdout. |
 | `-f` | `--force` | flag | `false` | Force initial LaTeX run unconditionally (bypasses build cache). |
+| *(none)* | `--force-file` | flag | `false` | Force using specified file even if it matches `exclude_main_tex`. |
 | `-u` | `--single-pass`| flag | `false` | Execute exactly 1 LaTeX pass without BibTeX/Biber or convergence passes. |
 | `-n` | `--passes` | integer (1–10)| `5` | Maximum number of LaTeX compilation passes. |
 | `-b` | `--[no-]bib` | boolean | auto | Force or skip bibliography pass (Biber or BibTeX). |
@@ -78,6 +79,7 @@ l --json paper.tex
 | `-cc` | `--compile` | flag | `false` | GNU standard compiler output (`file:line:col: severity: msg`). |
 | *(none)* | `--[no-]mirror-subdirs` | boolean | `false` | Mirror project subdirectories into build directory (alias: `--[no-]copy-subdirs`). |
 | *(none)* | `--gitignore-init` | flag | `false` | Additive setup: create or add standard LaTeX & `junk/` rules to `.gitignore`. |
+| *(none)* | `--set-main-file` | string | `nil` | Set main document in local `.l.jsonc` and exit. |
 
 ---
 
@@ -88,6 +90,7 @@ Global file: `~/.config/leeni/config.jsonc`.
 
 ```jsonc
 {
+  "main_file": "paper.tex",          // string (explicit main document to compile)
   "engine": "xelatex",               // "xelatex" | "lualatex" | "pdflatex"
   "passes": 5,                       // 1 .. 10
   // Set "junk_dir": "junk" only for a project-local build directory.

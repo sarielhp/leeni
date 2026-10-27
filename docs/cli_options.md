@@ -24,6 +24,7 @@ All long options accept either `-` or `--` and allow internal dashes to be omitt
 | :--- | :--- | :--- |
 | `(none)` | Build | Find and compile main document automatically. |
 | `-f`, `--force` | Build | Force initial LaTeX run unconditionally, bypassing cache. |
+| `--force-file` | Build | Force using specified file even if it matches `exclude_main_tex`. |
 | `-u`, `--single-pass` | Build | Execute a single LaTeX pass only (no BibTeX or rerun loops). |
 | `-n`, `--passes NUM` | Build | Maximum compilation passes allowed (1-10, default: 5). |
 | `-b`, `--[no-]bib` | Build | Explicitly enable or skip bibliography pass. |
@@ -58,6 +59,7 @@ All long options accept either `-` or `--` and allow internal dashes to be omitt
 | `--[no-]lock` | Environment | Enable/disable lockfile concurrency protection (default: on). |
 | `--theme THEME` | Config | Set diagnostic color theme (`blush`, `catppuccin`, etc.). |
 | `--theme-list` | Config | List available diagnostic color themes with previews. |
+| `--set-main-file FILE` | Config | Set main LaTeX document in local `.l.jsonc` and exit. |
 | `--config-init` | Config | Create a local `.l.jsonc` configuration template in current directory. |
 | `--config-show` | Config | Show active configuration sources and resolved settings. |
 | `--config-save` | Config | Save specified CLI options to configuration file. |
@@ -76,6 +78,12 @@ All long options accept either `-` or `--` and allow internal dashes to be omitt
 Bypasses `.build_state.json` in the project cache and forces the first LaTeX pass to run unconditionally. Subsequent passes and BibTeX will only run if required for convergence.
 ```bash
 l -f paper.tex
+```
+
+### `--force-file`
+Forces `leeni` to compile the specified `.tex` file even if its filename matches an `exclude_main_tex` pattern (e.g. `prefix.tex` or `preamble.tex`).
+```bash
+l --force-file prefix.tex
 ```
 
 ### `-u`, `--single-pass`
@@ -301,6 +309,12 @@ Sets the terminal diagnostic color theme (`blush`, `catppuccin`, `tokyo-night`, 
 ```bash
 l --theme catppuccin
 l --theme +1
+```
+
+### `--set-main-file <file>`
+Sets the `main_file` configuration property in the local `.l.jsonc` file (creating it if needed) and exits immediately.
+```bash
+l --set-main-file paper.tex
 ```
 
 ### `--config-init`

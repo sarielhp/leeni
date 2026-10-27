@@ -34,6 +34,9 @@ module LaTeXConfig
       // Hardcoding it here made the magic comment unreachable.
       // "engine": "xelatex",
 
+      // Explicit main document file to compile in this directory
+      // "main_file": "paper.tex",
+
       // Accepted for compatibility and currently has no effect; incremental
       // rebuilds are automatic via the project build cache.
       "fast": false,
@@ -386,12 +389,12 @@ module LaTeXConfig
                else
                  (val.nil? ? 'null' : val.to_s)
                end
-    key_pattern = /"#{Regexp.escape(key)}"\s*:\s*(?:"(?:[^"\\]|\\.)*"|true|false|null|-?\d+(?:\.\d+)?)/
+    key_pattern = /^[ \t]*"#{Regexp.escape(key)}"\s*:\s*(?:"(?:[^"\\]|\\.)*"|true|false|null|-?\d+(?:\.\d+)?)/
 
-    return content.sub(key_pattern, "\"#{key}\": #{json_val}") if content =~ key_pattern
+    return content.sub(key_pattern, "  \"#{key}\": #{json_val}") if content =~ key_pattern
 
-    comment_pattern = %r{//\s*"#{Regexp.escape(key)}"\s*:\s*(?:"(?:[^"\\]|\\.)*"|true|false|null|-?\d+(?:\.\d+)?),?}
-    return content.sub(comment_pattern, "\"#{key}\": #{json_val},") if content =~ comment_pattern
+    comment_pattern = %r{^[ \t]*//\s*"#{Regexp.escape(key)}"\s*:\s*(?:"(?:[^"\\]|\\.)*"|true|false|null|-?\d+(?:\.\d+)?),?}
+    return content.sub(comment_pattern, "  \"#{key}\": #{json_val},") if content =~ comment_pattern
 
     content.sub(/(?<=\S)(\s*\}\s*\z)/) do |match|
       prev_char = content[0...content.rindex(match)].strip[-1]
@@ -432,10 +435,19 @@ module LaTeXConfig
     [:explicit_help_style, 'help_style', ->(opts) { opts[:help_style] }],
     [:theme_arg, 'theme', ->(opts) { opts[:theme_arg] }],
     [:explicit_junk_dir, 'junk_dir', ->(opts) { opts[:junk_dir] }],
-    [:explicit_styles_inject, 'styles_inject', ->(opts) { opts[:inject_styles] }]
+    [:explicit_styles_inject, 'styles_inject', ->(opts) { opts[:inject_styles] }],
+    [:main_file_explicit, 'main_file', ->(opts) { opts[:main_file] }]
   ].freeze
 
   UNSETTABLE_KEYS = SAVABLE_CLI_MAPPINGS.map { |mapping| mapping[1] }.reject { |key| key == 'styles_inject' }.freeze
+
+  def self.set_main_file!(file, scope: :local, dir: '.')
+    local_name = LOCAL_CONFIG_CANDIDATES.find { |name| File.file?(File.join(dir, name)) } || '.l.jsonc'
+    target_file = scope == :global ? GLOBAL_CONFIG_FILE : File.join(dir, local_name)
+    success = save_settings!({ 'main_file' => file }, target_file)
+    puts Rainbow(" -- Saved main_file = '#{file}' to #{scope} configuration: #{target_file}").green if success
+    success
+  end
 
   def self.unset_setting!(key, scope: :local, dir: '.')
     unless UNSETTABLE_KEYS.include?(key)

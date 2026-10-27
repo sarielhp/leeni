@@ -76,21 +76,25 @@ module LatexCLI
       validate_output_mode!(options, prog_name)
       @suppress_at_exit_newline = true if options[:compile]
       handle_help_and_examples(parser, options, prog_name, argv)
-
-      if options[:config_unset]
-        exit(LaTeXConfig.unset_setting!(options[:config_unset], scope: options[:config_scope] || :local) ? 0 : 1)
-      end
-
-      if options[:config_save]
-        LaTeXConfig.save_cli_options!(options)
-        exit 0 if argv.empty? && LaTeXUtils.candidate_tex_files('.', options[:exclude_main_tex]).empty?
-      end
-
+      dispatch_config_actions(options, argv)
       configure_environment(options)
       execute_targets(argv, options)
     rescue SignalException => e
       handle_interrupt(options, e)
     end
+  end
+
+  def self.dispatch_config_actions(options, argv)
+    if options[:config_unset]
+      exit(LaTeXConfig.unset_setting!(options[:config_unset], scope: options[:config_scope] || :local) ? 0 : 1)
+    end
+    if options[:set_main_file]
+      exit(LaTeXConfig.set_main_file!(options[:set_main_file], scope: options[:config_scope] || :local) ? 0 : 1)
+    end
+    return unless options[:config_save]
+
+    LaTeXConfig.save_cli_options!(options)
+    exit 0 if argv.empty? && LaTeXUtils.candidate_tex_files('.', options[:exclude_main_tex]).empty?
   end
 
   def self.handle_interrupt(options = nil, exception = nil)
@@ -243,7 +247,7 @@ module LatexCLI
       engine: symlink_engine,
       config_engine: cfg['engine'],
       engine_explicit: !symlink_engine.nil?,
-      clean: false, force: false, single_pass: false, show_examples: false,
+      clean: false, force: false, force_file: false, single_pass: false, show_examples: false,
       show_help: false, show_help_all: false, show_main: false, clean_only: false,
       fast: is_lw || cfg['fast'] == true,
       update_on_diff: cfg['update_on_diff'] == true,
@@ -265,6 +269,7 @@ module LatexCLI
       alert_as_warning: Array(cfg['alert_as_warning']),
       all: false, explain: false, deps: false,
       context_lines: cfg['context_lines'] || 0,
+      main_file: cfg['main_file'],
       exclude_main_tex: cfg['exclude_main_tex'] || LaTeXUtils::DEFAULT_EXCLUDE_MAIN_PATTERNS,
       exclude_source_tex: cfg['exclude_source_tex'] || LaTeXUtils::DEFAULT_EXCLUDE_SOURCE_PATTERNS,
       bib_dirs: cfg['bib_dirs'] || LaTeXUtils::DEFAULT_BIB_DIRS,
@@ -278,7 +283,7 @@ module LatexCLI
       vscode_lw: false,
       raw: cfg['raw'] == true, link: cfg['links'],
       index: cfg['index'] == true, explicit_index: false, config_save: false, config_scope: nil,
-      config_unset: nil,
+      config_unset: nil, set_main_file: nil, main_file_explicit: false,
       explicit_passes: false, explicit_update_on_diff: false, explicit_time: false,
       explicit_raw: false, explicit_trace: false, explicit_werror: false,
       explicit_emacs: false, explicit_help_style: false, explicit_styles_inject: false
@@ -407,6 +412,9 @@ module LatexCLI
     opts.separator ''
     opts.separator '  Pass Control & Compilation:'
     opts.on('-f', '--force', 'Force an initial compilation run unconditionally (bypasses build cache)') { options[:force] = true }
+    opts.on('--force-file', 'Force using specified .tex file even if it matches exclude_main_tex') do
+      options[:force_file] = true
+    end
     opts.on('-u', '--single-pass', 'Execute a single LaTeX pass only (no BibTeX/Biber or convergence passes)') do
       options[:single_pass] = true
       options[:passes] = 1
@@ -567,6 +575,9 @@ module LatexCLI
     opts.on('--config-init', 'Create a local .l.jsonc configuration template in the current directory and exit') do
       LaTeXConfig.create_local_template!('.')
       exit 0
+    end
+    opts.on('--set-main-file FILE', 'Set main LaTeX document in local .l.jsonc configuration and exit') do |file|
+      options[:set_main_file] = file
     end
     opts.on('--config-show', 'Show active configuration sources and resolved settings and exit') { options[:show_config] = true }
     opts.on('--config-save', 'Save specified CLI option choices to configuration file (default: local .l.jsonc)') do

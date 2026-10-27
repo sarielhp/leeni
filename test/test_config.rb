@@ -10,6 +10,7 @@ require_relative '../lib/leeni/config'
 require_relative '../lib/leeni/utils'
 require_relative '../lib/leeni/flattener'
 require_relative '../lib/leeni/builder'
+require_relative '../lib/leeni/cli_targets'
 
 class TestLaTeXConfigAndConventions < Minitest::Test
   def test_legacy_global_config_is_migrated_without_losing_settings
@@ -104,6 +105,79 @@ class TestLaTeXConfigAndConventions < Minitest::Test
       File.write(File.join(dir, 'preamble.tex'), "\\usepackage{amssymb}\n")
 
       assert_equal 'main.tex', LaTeXUtils.find_main_latex_file(dir)
+    end
+  end
+
+  def test_find_main_latex_file_with_configured_main
+    Dir.mktmpdir('leeni_find_main_test') do |dir|
+      File.write(File.join(dir, 'doc_a.tex'), "\\begin{document}\nA\n\\end{document}\n")
+      File.write(File.join(dir, 'doc_b.tex'), "\\begin{document}\nB\n\\end{document}\n")
+      File.write(File.join(dir, '.l.jsonc'), "{\n  \"main_file\": \"doc_b.tex\"\n}\n")
+
+      assert_equal 'doc_b.tex', LaTeXUtils.find_main_latex_file(dir)
+    end
+  end
+
+  def test_find_main_latex_file_ignores_excluded_configured_main
+    Dir.mktmpdir('leeni_find_main_test') do |dir|
+      File.write(File.join(dir, 'main.tex'), "\\begin{document}\nHello\n\\end{document}\n")
+      File.write(File.join(dir, 'prefix.tex'), "\\usepackage{amsmath}\n")
+      File.write(File.join(dir, '.l.jsonc'), "{\n  \"main_file\": \"prefix.tex\"\n}\n")
+
+      _out, err = capture_io do
+        assert_equal 'main.tex', LaTeXUtils.find_main_latex_file(dir)
+      end
+      assert_match(/Configured main_file 'prefix.tex' matches exclude_main_tex patterns and was ignored/, err)
+    end
+  end
+
+  def test_find_main_latex_file_ignores_excluded_dot_mainfile
+    Dir.mktmpdir('leeni_find_main_test') do |dir|
+      File.write(File.join(dir, 'main.tex'), "\\begin{document}\nHello\n\\end{document}\n")
+      File.write(File.join(dir, 'prefix.tex'), "\\usepackage{amsmath}\n")
+      File.write(File.join(dir, '.mainfile'), "prefix.tex\n")
+
+      _out, err = capture_io do
+        assert_equal 'main.tex', LaTeXUtils.find_main_latex_file(dir)
+      end
+      assert_match(/'.mainfile' target 'prefix.tex' matches exclude_main_tex patterns and was ignored/, err)
+    end
+  end
+
+  def test_set_main_file_command
+    Dir.mktmpdir('leeni_set_main_test') do |dir|
+      assert LaTeXConfig.set_main_file!('target_paper.tex', scope: :local, dir: dir)
+      cfg = LaTeXConfig.load_merged_config(dir)
+      assert_equal 'target_paper.tex', cfg['main_file']
+    end
+  end
+
+  def test_resolve_cli_targets_with_excluded_file
+    Dir.mktmpdir('leeni_cli_targets_test') do |dir|
+      File.write(File.join(dir, 'main.tex'), "\\begin{document}\nHello\n\\end{document}\n")
+      File.write(File.join(dir, 'prefix.tex'), "\\usepackage{amsmath}\n")
+
+      test_obj = Object.new.extend(LatexCLITargets)
+      opts = {
+        exclude_main_tex: LaTeXUtils::DEFAULT_EXCLUDE_MAIN_PATTERNS,
+        main_file: nil,
+        force_file: false
+      }
+
+      Dir.chdir(dir) do
+        _out, err = capture_io do
+          targets = test_obj.resolve_cli_targets(['prefix.tex'], opts)
+          assert_equal ['main.tex'], targets
+        end
+        assert_match(/'prefix.tex' matches exclude_main_tex patterns and was ignored/, err)
+
+        opts[:force_file] = true
+        _out, err = capture_io do
+          targets = test_obj.resolve_cli_targets(['prefix.tex'], opts)
+          assert_equal ['prefix.tex'], targets
+        end
+        assert_empty err
+      end
     end
   end
 

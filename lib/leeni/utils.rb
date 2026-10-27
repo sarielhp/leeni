@@ -354,29 +354,63 @@ module LaTeXUtils
     exit 1
   end
 
+  def self.file_matches_patterns?(file, patterns)
+    return false if file.to_s.empty? || patterns.nil? || patterns.empty?
+
+    base = File.basename(file)
+    patterns.any? { |pat| File.fnmatch?(pat, base, File::FNM_CASEFOLD | File::FNM_EXTGLOB) }
+  end
+
   def self.candidate_tex_files(dir, exclude_patterns = nil)
     patterns = exclude_patterns || DEFAULT_EXCLUDE_MAIN_PATTERNS
     search_path = (dir == '.' ? '*.tex' : File.join(dir, '*.tex'))
     Dir[search_path].map { |f| File.basename(f) }.reject do |f|
       f.start_with?('flycheck_', '.') || f.end_with?('~', '.bak') ||
-        patterns.any? { |pat| File.fnmatch?(pat, f, File::FNM_CASEFOLD | File::FNM_EXTGLOB) }
+        file_matches_patterns?(f, patterns)
     end
   end
 
-  def self.find_main_latex_file(dir = '.', exclude_patterns = nil)
-    mainfile = File.join(dir, '.mainfile')
-    if File.exist?(mainfile)
-      mf = File.read(mainfile).strip
-      return mf unless mf.empty?
-    end
+  def self.find_main_latex_file(dir = '.', exclude_patterns = nil, configured_main = nil)
+    patterns = exclude_patterns || DEFAULT_EXCLUDE_MAIN_PATTERNS
+    configured = resolve_configured_main_file(dir, configured_main, patterns)
+    return configured if configured
 
-    candidates = candidate_tex_files(dir, exclude_patterns)
+    candidates = candidate_tex_files(dir, patterns)
     if candidates.empty?
       warn "Error: No LaTeX (.tex) files found in directory '#{File.expand_path(dir)}'."
       exit 1
     end
     return candidates.first if candidates.size == 1
 
+    select_best_candidate(dir, candidates)
+  end
+
+  def self.resolve_configured_main_file(dir, configured_main, patterns)
+    candidate = configured_main || load_configured_main_file(dir)
+    return candidate if candidate_valid?(candidate, patterns, 'Configured main_file')
+
+    mainfile = File.join(dir, '.mainfile')
+    return nil unless File.exist?(mainfile)
+
+    mf = File.read(mainfile).strip
+    candidate_valid?(mf, patterns, "'.mainfile' target") ? mf : nil
+  end
+
+  def self.candidate_valid?(file, patterns, label)
+    return false if file.to_s.empty?
+    return true unless file_matches_patterns?(file, patterns)
+
+    warn "Warning: #{label} '#{file}' matches exclude_main_tex patterns and was ignored."
+    false
+  end
+
+  def self.load_configured_main_file(dir)
+    LaTeXConfig.load_merged_config(dir)['main_file']
+  rescue StandardError
+    nil
+  end
+
+  def self.select_best_candidate(dir, candidates)
     dir_match = "#{File.basename(File.expand_path(dir))}.tex"
     return dir_match if candidates.include?(dir_match)
 
@@ -448,50 +482,7 @@ module LaTeXUtils
   end
 
   def self.detailed_examples(banner = nil)
-    lines = []
-    lines << banner if banner && !banner.empty?
-    lines << '' if banner && !banner.empty?
-    lines << 'Detailed Examples & Common Workflows:'
-    lines << ''
-    lines << '  1. Standard Compilation:'
-    lines << '     l                              Auto-detect main .tex and compile using xelatex'
-    lines << '     l paper.tex                    Compile specified paper.tex'
-    lines << '     l -f                           Force first pass (skip up-to-date check), continuing if needed'
-    lines << '     l -u                           Fast single pass only (no BibTeX/Biber, no extra passes)'
-    lines << '     l                              Incremental by default; skips passes when nothing changed'
-    lines << ''
-    lines << '  2. Compiler Engines:'
-    lines << '     l -e l paper.tex               Compile using LuaLaTeX (short: -e l, -e p, -e x)'
-    lines << '     l --engine=pdflatex paper.tex  Compile using pdfLaTeX'
-    lines << '     l --engine=xelatex paper.tex   Explicitly compile using XeLaTeX (default)'
-    lines << ''
-    lines << '  3. Diagnostics & Error Handling:'
-    lines << '     l -x                           Display plain-English diagnostic explanations & fixes'
-    lines << '     l -a                           Show all diagnostics (including suppressed Whatevers)'
-    lines << '     l -c                           Clean regenerable artifacts; preserve .bbl and metadata'
-    lines << '     l -C                           Clean directory artifacts and exit without building'
-    lines << '     l -s                           Quiet score mode (prints error/alert/warning counts)'
-    lines << '     l -W                           Treat compilation warnings as fatal errors'
-    lines << ''
-    lines << '  4. Output Protection & Update Guard:'
-    lines << '     l --update-if-changed          Only replace PDF if rendered text layout changed'
-    lines << ''
-    lines << '  5. Portable Paper Bundling & Verification:'
-    lines << '     l -z                           Bundle paper, active styles, and figures into paper.zip'
-    lines << '     l -z -t                        Bundle paper into zip and verify build in /tmp sandbox'
-    lines << '     l --zip-alone                  Bundle styles and verify a clean build with matching PDF'
-    lines << '     l -z -- figs/extra.png         Include extra supplemental files in the portable bundle'
-    lines << ''
-    lines << '  6. arXiv Submission Preparation:'
-    lines << '     l --arxiv                      Flatten inputs, strip comments, and bundle arXiv package'
-    lines << '     l --meta                       Extract title, authors, abstract, and comments metadata'
-    lines << ''
-    lines << '  7. Configuration & Utilities:'
-    lines << '     l -m                           Print detected main LaTeX file and exit'
-    lines << '     l --config-init                Generate a starter .l.jsonc configuration file'
-    lines << '     l --vscode-init                Generate .vscode/tasks.json and settings.json for VS Code'
-    lines << '     l --gitignore-init             Generate or update .gitignore with standard LaTeX & junk/ rules'
-    lines.join("\n")
+    LatexCLI.detailed_examples(banner)
   end
 
   def self.pdf_page_count(pdf_path)

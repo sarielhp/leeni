@@ -31,7 +31,7 @@ The build pipeline follows an orderly sequence of phases:
 ```
 
 ### Phase 1: Main File & Engine Discovery
-- If no file is specified on the command line, `leeni` scans the current directory using heuristics: checks `.mainfile`, `<dirname>.tex`, filters preamble snippets (`prefix*.tex`, `prelim*.tex`), and searches for `\begin{document}`.
+- If no file is specified on the command line, `leeni` scans the current directory using heuristics: checks `main_file` config, `<dirname>.tex`, filters preamble snippets (`prefix*.tex`, `prelim*.tex`), and searches for `\begin{document}`.
 - Engine auto-detection reads `% !TEX TS-program` or `% !TEX program` magic comments, AUCTeX file variables, or package requirements (`luacode`, `luamplib`).
 
 ### Phase 2: Pre-Flight Auditing

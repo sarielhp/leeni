@@ -389,11 +389,7 @@ module LaTeXUtils
     candidate = configured_main || load_configured_main_file(dir)
     return candidate if candidate_valid?(candidate, patterns, 'Configured main_file')
 
-    mainfile = File.join(dir, '.mainfile')
-    return nil unless File.exist?(mainfile)
-
-    mf = File.read(mainfile).strip
-    candidate_valid?(mf, patterns, "'.mainfile' target") ? mf : nil
+    nil
   end
 
   def self.candidate_valid?(file, patterns, label)
@@ -430,7 +426,7 @@ module LaTeXUtils
     return with_pdf.first if with_pdf.size == 1
 
     warn 'Error: Multiple candidate .tex files found. Please specify which file to compile, or'
-    warn '       create a .mainfile containing the name of the main LaTeX file:'
+    warn '       set main_file in .l.jsonc (or run: l --set-main-file <file>):'
     candidates.each { |f| warn "  #{f}" }
     exit 1
   end

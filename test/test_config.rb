@@ -131,16 +131,12 @@ class TestLaTeXConfigAndConventions < Minitest::Test
     end
   end
 
-  def test_find_main_latex_file_ignores_excluded_dot_mainfile
+  def test_find_main_latex_file_ignores_dot_mainfile
     Dir.mktmpdir('leeni_find_main_test') do |dir|
       File.write(File.join(dir, 'main.tex'), "\\begin{document}\nHello\n\\end{document}\n")
-      File.write(File.join(dir, 'prefix.tex'), "\\usepackage{amsmath}\n")
-      File.write(File.join(dir, '.mainfile'), "prefix.tex\n")
+      File.write(File.join(dir, '.mainfile'), "other_doc.tex\n")
 
-      _out, err = capture_io do
-        assert_equal 'main.tex', LaTeXUtils.find_main_latex_file(dir)
-      end
-      assert_match(/'.mainfile' target 'prefix.tex' matches exclude_main_tex patterns and was ignored/, err)
+      assert_equal 'main.tex', LaTeXUtils.find_main_latex_file(dir)
     end
   end
 

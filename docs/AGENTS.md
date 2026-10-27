@@ -234,7 +234,7 @@ When reviewing, refactoring, or evaluating changes to `leeni`, evaluate across t
    - File locking (`--lock` with `flock`) must prevent race conditions without deadlocking.
    - Child process execution via `Open3.capture2e` must handle process exit statuses and signal termination gracefully.
 2. **Correctness & Heuristics**:
-   - Main file heuristic detection must accurately resolve `.mainfile`, directory name matching, and candidate filtering without false positives.
+   - Main file heuristic detection must accurately resolve `main_file` config, directory name matching, and candidate filtering without false positives.
    - Auxiliary file hashing (`compute_aux_hash`) must accurately reflect all `.aux` changes across subdirectories.
 3. **Resilience & Fault Tolerance**:
    - Missing compilers (`xelatex`, `biber`, `bibtex`) or system tools must fail fast with actionable error messages.

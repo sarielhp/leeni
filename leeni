@@ -5,7 +5,7 @@
 # Unified LaTeX Builder (leeni / l)
 #
 # Robust, high-performance LaTeX compilation manager with:
-# - Automatic main file detection (.mainfile or directory scan)
+# - Automatic main file detection (config or directory scan)
 # - Isolated XDG cache output (project-local junk/ remains configurable)
 # - Multi-engine support (xelatex [default], lualatex, pdflatex)
 # - BibTeX and Biber bibliography generation

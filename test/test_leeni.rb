@@ -411,9 +411,9 @@ class TestLeeniCLI < LeeniTestBase
     end
   end
 
-  def test_find_main_flag_with_mainfile
+  def test_find_main_flag_with_configured_main
     Dir.mktmpdir do |dir|
-      File.write(File.join(dir, '.mainfile'), "document.tex\n")
+      File.write(File.join(dir, '.l.jsonc'), "{\"main_file\": \"document.tex\"}\n")
       File.write(File.join(dir, 'other.tex'), "\\begin{document}\\end{document}\n")
 
       Dir.chdir(dir) do

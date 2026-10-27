@@ -56,7 +56,7 @@ module LaTeXMacroHarvester
   end
 
   def self.root_indicator?(dir)
-    return true if File.file?(File.join(dir, '.mainfile'))
+    return true if File.file?(File.join(dir, '.l.jsonc')) || File.file?(File.join(dir, '.leeni.jsonc'))
 
     Dir.glob(File.join(dir, '*.tex')).any? do |f|
       File.file?(f) && File.size(f) <= 1_000_000 && File.read(f, 2048)&.include?('\\documentclass')

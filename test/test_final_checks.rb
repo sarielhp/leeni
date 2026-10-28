@@ -95,7 +95,7 @@ class TestFinalChecks < LeeniTestBase
         out, = capture_io { final.send(:analyze_output) }
         plain = strip_ansi(out)
         assert_includes plain, '(2 alerts)'
-        assert_includes plain, 'main.tex:1:'
+        assert_includes plain, '1: 🚨 Draft leftover'
         assert_includes plain, 'documentclass option draft'
         assert_includes plain, '\\includeonly restricts the build'
       end

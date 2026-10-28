@@ -151,7 +151,7 @@ class LatexBuilder
     discard_stale_bib_format_files
     total_t0 = Process.clock_gettime(Process::CLOCK_MONOTONIC) if @options[:time]
 
-    unless run_convergence_loop
+    unless run_convergence_loop_with_recovery
       sync_bbl_to_root if @options[:trace]
       LaTeXIndicator.stop(clear: true, enabled: interactive_tty?)
       return false
@@ -218,8 +218,10 @@ class LatexBuilder
   # What a caller (--json) needs to reuse the build: the engine that ran, the build directory,
   # the LaTeX passes run now (0 when up to date) and whether the passes converged.
   def build_report
-    { engine: @engine_name, build_dir: @junk_dir && File.expand_path(@junk_dir), passes: @latex_passes.to_i,
-      up_to_date: @up_to_date == true, converged: @cacheable_build != false }
+    report = { engine: @engine_name, build_dir: @junk_dir && File.expand_path(@junk_dir), passes: @latex_passes.to_i,
+               up_to_date: @up_to_date == true, converged: @cacheable_build != false }
+    report[:recovery] = @recovery_case if @recovery_case
+    report
   end
 
   def targets_up_to_date?

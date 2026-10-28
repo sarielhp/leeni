@@ -198,3 +198,13 @@ When debugging complex build issues or optimizing compilation speed:
 - **Bibliography runs**: BibTeX/Biber runs once, and at most twice if the first run is provably stale (uncovered citations, a changed citation set, or a changed `.bcf`). A bibliography still stale at exit prevents caching. With `-n 1` bibliography tools are skipped, since no later pass could use their output.
 - **Stale bibliography files**: a `.bbl`, `.bcf` or biblatex `.aux` left in the build directory by a build using the other bibliography system is discarded before the first pass.
 - **Single bibliography only**: `bibtex` is run on the main document's `.aux` only. `multibib`/`chapterbib` documents that need one BibTeX run per sub-`.aux` are not handled automatically; run those tools by hand.
+
+## 10. Cache Recovery & Quarantine
+
+A pass that fails with its first error inside a *generated* file (`.aux`, a chapter's sub-`.aux`, `.toc`, `.out`, `.bbl`, `.bcf`, ...) cannot be the source's fault. Instead of reporting it, `leeni`:
+
+1. stores the build directory (without PDFs), the pass logs and the project-local sources from the recorder as a **case** under `$XDG_CACHE_HOME/leeni/quarantine/<project>-<timestamp>/` with a `manifest.json` (trigger, first error, engine, versions);
+2. cleans the build directory exactly as `-c` would and reruns the convergence loop once;
+3. prints one line: `Build failed with an error inside generated file chap.aux; cleaned the build directory and rebuilt. Case kept at ...` (`leeni: note:` in `-llm` mode; `build.recovery` in `--json`).
+
+A second failure in the same run is reported normally. If the same project needed a recovery within the last week, the note adds `run l --doctor`, because a repeat is a bug worth reporting rather than a one-off. The ten newest cases are kept; each is capped at 40 MB. A `.bbl` error that traces back to a `.bib` entry is excluded, since cleaning cannot fix it.

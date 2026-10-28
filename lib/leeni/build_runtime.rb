@@ -347,12 +347,69 @@ module LatexBuildRuntime
     error_count = count_errors_in_log(exit_status, pass_log)
     return unless error_count.positive?
 
+    failure = @recovered ? nil : cache_failure(pass_log)
+    raise failure if failure
+
     announce_detected_failure if exit_status.zero?
     if @options[:score]
       output_score(pass_log, exit_status)
       exit 1
     end
     report_errors(pass_log)
+  end
+
+  # The first error of the pass sits in a generated file (.aux, .toc, .bbl,
+  # ...): the cache, not the source, is at fault. A .bbl error traced back to
+  # a .bib entry is the user's and is excluded.
+  def cache_failure(pass_log)
+    content = LaTeXUtils.filter_subcommand_noise(LaTeXUtils.safe_read(pass_log))
+    first = extract_errors(content).first
+    return nil unless first && LeeniQuarantine.generated_file?(first[:file]) && !first[:bib_entry]
+
+    LeeniQuarantine::CacheFailure.new(
+      "error inside generated file #{File.basename(first[:file].to_s)}",
+      first[:text].to_s.lines.first.to_s.strip, pass_log
+    )
+  end
+
+  # A failure inside generated files is the cache's fault, not the source's:
+  # keep the evidence as a quarantine case, clean, and rebuild once. A second
+  # failure in the same run is reported as usual.
+  def run_convergence_loop_with_recovery
+    run_convergence_loop
+  rescue LeeniQuarantine::CacheFailure => e
+    @recovered = true
+    repeat = LeeniQuarantine.recent_case_for?('.')
+    @recovery_case = quarantine_build(e)
+    announce_recovery(e, repeat)
+    LaTeXUtils.clean_directory('.', false, workspace_dir: @junk_dir)
+    junk_dir_create
+    discard_stale_bib_format_files
+    run_convergence_loop
+  end
+
+  def quarantine_build(failure)
+    sources = extract_fls_dependencies(File.join(@junk_dir, "#{@bfilename}.fls"))
+    sources = [@filename] if sources.empty?
+    LeeniQuarantine.store(project_dir: '.', main_file: @filename, junk_dir: @junk_dir, engine: @engine_name,
+                          failure: failure, sources: sources)
+  rescue StandardError => e
+    warn "Warning: could not store the quarantine case: #{e.message}" if @options[:verbose]
+    nil
+  end
+
+  def announce_recovery(failure, repeat)
+    LaTeXIndicator.stop(clear: true, enabled: interactive_tty?)
+    return if json_mode?
+
+    msg = "Build failed with an #{failure.trigger}; cleaned the build directory and rebuilt."
+    msg += " Case kept at #{@recovery_case}." if @recovery_case
+    msg += ' Second recovery for this project within a week; run l --doctor.' if repeat
+    if compile_mode?
+      warn "leeni: note: #{msg}"
+    else
+      puts "\n#{Rainbow(msg).yellow}"
+    end
   end
 
   # TeX exits 0 on some malformed input (an unclosed group at \end), so the

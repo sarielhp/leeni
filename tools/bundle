@@ -27,6 +27,7 @@ module LatexBundler
     compatibility.rb
     config.rb
     build_workspace.rb
+    quarantine.rb
     log_promoter.rb
     utils.rb
     indicator.rb

@@ -345,7 +345,11 @@ module Tooling
     published = false
     upstream
     version
-    script('commit', message)
+    if git('status', '--porcelain').empty?
+      puts 'Working tree clean; nothing to commit, moving on to the bump.'
+    else
+      script('commit', message)
+    end
     script('bump')
     published = true
     script('install') if install_requested

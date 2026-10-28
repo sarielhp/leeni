@@ -12,6 +12,7 @@ require 'json'
 require_relative 'utils'
 require_relative 'build_workspace'
 require_relative 'quarantine'
+require_relative 'cache_pruner'
 require_relative 'version'
 
 module LeeniDoctor
@@ -21,7 +22,7 @@ module LeeniDoctor
   module_function
 
   # Entry point for the CLI. `target` is true for the overview, a case name
-  # to show one quarantined build, or "clear". Returns the exit status.
+  # to show one quarantined build, "clear" or "prune". Returns the exit status.
   def run(target, options, io: $stdout)
     json = options[:json]
     plain = options[:compile] || options[:color] == false
@@ -31,30 +32,36 @@ module LeeniDoctor
       LeeniQuarantine.clear!
       io.puts(json ? JSON.generate(cleared: count) : "Removed #{plural(count, 'quarantined build')}.")
       0
+    when 'prune'
+      summary = LeeniCachePruner.run(days: LeeniCachePruner.days_from(options))
+      io.puts(json ? JSON.pretty_generate(summary) : LeeniCachePruner.describe(summary))
+      0
     when String
       show_case(target, io: io, json: json)
     else
-      data = report
+      data = report(options)
       io.puts(json ? JSON.pretty_generate(data) : render_text(data, plain: plain).join("\n"))
       0
     end
   end
 
-  def report
+  def report(options = {})
     {
       leeni_version: Leeni::VERSION,
       engines: ENGINES.to_h { |t| [t, LaTeXUtils.command_available?(t)] },
       helpers: HELPERS.to_h { |t| [t, LaTeXUtils.command_available?(t)] },
-      cache: cache_summary,
+      cache: cache_summary(LeeniCachePruner.days_from(options)),
       quarantine: LeeniQuarantine.cases.map { |dir, m| case_summary(dir, m) }
     }
   end
 
-  def cache_summary
+  def cache_summary(days = LeeniCachePruner::DEFAULT_DAYS)
     home = File.join(LeeniBuildWorkspace.cache_home, 'leeni')
     projects_dir = File.join(home, 'projects')
     projects = File.directory?(projects_dir) ? Dir.children(projects_dir).size : 0
-    { path: home, projects: projects, size_bytes: tree_size(home) }
+    statuses = LeeniCachePruner.survey(days: days).group_by { |e| e[:status] }.transform_values(&:size)
+    { path: home, projects: projects, size_bytes: tree_size(home), cache_days: days,
+      orphaned: statuses.fetch(:orphan, 0), idle: statuses.fetch(:idle, 0) }
   end
 
   def tree_size(dir)
@@ -76,6 +83,7 @@ module LeeniDoctor
     lines << "Helpers:  #{availability_line(data[:helpers], plain)}"
     cache = data[:cache]
     lines << "Cache:    #{cache[:path]} (#{cache[:projects]} projects, #{human_size(cache[:size_bytes])})"
+    lines << "          #{stale_line(cache)}"
     lines << ''
     lines.concat(render_quarantine(data[:quarantine], plain))
   end
@@ -103,6 +111,15 @@ module LeeniDoctor
       lines << "    error:   #{c[:first_error]}" if c[:first_error] && !c[:first_error].empty?
     end
     lines
+  end
+
+  def stale_line(cache)
+    stale = []
+    stale << "#{cache[:orphaned]} of deleted projects" if cache[:orphaned].positive?
+    stale << "#{cache[:idle]} idle for more than #{cache[:cache_days]} days" if cache[:idle].positive?
+    return 'no stale build directories' if stale.empty?
+
+    "stale: #{stale.join(', ')}; removed daily after a build, or now with l --doctor prune"
   end
 
   def plural(count, noun)

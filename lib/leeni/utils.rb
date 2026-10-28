@@ -11,6 +11,7 @@ require 'fileutils'
 require 'io/console'
 require 'pathname'
 require_relative 'build_workspace'
+require_relative 'project_record'
 require_relative 'log_promoter'
 begin
   require 'unicode/display_width'
@@ -456,9 +457,15 @@ module LaTeXUtils
       end
     end
 
-    cache = LeeniBuildWorkspace.cache_dir(target_dir)
-    FileUtils.rm_rf(cache)
+    remove_workspace(LeeniBuildWorkspace.cache_dir(target_dir))
     clean_custom_workspace(target_dir, workspace_dir) if workspace_dir
+  end
+
+  # A clean resets the build, not the project's history: project.json survives.
+  def self.remove_workspace(path)
+    record = LeeniProjectRecord.read(path)
+    FileUtils.rm_rf(path)
+    LeeniProjectRecord.write(path, record) if record
   end
 
   def self.clean_custom_workspace(target_dir, workspace_dir)
@@ -468,7 +475,7 @@ module LaTeXUtils
     return unless File.file?(File.join(path, '.leeni_workspace'))
     return unless File.read(File.join(path, '.leeni_workspace')).strip == LeeniBuildWorkspace.project_root(target_dir)
 
-    FileUtils.rm_rf(path)
+    remove_workspace(path)
   end
 
   def self.reset_latex_environment!

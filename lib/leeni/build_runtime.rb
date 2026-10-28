@@ -109,6 +109,19 @@ module LatexBuildRuntime
     LaTeXUtils.compatible_engine(requested_engine, @filename)
   end
 
+  # project.json bookkeeping around the pipeline body.
+  def record_build_start
+    @build_started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+    @build_result = 'interrupted'
+    LeeniProjectRecord.start!(@junk_dir, project: File.expand_path('.'), main_file: @filename, engine: @engine_name)
+  end
+
+  def record_build_finish
+    duration = Process.clock_gettime(Process::CLOCK_MONOTONIC) - @build_started
+    LeeniProjectRecord.finish!(@junk_dir, result: @build_result, passes: @latex_passes.to_i, duration: duration,
+                                          recovered: @recovered == true)
+  end
+
   def junk_dir_create
     dir = junk_dir
     FileUtils.mkdir_p(dir, mode: 0o700)

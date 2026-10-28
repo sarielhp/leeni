@@ -102,4 +102,26 @@ class TestCacheRecovery < LeeniTestBase
       saved ? ENV['XDG_CACHE_HOME'] = saved : ENV.delete('XDG_CACHE_HOME')
     end
   end
+
+  def test_project_record_follows_the_builds_and_counts_the_recovery
+    with_built_project do |junk_dir|
+      record = LeeniProjectRecord.read(junk_dir)
+      assert_equal File.expand_path('.'), record['project']
+      assert_equal 'ok', record['last_build']['result']
+      assert_operator record['last_build']['passes'], :>=, 1
+      assert_operator record['last_build']['duration_s'], :>, 0
+
+      poison(junk_dir)
+      capture_io { assert LatexBuilder.new('main.tex', options).run! }
+      record = LeeniProjectRecord.read(junk_dir)
+      assert_equal 1, record['recoveries']
+      assert record['last_build']['recovered']
+
+      capture_io { assert LatexBuilder.new('main.tex', options(force: false)).run! }
+      record = LeeniProjectRecord.read(junk_dir)
+      assert_equal 'up_to_date', record['last_build']['result']
+      assert_equal 3, record['runs']
+      assert_equal 2, record['builds']
+    end
+  end
 end

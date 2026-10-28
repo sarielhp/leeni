@@ -63,7 +63,7 @@ All long options accept either `-` or `--` and allow internal dashes to be omitt
 | `--config-init` | Config | Create a local `.l.jsonc` configuration template in current directory. |
 | `--config-show` | Config | Show active configuration sources and resolved settings. |
 | `--report [LEVEL]` | Config | Write a problem-report bundle (diagnostics, build logs, environment; `full` adds sources) and exit. |
-| `--doctor [TARGET]` | Config | Report engines, helper tools, cache state and quarantined builds; show one case or `clear` them. |
+| `--doctor [TARGET]` | Config | Report engines, helper tools, cache state and quarantined builds; show one case, `clear` them, or `prune` stale build directories. |
 | `--config-save` | Config | Save specified CLI options to configuration file. |
 | `--config-unset KEY` | Config | Remove a saved setting from local or global configuration. |
 | `--vscode-init` | Config | Create VS Code `tasks.json` and `settings.json` in `.vscode/`. |
@@ -339,11 +339,12 @@ l --report=full paper.tex
 ```
 
 ### `--doctor [TARGET]`
-Reports which engines and helper tools are on the PATH, the cache location, project count and size, and the builds quarantined by the automatic cache recovery (see Advanced Topics §10). A case name shows its manifest and first error block; `clear` removes every case. Plain text under `-llm`, JSON with `--json`.
+Reports which engines and helper tools are on the PATH, the cache location, project count, size and stale entries, and the builds quarantined by the automatic cache recovery (see Advanced Topics §10). A case name shows its manifest and first error block; `clear` removes every case; `prune` removes the cached build directories of deleted projects and of projects idle for more than `cache_days` days (default 10), the sweep that otherwise runs once a day after a build (see Advanced Topics §12). Plain text under `-llm`, JSON with `--json`.
 ```bash
 l --doctor
 l --doctor paper-20261028-133113
 l --doctor clear
+l --doctor prune
 ```
 
 ### `--config-save`

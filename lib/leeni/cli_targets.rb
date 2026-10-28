@@ -95,11 +95,23 @@ module LatexCLITargets
     exit 1 unless LatexArxivPackager.new(builder).package!
   end
 
+  # Once a day, after the build's own output; one line, and only when
+  # something was removed and a person is reading.
+  def prune_cache_if_due(options)
+    summary = LeeniCachePruner.auto(options)
+    return unless summary && !summary[:removed].empty?
+    return if options[:compile] || options[:json] || options[:llm] || options[:agent] || options[:score] || options[:emacs]
+
+    puts "      #{Rainbow("Cache: #{LeeniCachePruner.describe(summary)}").cyan}"
+  end
+
   def process_standard_target(target, options)
     options = options.merge(zip: true, inject_styles: true, verify: true, force: true) if options[:zip_alone]
     options = options.merge(final: true) if options[:zip] || options[:verify]
     builder = LatexBuilder.new(target, options)
-    exit 1 unless builder.run!
+    built = builder.run!
+    prune_cache_if_due(options)
+    exit 1 unless built
     return unless options[:zip] || options[:verify]
 
     packager = LatexPackager.new(builder)

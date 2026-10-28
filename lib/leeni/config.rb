@@ -133,6 +133,11 @@ module LaTeXConfig
       // Build artifact directory. Unset uses $XDG_CACHE_HOME/leeni/projects/.
       // Set junk_dir to junk for project-local compatibility.
 
+      // Days without a build after which a project's cached build directory is
+      // removed (once a day, after a build, or with l --doctor prune); 0 keeps
+      // idle projects forever. Directories of deleted projects always go.
+      "cache_days": 10,
+
       // Automatically mirror project subdirectories into the build directory for nested inputs
       "auto_mirror_subdirs": false,
 

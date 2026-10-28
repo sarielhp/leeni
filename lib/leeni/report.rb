@@ -18,6 +18,7 @@ require 'tmpdir'
 require_relative 'utils'
 require_relative 'build_workspace'
 require_relative 'quarantine'
+require_relative 'project_record'
 require_relative 'doctor'
 require_relative 'version'
 
@@ -60,6 +61,7 @@ module LeeniReport
     copy_quarantine(File.join(stage, 'quarantine'))
     sources = level == 'full' ? copy_sources(build_dir, target, File.join(stage, 'sources')) : []
     manifest = manifest(target, options, level, diagnostics, sources)
+    manifest[:project_record] = LeeniProjectRecord.touch_report!(build_dir) if File.directory?(build_dir)
     File.write(File.join(stage, 'manifest.json'), JSON.pretty_generate(manifest))
     Dir.glob('**/*', base: stage).select { |rel| File.file?(File.join(stage, rel)) }.sort
   end

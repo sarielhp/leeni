@@ -96,7 +96,9 @@ With `junk_dir` unset, leeni writes intermediate files to a per-project director
 
 Set `"junk_dir": "junk"` in `.l.jsonc` or use `l --junk-dir junk` to keep the previous local layout. Existing configuration files that contain this setting continue to use it. To remove a saved setting, run `l --config-unset junk_dir` for the local file or `l --config-unset junk_dir --global` for the global file.
 
-`l -C [directory]` removes that project's cache, legacy `junk/` and `.junk/` directories, and known regenerable auxiliary files left by direct TeX runs in the project directory. `l -c` performs the same cleanup before compilation. Final PDFs and `.bbl` files are preserved.
+`l -C [directory]` removes that project's cache, legacy `junk/` and `.junk/` directories, and known regenerable auxiliary files left by direct TeX runs in the project directory. `l -c` performs the same cleanup before compilation. Final PDFs and `.bbl` files are preserved, and so is the build directory's `project.json` (see Advanced Topics §12).
+
+Cached build directories are pruned once a day, after a build: entries whose project directory no longer exists are removed, and so are projects with no build for more than `cache_days` days (default 10). `"cache_days": 0` keeps idle projects forever; directories of deleted projects always go. `l --doctor prune` runs the same sweep on demand and `l --doctor` shows what it would remove.
 
 ### Downgrading alerts to warnings
 

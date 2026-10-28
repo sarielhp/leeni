@@ -32,7 +32,9 @@ require_relative 'lib/leeni/compatibility'
 require_relative 'lib/leeni/config'
 require_relative 'lib/leeni/quarantine'
 require_relative 'lib/leeni/log_promoter'
+require_relative 'lib/leeni/project_record'
 require_relative 'lib/leeni/utils'
+require_relative 'lib/leeni/cache_pruner'
 require_relative 'lib/leeni/doctor'
 require_relative 'lib/leeni/report'
 require_relative 'lib/leeni/help_manual'
@@ -279,6 +281,7 @@ module LatexCLI
       list_themes: false, show_config: false, doctor: nil, report: nil, no_env: is_env_free, verbose: false,
       trace: cfg['trace'] == true, emacs: cfg['emacs'] == true, werror: cfg['werror'] == true,
       final: cfg['final'] == true,
+      cache_days: cfg.key?('cache_days') ? cfg['cache_days'].to_i : LeeniCachePruner::DEFAULT_DAYS,
       revtex4: cfg['revtex4'].is_a?(Hash) ? cfg['revtex4'] : {},
       alert_overfull_pt: (cfg['alert_overfull_pt'] || 24.0).to_f,
       whatever_overfull_pt: (cfg['whatever_overfull_pt'] || 2.5).to_f,
@@ -604,7 +607,7 @@ module LatexCLI
     opts.on('--report [LEVEL]', 'Write a problem-report bundle for the document (diagnostics, build logs, environment; LEVEL "full" adds the sources) and exit') do |v|
       options[:report] = v || 'basic'
     end
-    opts.on('--doctor [TARGET]', 'Report engines, helper tools, cache state and quarantined builds and exit; TARGET names a case to show, or "clear"') do |v|
+    opts.on('--doctor [TARGET]', 'Report engines, helper tools, cache state and quarantined builds and exit; TARGET names a case to show, "clear" removes the cases, "prune" removes stale build directories') do |v|
       options[:doctor] = v || true
     end
     opts.on('--config-show', 'Show active configuration sources and resolved settings and exit') { options[:show_config] = true }

@@ -137,11 +137,19 @@ class LatexBuilder
     setup_environment
     deep_clean if @options[:clean]
     paper_cleanup
+    record_build_start
+    @build_result = run_build_steps
+    @build_result != 'failed'
+  ensure
+    record_build_finish if @build_started
+  end
 
+  # Returns ok, up_to_date or failed; project.json keeps the answer.
+  def run_build_steps
     if targets_up_to_date?
       @up_to_date = true
       handle_cached_up_to_date_build
-      return true
+      return 'up_to_date'
     end
 
     snapshot_build_inputs!
@@ -154,12 +162,12 @@ class LatexBuilder
     unless run_convergence_loop_with_recovery
       sync_bbl_to_root if @options[:trace]
       LaTeXIndicator.stop(clear: true, enabled: interactive_tty?)
-      return false
+      return 'failed'
     end
 
     interactive_tty? ? LaTeXIndicator.stop(clear: true) : (puts('') unless @options[:compile])
     finalize_build_outputs(total_t0)
-    true
+    'ok'
   end
 
   def handle_cached_up_to_date_build

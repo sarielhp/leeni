@@ -65,6 +65,8 @@ The codebase is organized into modular files under `lib/leeni/`:
 | `compatibility.rb` | REVTeX 4.0 legacy compatibility tree staging and path injection. |
 | `config.rb` | JSONC configuration loader, quote-aware parser, and defaults. |
 | `utils.rb` | Engine detection, main file heuristics, log noise filtering, and file utilities. |
+| `project_record.rb` | Per-project `project.json` in the build directory: path, main file, engine, build history; written atomically, kept by `-c`. |
+| `cache_pruner.rb` | Daily removal of cached build directories of deleted projects and of projects idle for more than `cache_days` days; `--doctor prune`. |
 | `brace_checker.rb` | Static lexical environment and brace validator. |
 | `diagnostics.rb` | AUCTeX-compatible log parser and 4-tier diagnostic classifier. |
 | `error_catalog.rb` | Declarative catalog of 55 TeX/LaTeX compilation errors with token extractors and explanations. |

@@ -27,9 +27,11 @@ module LatexBundler
     compatibility.rb
     config.rb
     build_workspace.rb
+    project_record.rb
     quarantine.rb
     log_promoter.rb
     utils.rb
+    cache_pruner.rb
     doctor.rb
     report.rb
     indicator.rb

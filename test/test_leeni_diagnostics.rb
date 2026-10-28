@@ -1072,69 +1072,48 @@ class TestLeeniDiagnostics < LeeniTestBase
   # A misspelled \documentclass option is ignored by LaTeX and silently leaves
   # the default layout in place, so it ranks as an alert rather than a warning.
   def test_unused_global_option_is_an_alert
-    Dir.mktmpdir do |dir|
-      FileUtils.mkdir_p(File.join(dir, 'junk'))
-      File.write(File.join(dir, 'junk', 'err_xelatex'), <<~LOG)
-        (./main.tex
-        LaTeX Warning: Unused global option(s):
-            [11p,twocolum].
-        )
-      LOG
-
-      builder = legacy_builder('main.tex', {})
-      out, = capture_io { Dir.chdir(dir) { builder.send(:analyze_output) } }
-      plain = strip_ansi(out)
-      assert_includes plain, '(1 alert)'
-      assert_includes plain, 'Unused global option(s): [11p,twocolum]'
-      assert_includes plain, 'Alerts: 1'
-      assert_includes plain, 'Warnings: 0'
-    end
+    plain = analyze_log(<<~LOG)
+      (./main.tex
+      LaTeX Warning: Unused global option(s):
+          [11p,twocolum].
+      )
+    LOG
+    assert_includes plain, '(1 alert)'
+    assert_includes plain, 'Unused global option(s): [11p,twocolum]'
+    assert_includes plain, 'Alerts: 1'
+    assert_includes plain, 'Warnings: 0'
   end
 
   # \em and the size switches inside math are only a Font Warning, yet they
   # never fix themselves and always mark a source mistake, so they are alerts.
   def test_font_switch_inside_math_is_an_alert_with_advice
-    Dir.mktmpdir do |dir|
-      FileUtils.mkdir_p(File.join(dir, 'junk'))
-      File.write(File.join(dir, 'junk', 'err_xelatex'), <<~LOG)
-        (./main.tex
-        LaTeX Font Warning: Command \\em invalid in math mode on input line 3.
-        LaTeX Font Warning: Command \\large invalid in math mode on input line 9.
-        )
-      LOG
-
-      builder = legacy_builder('main.tex', {})
-      out, = capture_io { Dir.chdir(dir) { builder.send(:analyze_output) } }
-      plain = strip_ansi(out)
-      assert_includes plain, '(2 alerts)'
-      assert_includes plain, 'command \\em invalid in math mode; use \\mathit{...}'
-      assert_includes plain, 'command \large invalid in math mode; wrap the whole formula'
-      assert_includes plain, 'Alerts: 2'
-    end
+    plain = analyze_log(<<~LOG)
+      (./main.tex
+      LaTeX Font Warning: Command \\em invalid in math mode on input line 3.
+      LaTeX Font Warning: Command \\large invalid in math mode on input line 9.
+      )
+    LOG
+    assert_includes plain, '(2 alerts)'
+    assert_includes plain, 'command \\em invalid in math mode; use \\mathit{...}'
+    assert_includes plain, 'command \large invalid in math mode; wrap the whole formula'
+    assert_includes plain, 'Alerts: 2'
   end
 
   # Vertical overflow and oversized floats lose content off the page, so the
   # same point threshold that promotes horizontal boxes applies to them.
   def test_vertical_overflow_and_large_floats_are_alerts_above_threshold
-    Dir.mktmpdir do |dir|
-      FileUtils.mkdir_p(File.join(dir, 'junk'))
-      File.write(File.join(dir, 'junk', 'err_xelatex'), <<~LOG)
-        (./main.tex
-        Overfull \\vbox (40.0pt too high) has occurred while \\output is active
-        Overfull \\vbox (5.0pt too high) detected at line 12
-        LaTeX Warning: Float too large for page by 341.29997pt on input line 4.
-        LaTeX Warning: Float too large for page by 3.0pt on input line 9.
-        )
-      LOG
-
-      builder = legacy_builder('main.tex', {})
-      out, = capture_io { Dir.chdir(dir) { builder.send(:analyze_output) } }
-      plain = strip_ansi(out)
-      assert_includes plain, '40.00pt too high'
-      assert_includes plain, 'Float too large for page by 341.30pt'
-      assert_includes plain, 'Alerts: 2'
-      assert_includes plain, 'Warnings: 2'
-    end
+    plain = analyze_log(<<~LOG)
+      (./main.tex
+      Overfull \\vbox (40.0pt too high) has occurred while \\output is active
+      Overfull \\vbox (5.0pt too high) detected at line 12
+      LaTeX Warning: Float too large for page by 341.29997pt on input line 4.
+      LaTeX Warning: Float too large for page by 3.0pt on input line 9.
+      )
+    LOG
+    assert_includes plain, '40.00pt too high'
+    assert_includes plain, 'Float too large for page by 341.30pt'
+    assert_includes plain, 'Alerts: 2'
+    assert_includes plain, 'Warnings: 2'
   end
 
   # The convergence loop appends its own LaTeX-style warning when the pass
@@ -1177,24 +1156,17 @@ class TestLeeniDiagnostics < LeeniTestBase
   # pdfTeX's duplicate-destination note is not a LaTeX warning; it is
   # normalised into one and ranked as an alert, once per anchor name.
   def test_duplicate_hyperlink_destinations_are_alerts_once_per_name
-    Dir.mktmpdir do |dir|
-      FileUtils.mkdir_p(File.join(dir, 'junk'))
-      File.write(File.join(dir, 'junk', 'err_xelatex'), <<~LOG)
-        (./main.tex
-        pdfTeX warning (ext4): destination with the same identifier (name{page.1}) has been already used, duplicate ignored
-        pdfTeX warning (ext4): destination with the same identifier (name{page.1}) has been already used, duplicate ignored
-        pdfTeX warning (ext4): destination with the same identifier (name{dup}) has been already used, duplicate ignored
-        [2]
-        )
-      LOG
-
-      builder = legacy_builder('main.tex', {})
-      out, = capture_io { Dir.chdir(dir) { builder.send(:analyze_output) } }
-      plain = strip_ansi(out)
-      assert_includes plain, '(2 alerts)'
-      assert_includes plain, "Duplicate hyperlink destination 'page.1' (2 occurrences)"
-      assert_includes plain, "Duplicate hyperlink destination 'dup';"
-    end
+    plain = analyze_log(<<~LOG)
+      (./main.tex
+      pdfTeX warning (ext4): destination with the same identifier (name{page.1}) has been already used, duplicate ignored
+      pdfTeX warning (ext4): destination with the same identifier (name{page.1}) has been already used, duplicate ignored
+      pdfTeX warning (ext4): destination with the same identifier (name{dup}) has been already used, duplicate ignored
+      [2]
+      )
+    LOG
+    assert_includes plain, '(2 alerts)'
+    assert_includes plain, "Duplicate hyperlink destination 'page.1' (2 occurrences)"
+    assert_includes plain, "Duplicate hyperlink destination 'dup';"
   end
 
   def test_invisible_source_characters_are_warnings
@@ -1209,6 +1181,17 @@ class TestLeeniDiagnostics < LeeniTestBase
         assert_includes plain, '(1 warning)'
         assert_includes plain, 'invisible character (zero-width space U+200B) at column 2'
       end
+    end
+  end
+
+  # Runs the final analysis over a canned pass log and returns the plain output.
+  def analyze_log(log, options = {})
+    Dir.mktmpdir do |dir|
+      FileUtils.mkdir_p(File.join(dir, 'junk'))
+      File.write(File.join(dir, 'junk', 'err_xelatex'), log)
+      builder = legacy_builder('main.tex', options)
+      out, = capture_io { Dir.chdir(dir) { builder.send(:analyze_output) } }
+      strip_ansi(out)
     end
   end
 end

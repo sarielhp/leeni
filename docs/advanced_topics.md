@@ -208,3 +208,9 @@ A pass that fails with its first error inside a *generated* file (`.aux`, a chap
 3. prints one line: `Build failed with an error inside generated file chap.aux; cleaned the build directory and rebuilt. Case kept at ...` (`leeni: note:` in `-llm` mode; `build.recovery` in `--json`).
 
 A second failure in the same run is reported normally. If the same project needed a recovery within the last week, the note adds `run l --doctor` (which lists the cases, shows one by name, and clears them), because a repeat is a bug worth reporting rather than a one-off. The ten newest cases are kept; each is capped at 40 MB. A `.bbl` error that traces back to a `.bib` entry is excluded, since cleaning cannot fix it.
+
+## 11. Reporting a Problem (`--report`)
+
+`l --report paper.tex` builds the document once more and writes a zip under `$XDG_CACHE_HOME/leeni/reports/` containing `diagnostics.txt` and `diagnostics.json` (leeni's own output in both forms), the pass logs, `.log`, `.blg`, `.fls` and build state from the build directory, a `manifest.json` with versions and tool availability, and the newest quarantined case for the project if there is one. `--report=full` adds the project-local sources recorded by `-recorder`.
+
+The default deliberately leaves the sources out: a report should be shareable without handing over an unpublished paper. Build logs do contain fragments of typeset text from overfull-box reports, and the summary says so. Nothing is uploaded by leeni. In an interactive terminal with `gh` on the PATH it offers to open a GitHub issue whose body carries only the summary, and asks you to attach the zip yourself; under `-llm` or `--json` it prints the bundle path and stops.

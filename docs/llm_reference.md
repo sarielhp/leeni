@@ -57,6 +57,7 @@ l --json paper.tex
 | `-x` | `--explain` | flag | `false` | Print boxed plain-English explanations on first diagnostic occurrence. |
 | `-a` | `--all` | flag | `false` | Display all diagnostics (disables warning folding and whatever suppression). |
 | `-W` | `--werror` | flag | `false` | Treat alerts and warnings as fatal errors (exit code 1). |
+| *(none)* | `--report [LEVEL]` | flag | - | Write a problem-report zip (diagnostics, build logs, environment; `full` adds sources) and print its path as `leeni: note: report written: ...`. Never sends anything. |
 | *(none)* | `--doctor [TARGET]` | flag | - | Report engines, helper tools, cache state and quarantined builds (plain text; JSON with `--json`); TARGET shows one case or `clear` removes all. Exits without building. |
 | *(none)* | `--final` | flag | `false` | Final-build profile: undefined references/citations, missing bib entries, unconverged builds and oversized floats are errors; draft leftovers (`\includeonly`, `draft`, `\linenumbers`, showkeys, todonotes) are alerts. Implied by `-z`, `-t`, `--arxiv`. |
 | `-r` | `--raw` | flag | `false` | Print unfiltered raw stdout/stderr from TeX compilers. |

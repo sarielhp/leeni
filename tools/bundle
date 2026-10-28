@@ -31,6 +31,7 @@ module LatexBundler
     log_promoter.rb
     utils.rb
     doctor.rb
+    report.rb
     indicator.rb
     help_manual.rb
     cli_help.rb

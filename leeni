@@ -34,6 +34,7 @@ require_relative 'lib/leeni/quarantine'
 require_relative 'lib/leeni/log_promoter'
 require_relative 'lib/leeni/utils'
 require_relative 'lib/leeni/doctor'
+require_relative 'lib/leeni/report'
 require_relative 'lib/leeni/help_manual'
 require_relative 'lib/leeni/cli_help'
 require_relative 'lib/leeni/brace_checker'
@@ -58,6 +59,17 @@ require_relative 'lib/leeni/cli_targets'
 module LatexCLI
   extend LatexCLITargets
 
+  # --report takes an optional level, so `l --report paper.tex` hands the
+  # document to the option; a value that names a file goes back to the targets.
+  def self.reclaim_report_target!(options, argv)
+    value = options[:report]
+    return unless value.is_a?(String) && !LeeniReport::LEVELS.include?(value)
+    return unless value.end_with?('.tex') || File.exist?(value)
+
+    argv.unshift(value)
+    options[:report] = 'basic'
+  end
+
   def self.run(argv = ARGV, prog_name = File.basename($PROGRAM_NAME))
     $stdout.sync = true
     $stderr.sync = true
@@ -78,6 +90,7 @@ module LatexCLI
 
       parser = build_option_parser(options)
       parse_options!(parser, argv, prog_name)
+      reclaim_report_target!(options, argv)
       validate_output_mode!(options, prog_name)
       @suppress_at_exit_newline = true if options[:compile]
       handle_help_and_examples(parser, options, prog_name, argv)
@@ -263,7 +276,7 @@ module LatexCLI
       lock: cfg.key?('lock') ? (cfg['lock'] == true) : true,
       score: false, color: cfg['color'], theme: cfg['theme'], theme_arg: nil,
       help_style: cfg['help_style'] || (cfg['help_lines'] == true ? 'lines' : 'plain'),
-      list_themes: false, show_config: false, doctor: nil, no_env: is_env_free, verbose: false,
+      list_themes: false, show_config: false, doctor: nil, report: nil, no_env: is_env_free, verbose: false,
       trace: cfg['trace'] == true, emacs: cfg['emacs'] == true, werror: cfg['werror'] == true,
       final: cfg['final'] == true,
       revtex4: cfg['revtex4'].is_a?(Hash) ? cfg['revtex4'] : {},
@@ -587,6 +600,9 @@ module LatexCLI
     end
     opts.on('--set-main-file FILE', 'Set main LaTeX document in local .l.jsonc configuration and exit') do |file|
       options[:set_main_file] = file
+    end
+    opts.on('--report [LEVEL]', 'Write a problem-report bundle for the document (diagnostics, build logs, environment; LEVEL "full" adds the sources) and exit') do |v|
+      options[:report] = v || 'basic'
     end
     opts.on('--doctor [TARGET]', 'Report engines, helper tools, cache state and quarantined builds and exit; TARGET names a case to show, or "clear"') do |v|
       options[:doctor] = v || true

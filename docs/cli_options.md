@@ -62,6 +62,7 @@ All long options accept either `-` or `--` and allow internal dashes to be omitt
 | `--set-main-file FILE` | Config | Set main LaTeX document in local `.l.jsonc` and exit. |
 | `--config-init` | Config | Create a local `.l.jsonc` configuration template in current directory. |
 | `--config-show` | Config | Show active configuration sources and resolved settings. |
+| `--report [LEVEL]` | Config | Write a problem-report bundle (diagnostics, build logs, environment; `full` adds sources) and exit. |
 | `--doctor [TARGET]` | Config | Report engines, helper tools, cache state and quarantined builds; show one case or `clear` them. |
 | `--config-save` | Config | Save specified CLI options to configuration file. |
 | `--config-unset KEY` | Config | Remove a saved setting from local or global configuration. |
@@ -328,6 +329,13 @@ l --config-init
 Displays the active configuration hierarchy, loaded file paths, and merged settings.
 ```bash
 l --config-show
+```
+
+### `--report [LEVEL]`
+Writes a zip under `$XDG_CACHE_HOME/leeni/reports/` with leeni's diagnostics (text and JSON), the build logs, the environment, and the latest quarantined case for the project. `full` adds the project-local sources from the recorder; the default does not, because build logs already carry fragments of typeset text and sources are the whole paper. Nothing is uploaded: interactively, with `gh` installed, leeni offers to open a GitHub issue carrying only the summary; `-llm` and `--json` print the bundle path and never ask.
+```bash
+l --report paper.tex
+l --report=full paper.tex
 ```
 
 ### `--doctor [TARGET]`

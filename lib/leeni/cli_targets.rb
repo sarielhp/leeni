@@ -33,6 +33,8 @@ module LatexCLITargets
   end
 
   def process_target(target, options)
+    exit LeeniReport.run(target, options) if options[:report]
+
     if options[:meta_only]
       process_meta_target(target, options)
     elsif options[:arxiv]

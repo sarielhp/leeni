@@ -1088,6 +1088,16 @@ module LaTeXErrorCatalog
       doc_slug: '59_no_pages_of_output'
     },
     {
+      id: :invalid_in_math_mode,
+      pattern: /Command (\\[A-Za-z@]+) invalid in math mode/,
+      title: 'Command invalid in math mode',
+      token_extractor: ->(match, _block) { match[1] },
+      hint: ->(tok) { LaTeXErrorCatalog.math_mode_hint(tok) },
+      why: 'A text font declaration or size switch was used inside math. Font declarations are rejected; size switches are silently ignored, so the formula keeps its default look.',
+      fix: 'Use the math equivalent (\\mathbf, \\mathit, \\mathsf, \\mathtt, \\mathrm) or move the switch outside the formula.',
+      doc_slug: '60_invalid_in_math_mode'
+    },
+    {
       id: :cannot_write_file,
       pattern: /I can't write on file\s+[`"'](?:"?)([^'"`]+?)(?:"?)['"`]/i,
       title: 'Cannot write to file',
@@ -1107,6 +1117,28 @@ module LaTeXErrorCatalog
       doc_slug: '56_cannot_write_file'
     }
   ].freeze
+
+  MATH_MODE_EQUIVALENTS = {
+    '\\bfseries' => '\\mathbf', '\\itshape' => '\\mathit', '\\em' => '\\mathit', '\\slshape' => '\\mathit',
+    '\\rmfamily' => '\\mathrm', '\\upshape' => '\\mathrm', '\\sffamily' => '\\mathsf', '\\ttfamily' => '\\mathtt',
+    '\\normalfont' => '\\mathnormal'
+  }.freeze
+  SIZE_SWITCHES = %w[\\tiny \\scriptsize \\footnotesize \\small \\normalsize \\large \\Large \\LARGE \\huge \\Huge].freeze
+
+  def self.math_mode_advice(command)
+    if (equivalent = MATH_MODE_EQUIVALENTS[command])
+      "use #{equivalent}{...}"
+    elsif SIZE_SWITCHES.include?(command)
+      "wrap the whole formula: {#{command} $...$}"
+    else
+      'use its \\math... equivalent or move it outside the formula'
+    end
+  end
+
+  def self.math_mode_hint(command)
+    subject = command ? "'#{command}' does not work in math" : 'Text font command does not work in math'
+    "#{subject}; #{math_mode_advice(command)}"
+  end
 
   def self.classify(err_text, err_block = [], file: nil, line: nil, junk_dir: nil)
     text = err_text.to_s
@@ -1221,6 +1253,11 @@ module LaTeXErrorCatalog
       title: 'Error: Multiply-Defined Label',
       why: 'Two or more \\label{...} tags share the identical key; every \\ref silently resolves to whichever definition came last. LaTeX only warns, leeni flags it as an error.',
       fix: 'Search your .tex sources for \\label{<key>} and rename or delete one.'
+    },
+    invalid_in_math_mode: {
+      title: 'Alert: Command Invalid in Math Mode',
+      why: 'A text font declaration or size switch was used inside math, where LaTeX ignores it, so the formula silently keeps its default look.',
+      fix: 'Use the math equivalent (\\mathbf, \\mathit, \\mathsf, \\mathtt, \\mathrm) or wrap the whole formula: {\\large $...$}.'
     },
     unused_global_option: {
       title: 'Alert: Unused Global Option',

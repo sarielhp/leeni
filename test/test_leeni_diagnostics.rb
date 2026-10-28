@@ -1090,4 +1090,26 @@ class TestLeeniDiagnostics < LeeniTestBase
       assert_includes plain, 'Warnings: 0'
     end
   end
+
+  # \em and the size switches inside math are only a Font Warning, yet they
+  # never fix themselves and always mark a source mistake, so they are alerts.
+  def test_font_switch_inside_math_is_an_alert_with_advice
+    Dir.mktmpdir do |dir|
+      FileUtils.mkdir_p(File.join(dir, 'junk'))
+      File.write(File.join(dir, 'junk', 'err_xelatex'), <<~LOG)
+        (./main.tex
+        LaTeX Font Warning: Command \\em invalid in math mode on input line 3.
+        LaTeX Font Warning: Command \\large invalid in math mode on input line 9.
+        )
+      LOG
+
+      builder = legacy_builder('main.tex', {})
+      out, = capture_io { Dir.chdir(dir) { builder.send(:analyze_output) } }
+      plain = strip_ansi(out)
+      assert_includes plain, '(2 alerts)'
+      assert_includes plain, 'command \\em invalid in math mode; use \\mathit{...}'
+      assert_includes plain, 'command \large invalid in math mode; wrap the whole formula'
+      assert_includes plain, 'Alerts: 2'
+    end
+  end
 end

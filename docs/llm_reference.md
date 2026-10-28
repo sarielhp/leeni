@@ -124,7 +124,7 @@ Global file: `~/.config/leeni/config.jsonc`.
 | Tier | Severity Label | Definition & Examples | Default Behavior in `-llm` |
 | :--- | :--- | :--- | :--- |
 | **Errors** | `error:` | Hard compilation crashes preventing PDF output. Syntax errors, missing packages, undefined control sequences. | Emitted first (max 5 errors displayed). Suppresses all lower tiers. |
-| **Alerts** | `warning: [alert]` | Silent flaws that compile with exit code 0 but corrupt document semantics. Inverted `\label` before `\caption`, overfull `\hbox` $\ge 24\text{pt}$, unused `\documentclass` options, Type 3 raster fonts. Duplicate labels, unclosed groups at `\end{document}`, missing `\include` targets, missing glyphs, and no pages of output are errors. | Displayed in plaintext. Counted towards `-W` fatal errors. |
+| **Alerts** | `warning: [alert]` | Silent flaws that compile with exit code 0 but corrupt document semantics. Inverted `\label` before `\caption`, overfull `\hbox` $\ge 24\text{pt}$, unused `\documentclass` options, text font switches ignored inside math, Type 3 raster fonts. Duplicate labels, unclosed groups at `\end{document}`, missing `\include` targets, missing glyphs, and no pages of output are errors. | Displayed in plaintext. Counted towards `-W` fatal errors. |
 | **Warnings**| `warning:` | Standard typesetting notices. Undefined citations, undefined `\ref`, overfull `\hbox` ($2.5\text{pt} < \text{pt} < 24\text{pt}$). | Folded: top 2 instances displayed + summary count note. |
 | **Whatevers**| `note:` | Harmless cosmetic noise. Micro-overfull `\hbox` ($\le 2.5\text{pt}$), `hyperref` bookmark math removals, font substitutions. | **Suppressed** by default. Shown only with `-a`. |
 

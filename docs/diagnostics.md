@@ -25,7 +25,7 @@ Diagnostics are organized into four severity levels:
 | Tier | Description | Examples | Default Behavior |
 | :--- | :--- | :--- | :--- |
 | **Errors** | Hard compilation failures, plus silent flaws that corrupt the document while TeX still exits 0. | Syntax errors, undefined commands, runaway arguments, missing packages; unclosed groups at `\end{document}`, missing `\include` targets, missing glyphs, no pages of output, multiply-defined labels. | Highlighted in red; suppresses lower tiers so the root failure is immediately visible. |
-| **Alerts** | Serious structural issues or major layout defects. | Overfull `\hbox` $\ge 24\text{pt}$, inverted labels before captions, unused `\documentclass` options. | Highlighted in yellow/bold; always displayed. |
+| **Alerts** | Serious structural issues or major layout defects. | Overfull `\hbox` $\ge 24\text{pt}$, inverted labels before captions, unused `\documentclass` options, text font switches ignored inside math. | Highlighted in yellow/bold; always displayed. |
 | **Warnings** | Actionable layout and reference issues. | Overfull `\hbox` ($2.5\text{pt} < \text{pt} < 24\text{pt}$), underfull `\vbox`, undefined references, missing citations. | Displayed in normal output. Deduplicated per line. |
 | **Whatevers** | Minor cosmetic noise with negligible visual impact. | Micro overfull `\hbox` ($\le 2.5\text{pt}$), hyperref bookmark token removals, font substitution notices. | Suppressed from output; total count reported in the summary line (`Whatevers: N (suppressed)`). |
 
@@ -264,7 +264,7 @@ Example JSON response:
 
 For an in-depth catalog of 55 common LaTeX compilation errors, their root causes, and minimal reproducer examples:
 
-- **[Master Error Index](errors/README.md)**: Catalog of 59 errors categorized by layer (TeX Primitive, LaTeX Kernel, Package).
+- **[Master Error Index](errors/README.md)**: Catalog of 60 errors categorized by layer (TeX Primitive, LaTeX Kernel, Package).
 - **[Troubleshooting Bibliography Errors](troubleshooting_bibliography_errors.md)**: Resolving cryptic `\printbibliography` crashes and pinpointing `.bib` database syntax errors.
 - **[Deep Dive: Underfull Boxes (`badness 10000`)](guides/underfull_boxes/README.md)**: Diagnosing and solving `Underfull \hbox` and `Underfull \vbox` warnings.
-- **Corpus Test Suite**: Run `tools/test_error_corpus` to verify all 59 reproducers against real LaTeX engines.
+- **Corpus Test Suite**: Run `tools/test_error_corpus` to verify all 60 reproducers against real LaTeX engines.

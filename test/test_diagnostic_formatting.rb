@@ -89,7 +89,8 @@ class TestDiagnosticFormatting < Minitest::Test
 
     # Math mode cleaning
     raw_math = 'LaTeX Warning: Command \L invalid in math mode on input line 133.'
-    assert_equal 'Warning: command \L invalid in math mode', builder.send(:clean_diagnostic_warning, raw_math)
+    assert_equal 'Warning: command \L invalid in math mode; use its \math... equivalent or move it outside the formula',
+                 builder.send(:clean_diagnostic_warning, raw_math)
 
     # Font warning cleaning
     raw_font = "LaTeX Font Warning: Font shape `TU/lmss/m/sc' in size <10.95> not available\n" \

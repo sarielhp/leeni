@@ -25,7 +25,7 @@ Errors during compilation originate in one of three layers:
 
 ---
 
-## 3. Master Error Index (59 Errors)
+## 3. Master Error Index (60 Errors)
 
 | # | Error Message / Pattern | Layer | Cause & Summary | Support | Reproducer & Details |
 |---|:--- |:--- |:--- |:--- |:--- |
@@ -88,6 +88,7 @@ Errors during compilation originate in one of three layers:
 | **57** | `No file foo.tex.` (from `\include`) | TeX Primitive | `\include` of a missing file; TeX only notes it and exits 0 with the chapter absent, `leeni` promotes it to an error and locates the `\include`. | **Catalog Hint** | [`57_include_target_missing`](57_include_target_missing/) |
 | **58** | `Missing character: There is no X in font Y` | TeX Primitive | The font lacks a glyph, so the character is silently dropped from the PDF; `leeni` promotes it to an error and locates the character. | **Catalog Hint** | [`58_missing_character`](58_missing_character/) |
 | **59** | `No pages of output.` | TeX Primitive | The body typeset nothing and no PDF was written, yet TeX exits 0; `leeni` promotes it to an error. | **Catalog Hint** | [`59_no_pages_of_output`](59_no_pages_of_output/) |
+| **60** | `Command \foo invalid in math mode` | LaTeX Kernel | Text font declaration or size switch inside math; declarations error, `\em` and size switches are silently ignored (promoted to an alert). Hint names the `\math...` equivalent. | **Catalog Hint** | [`60_invalid_in_math_mode`](60_invalid_in_math_mode/) |
 
 ---
 
@@ -101,6 +102,6 @@ The reproducer cases in this directory provide verification fixtures. Each subdi
 To keep continuous integration and quality gates fast, the error corpus is executed **on demand** and completely decoupled from `tools/gate`:
 
 ```bash
-# Run standalone verification across all 59 error corpus reproducers
+# Run standalone verification across all 60 error corpus reproducers
 rtk ./tools/test_error_corpus
 ```

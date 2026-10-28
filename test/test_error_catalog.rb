@@ -749,4 +749,16 @@ class TestErrorCatalog < Minitest::Test
     assert_equal :no_pages_of_output, item[:id]
     assert_equal '59_no_pages_of_output', item[:doc_slug]
   end
+
+  def test_classify_invalid_in_math_mode_names_the_math_equivalent
+    text = "./main.tex:3: LaTeX Error: Command \\bfseries invalid in math mode.\nl.3 Bold: $a \\bfseries"
+    item = LaTeXErrorCatalog.classify(text, text.lines)
+    assert_equal :invalid_in_math_mode, item[:id]
+    assert_equal '\\bfseries', item[:token]
+    assert_includes item[:hint], 'use \\mathbf{...}'
+    assert_equal '60_invalid_in_math_mode', item[:doc_slug]
+
+    assert_includes LaTeXErrorCatalog.math_mode_advice('\\large'), '{\\large $...$}'
+    assert_includes LaTeXErrorCatalog.math_mode_advice('\\scshape'), '\\math... equivalent'
+  end
 end

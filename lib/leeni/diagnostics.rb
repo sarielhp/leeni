@@ -786,8 +786,10 @@ module LaTeXDiagnostics
     return clean_cite_warning(str) if str =~ /LaTeX Warning: Citation/i
 
     return 'Warning: empty bibliography' if str =~ /LaTeX Warning: Empty bibliography(?:\s+on input line \d+)?\.?/i
-    if str =~ /LaTeX Warning: Command\s+(.+?)\s+invalid in math mode(?:\s+on input line \d+)?\.?/i
-      return "Warning: command #{Regexp.last_match(1)} invalid in math mode"
+
+    if str =~ /LaTeX(?: Font)? Warning: Command\s+(.+?)\s+invalid in math mode(?:\s+on input line \d+)?\.?/i
+      command = Regexp.last_match(1)
+      return "Warning: command #{command} invalid in math mode; #{LaTeXErrorCatalog.math_mode_advice(command)}"
     end
     return "Warning: Missing database entry: '#{Regexp.last_match(1)}'" if str =~ /Missing database entry:\s*['"]([^`'"]+)['"]/i
     return "Warning: #{str}" if str =~ /^Missing database entries/i
@@ -1853,6 +1855,7 @@ module LaTeXDiagnostics
 
   SIMPLE_TEXT_CATEGORIES = [
     [/unused global option/i, :unused_global_option],
+    [/invalid in math mode/i, :invalid_in_math_mode],
     [/Token not allowed in a PDF string/, :hyperref_token],
     [/float specifier changed to/i, :float_specifier]
   ].freeze
@@ -2137,7 +2140,7 @@ module LaTeXDiagnostics
   def promoted_warning_alert?(item, threshold)
     return true if overfull_hbox?(item) && (item[:severity] || 0.0) >= threshold
 
-    item[:text].to_s.match?(/unused global option/i)
+    item[:text].to_s.match?(/unused global option|invalid in math mode/i)
   end
 
   def alert_as_warning?(item)

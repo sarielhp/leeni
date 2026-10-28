@@ -33,6 +33,7 @@ require_relative 'lib/leeni/config'
 require_relative 'lib/leeni/quarantine'
 require_relative 'lib/leeni/log_promoter'
 require_relative 'lib/leeni/utils'
+require_relative 'lib/leeni/doctor'
 require_relative 'lib/leeni/help_manual'
 require_relative 'lib/leeni/cli_help'
 require_relative 'lib/leeni/brace_checker'
@@ -262,7 +263,7 @@ module LatexCLI
       lock: cfg.key?('lock') ? (cfg['lock'] == true) : true,
       score: false, color: cfg['color'], theme: cfg['theme'], theme_arg: nil,
       help_style: cfg['help_style'] || (cfg['help_lines'] == true ? 'lines' : 'plain'),
-      list_themes: false, show_config: false, no_env: is_env_free, verbose: false,
+      list_themes: false, show_config: false, doctor: nil, no_env: is_env_free, verbose: false,
       trace: cfg['trace'] == true, emacs: cfg['emacs'] == true, werror: cfg['werror'] == true,
       final: cfg['final'] == true,
       revtex4: cfg['revtex4'].is_a?(Hash) ? cfg['revtex4'] : {},
@@ -586,6 +587,9 @@ module LatexCLI
     end
     opts.on('--set-main-file FILE', 'Set main LaTeX document in local .l.jsonc configuration and exit') do |file|
       options[:set_main_file] = file
+    end
+    opts.on('--doctor [TARGET]', 'Report engines, helper tools, cache state and quarantined builds and exit; TARGET names a case to show, or "clear"') do |v|
+      options[:doctor] = v || true
     end
     opts.on('--config-show', 'Show active configuration sources and resolved settings and exit') { options[:show_config] = true }
     opts.on('--config-save', 'Save specified CLI option choices to configuration file (default: local .l.jsonc)') do

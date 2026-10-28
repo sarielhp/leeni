@@ -207,4 +207,4 @@ A pass that fails with its first error inside a *generated* file (`.aux`, a chap
 2. cleans the build directory exactly as `-c` would and reruns the convergence loop once;
 3. prints one line: `Build failed with an error inside generated file chap.aux; cleaned the build directory and rebuilt. Case kept at ...` (`leeni: note:` in `-llm` mode; `build.recovery` in `--json`).
 
-A second failure in the same run is reported normally. If the same project needed a recovery within the last week, the note adds `run l --doctor`, because a repeat is a bug worth reporting rather than a one-off. The ten newest cases are kept; each is capped at 40 MB. A `.bbl` error that traces back to a `.bib` entry is excluded, since cleaning cannot fix it.
+A second failure in the same run is reported normally. If the same project needed a recovery within the last week, the note adds `run l --doctor` (which lists the cases, shows one by name, and clears them), because a repeat is a bug worth reporting rather than a one-off. The ten newest cases are kept; each is capped at 40 MB. A `.bbl` error that traces back to a `.bib` entry is excluded, since cleaning cannot fix it.

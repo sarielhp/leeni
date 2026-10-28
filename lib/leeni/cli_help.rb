@@ -168,6 +168,8 @@ module LatexCLI
       exit 0
     end
 
+    exit LeeniDoctor.run(options[:doctor], options) if options[:doctor]
+
     # Help is checked first so that it wins over every action, destructive ones
     # included: `l -C -h` used to clean the directory and exit 0 without ever
     # printing the usage the user asked for.

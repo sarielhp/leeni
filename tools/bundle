@@ -30,6 +30,7 @@ module LatexBundler
     quarantine.rb
     log_promoter.rb
     utils.rb
+    doctor.rb
     indicator.rb
     help_manual.rb
     cli_help.rb

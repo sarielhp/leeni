@@ -86,7 +86,7 @@ The codebase is organized into modular files under `lib/leeni/`:
   - `--fast`: Syntax check + unit tests in $\sim 2$ seconds.
   - `--medium`: Adds core LaTeX integration tests.
   - `--full`: Complete suite including sandbox builds and paper verifications.
-- **Corpus Test Runner (`tools/test_error_corpus`)**: Parallel runner verifying all 55 error reproducers against real LaTeX engines in $\sim 4$ seconds.
+- **Corpus Test Runner (`tools/test_error_corpus`)**: Parallel runner verifying all 56 error reproducers against real LaTeX engines in $\sim 4$ seconds.
 
 ---
 

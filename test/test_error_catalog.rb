@@ -711,4 +711,20 @@ class TestErrorCatalog < Minitest::Test
     dollars = LaTeXErrorCatalog.extract_dollars_in_range(lines, 0, 1)
     assert_equal 2, dollars.size
   end
+
+  def test_classify_unclosed_group_at_end
+    text = "! [leeni] \\end{document} reached inside an unclosed simple group opened by '{' on line 7 " \
+           "(TeX only warns about this; leeni flags it as an error).\nl.7"
+    item = LaTeXErrorCatalog.classify(text, text.lines)
+    assert item
+    assert_equal :unclosed_group_at_end, item[:id]
+    assert_equal '{', item[:token]
+    assert_equal '56_unclosed_group_at_end', item[:doc_slug]
+
+    cond = '! [leeni] \\end{document} reached inside an unfinished \\ifx conditional started on line 12 ' \
+           "(TeX only warns about this; leeni flags it as an error).\nl.12"
+    item = LaTeXErrorCatalog.classify(cond, cond.lines)
+    assert_equal :unclosed_group_at_end, item[:id]
+    assert_equal '\\ifx', item[:token]
+  end
 end

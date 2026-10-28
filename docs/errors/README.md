@@ -25,7 +25,7 @@ Errors during compilation originate in one of three layers:
 
 ---
 
-## 3. Master Error Index (55 Errors)
+## 3. Master Error Index (56 Errors)
 
 | # | Error Message / Pattern | Layer | Cause & Summary | Support | Reproducer & Details |
 |---|:--- |:--- |:--- |:--- |:--- |
@@ -84,6 +84,7 @@ Errors during compilation originate in one of three layers:
 | **53** | `LaTeX Error: Not allowed in LR mode` | LaTeX Kernel | Vertical or display elements (lists, displays, paragraphs) placed inside an LR box (`\mbox`, `\fbox`). | **Catalog Hint** | [`53_not_allowed_in_lr_mode`](53_not_allowed_in_lr_mode/) |
 | **54** | `Package enumitem Error: Key 'foo' is not defined` | Package | Unknown styling key passed to `enumitem` list options or `\setlist`. | **Catalog Hint** | [`54_package_enumitem_key_undefined`](54_package_enumitem_key_undefined/) |
 | **55** | `Package kvsetkeys Error: Undefined key 'foo'` | Package | Unknown key passed to key-value options parser used by packages like `geometry` or `hyperref`. | **Catalog Hint** | [`55_package_kvsetkeys_undefined_key`](55_package_kvsetkeys_undefined_key/) |
+| **56** | `(\end occurred inside a group at level N)` | TeX Primitive | A `{`, `\begingroup`, `$`, or `\if` opened and never closed; TeX only notes it and exits 0, `leeni` promotes it to an error. | **Catalog Hint** | [`56_unclosed_group_at_end`](56_unclosed_group_at_end/) |
 
 ---
 
@@ -97,6 +98,6 @@ The reproducer cases in this directory provide verification fixtures. Each subdi
 To keep continuous integration and quality gates fast, the error corpus is executed **on demand** and completely decoupled from `tools/gate`:
 
 ```bash
-# Run standalone verification across all 55 error corpus reproducers
+# Run standalone verification across all 56 error corpus reproducers
 rtk ./tools/test_error_corpus
 ```

@@ -1043,6 +1043,18 @@ module LaTeXErrorCatalog
       doc_slug: '55_package_kvsetkeys_undefined_key'
     },
     {
+      id: :unclosed_group_at_end,
+      pattern: /\\end\{document\} reached inside an (?:unclosed (.+? group) opened by '(.+?)'|unfinished (\\\w+) conditional)/,
+      title: '\\end{document} reached inside an unclosed group',
+      token_extractor: ->(match, _block) { match[2] || match[3] },
+      hint: lambda { |tok|
+        tok ? "Unclosed '#{tok}' still open at \\end{document}; close it" : 'Group still open at \\end{document}; close it'
+      },
+      why: 'A brace group, \\begingroup, math shift, or \\if conditional was opened and never closed, so the rest of the document ran inside it. TeX reports this only as a note and exits 0.',
+      fix: 'Close the group or conditional on the reported line (usually a stray { or $ in the preamble, or a macro definition missing its final }).',
+      doc_slug: '56_unclosed_group_at_end'
+    },
+    {
       id: :cannot_write_file,
       pattern: /I can't write on file\s+[`"'](?:"?)([^'"`]+?)(?:"?)['"`]/i,
       title: 'Cannot write to file',

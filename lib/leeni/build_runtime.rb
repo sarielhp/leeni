@@ -347,11 +347,22 @@ module LatexBuildRuntime
     error_count = count_errors_in_log(exit_status, pass_log)
     return unless error_count.positive?
 
+    announce_detected_failure if exit_status.zero?
     if @options[:score]
       output_score(pass_log, exit_status)
       exit 1
     end
     report_errors(pass_log)
+  end
+
+  # TeX exits 0 on some malformed input (an unclosed group at \end), so the
+  # failure banner is keyed on the detected error count rather than the status.
+  def announce_detected_failure
+    LaTeXIndicator.stop(clear: true, enabled: interactive_tty?)
+    return if interactive_tty? || @options[:compile]
+
+    puts ": #{format_compilation_failure('0, error detected by leeni')}"
+    $stdout.flush
   end
 
   def format_compilation_failure(status)

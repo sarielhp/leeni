@@ -137,6 +137,9 @@ Journals and indexing services (ACM TAPS, IEEE PDF eXpress, arXiv) often reject 
 ### Pre-Flight Brace Auditing
 The built-in brace checker (`LaTeXBraceChecker`) runs before LaTeX starts, catching unmatched `{`, `}`, and mismatched brackets like `{]` across environments without waiting for a full compiler run.
 
+### Unclosed Groups at `\end{document}`
+TeX finishes a document whose `\end{document}` sits inside an open `{`, `\begingroup`, `$`, or unfinished `\if` with only a log note (`\end occurred inside a group at level 1`), exit status 0, and a PDF. `leeni` promotes that note to a real error carrying the line TeX recorded, fails the build, and names the offending opener (see [`56_unclosed_group_at_end`](errors/56_unclosed_group_at_end/)).
+
 ### Bibliography Source Pinpointing
 When LaTeX crashes during `\printbibliography` or `\bibliography` due to a syntax error in a `.bib` file (such as an unescaped `_` or `&`), standard TeX engines only report `\printbibliography` in `main.tex`. `leeni` hooks BibLaTeX's entry processing, intercepts the active citation key, locates the entry and line in your `.bib` databases, and emits a companion error with line number and token hints. See [Troubleshooting Bibliography Errors](troubleshooting_bibliography_errors.md) for details.
 
@@ -261,7 +264,7 @@ Example JSON response:
 
 For an in-depth catalog of 55 common LaTeX compilation errors, their root causes, and minimal reproducer examples:
 
-- **[Master Error Index](errors/README.md)**: Catalog of 55 errors categorized by layer (TeX Primitive, LaTeX Kernel, Package).
+- **[Master Error Index](errors/README.md)**: Catalog of 56 errors categorized by layer (TeX Primitive, LaTeX Kernel, Package).
 - **[Troubleshooting Bibliography Errors](troubleshooting_bibliography_errors.md)**: Resolving cryptic `\printbibliography` crashes and pinpointing `.bib` database syntax errors.
 - **[Deep Dive: Underfull Boxes (`badness 10000`)](guides/underfull_boxes/README.md)**: Diagnosing and solving `Underfull \hbox` and `Underfull \vbox` warnings.
-- **Corpus Test Suite**: Run `tools/test_error_corpus` to verify all 55 reproducers against real LaTeX engines.
+- **Corpus Test Suite**: Run `tools/test_error_corpus` to verify all 56 reproducers against real LaTeX engines.

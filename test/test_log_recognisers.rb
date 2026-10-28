@@ -304,4 +304,60 @@ class TestLogRecognisers < Minitest::Test
     b = builder
     assert_equal 1, b.send(:count_latex_errors, log, 0)
   end
+
+  # TeX reaches \end{document} inside a group it never closed, notes it in
+  # parentheses, and exits 0 with a PDF. The source is malformed, so the note
+  # is promoted to an error carrying the line TeX recorded.
+  def test_end_inside_unclosed_group_is_an_error
+    log = <<~LOG
+      [1{/var/lib/texmf/fonts/map/pdftex/updmap/pdftex.map}] (./paper.aux) )
+      (\\end occurred inside a group at level 1)
+
+      ### simple group (level 1) entered at line 7 ({)
+      ### bottom level
+      Output written on junk/paper.pdf (1 page).
+    LOG
+
+    with_log(log) do |path, content|
+      b = builder
+      assert_equal 1, b.send(:count_errors_in_log, 0, path),
+                   'an unclosed group at \\end{document} was not counted as an error'
+      assert_equal 1, b.send(:count_latex_errors, content, 0)
+
+      errors = b.send(:extract_errors, content)
+      assert_equal 1, errors.size
+      assert_equal 7, errors.first[:line]
+      assert_equal :unclosed_group_at_end, errors.first[:catalog_id]
+      assert_includes errors.first[:text], 'leeni flags it as an error'
+    end
+  end
+
+  def test_end_inside_unfinished_conditional_is_an_error
+    log = <<~LOG
+      (./paper.aux) )
+      (\\end occurred when \\ifx on line 12 was incomplete)
+      (\\end occurred when \\ifnum on line 3 was incomplete)
+      Output written on junk/paper.pdf (1 page).
+    LOG
+
+    with_log(log) do |path, content|
+      b = builder
+      assert_equal 2, b.send(:count_errors_in_log, 0, path)
+      assert_equal([12, 3], b.send(:extract_errors, content).map { |e| e[:line] })
+    end
+  end
+
+  # The promotion must stay inert on clean logs and on document text that
+  # merely talks about groups.
+  def test_group_promotion_leaves_ordinary_logs_alone
+    log = <<~LOG
+      []\\OT1/cmr/m/n/10 the note (\\end occurred inside a group) is discussed below.
+      ### simple group (level 1) entered at line 7 ({)
+      Output written on junk/paper.pdf (1 page).
+    LOG
+
+    with_log(log) do |path, _content|
+      assert_equal 0, builder.send(:count_errors_in_log, 0, path)
+    end
+  end
 end

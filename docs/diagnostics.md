@@ -25,7 +25,7 @@ Diagnostics are organized into four severity levels:
 | Tier | Description | Examples | Default Behavior |
 | :--- | :--- | :--- | :--- |
 | **Errors** | Hard compilation failures, plus silent flaws that corrupt the document while TeX still exits 0. | Syntax errors, undefined commands, runaway arguments, missing packages; unclosed groups at `\end{document}`, missing `\include` targets, missing glyphs, no pages of output, multiply-defined labels. | Highlighted in red; suppresses lower tiers so the root failure is immediately visible. |
-| **Alerts** | Serious structural issues or major layout defects. | Overfull `\hbox` $\ge 24\text{pt}$, inverted labels before captions, unused `\documentclass` options, text font switches ignored inside math. | Highlighted in yellow/bold; always displayed. |
+| **Alerts** | Serious structural issues or major layout defects. | Overfull `\hbox` or `\vbox` $\ge 24\text{pt}$, floats too large for the page by $\ge 24\text{pt}$, inverted labels before captions, unused `\documentclass` options, text font switches ignored inside math, a build that did not converge, repeated `.bib` entries. | Highlighted in yellow/bold; always displayed. |
 | **Warnings** | Actionable layout and reference issues. | Overfull `\hbox` ($2.5\text{pt} < \text{pt} < 24\text{pt}$), underfull `\vbox`, undefined references, missing citations. | Displayed in normal output. Deduplicated per line. |
 | **Whatevers** | Minor cosmetic noise with negligible visual impact. | Micro overfull `\hbox` ($\le 2.5\text{pt}$), hyperref bookmark token removals, font substitution notices. | Suppressed from output; total count reported in the summary line (`Whatevers: N (suppressed)`). |
 

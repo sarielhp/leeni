@@ -1112,4 +1112,65 @@ class TestLeeniDiagnostics < LeeniTestBase
       assert_includes plain, 'Alerts: 2'
     end
   end
+
+  # Vertical overflow and oversized floats lose content off the page, so the
+  # same point threshold that promotes horizontal boxes applies to them.
+  def test_vertical_overflow_and_large_floats_are_alerts_above_threshold
+    Dir.mktmpdir do |dir|
+      FileUtils.mkdir_p(File.join(dir, 'junk'))
+      File.write(File.join(dir, 'junk', 'err_xelatex'), <<~LOG)
+        (./main.tex
+        Overfull \\vbox (40.0pt too high) has occurred while \\output is active
+        Overfull \\vbox (5.0pt too high) detected at line 12
+        LaTeX Warning: Float too large for page by 341.29997pt on input line 4.
+        LaTeX Warning: Float too large for page by 3.0pt on input line 9.
+        )
+      LOG
+
+      builder = legacy_builder('main.tex', {})
+      out, = capture_io { Dir.chdir(dir) { builder.send(:analyze_output) } }
+      plain = strip_ansi(out)
+      assert_includes plain, '40.00pt too high'
+      assert_includes plain, 'Float too large for page by 341.30pt'
+      assert_includes plain, 'Alerts: 2'
+      assert_includes plain, 'Warnings: 2'
+    end
+  end
+
+  # The convergence loop appends its own LaTeX-style warning when the pass
+  # budget runs out; stale cross-references rank as an alert.
+  def test_unconverged_build_warning_is_an_alert
+    Dir.mktmpdir do |dir|
+      FileUtils.mkdir_p(File.join(dir, 'junk'))
+      File.write(File.join(dir, 'junk', 'err_xelatex'),
+                 "(./main.tex\nLaTeX Warning: leeni: build did not converge; a rerun is still requested after 1 passes. " \
+                 "References or page numbers may be stale (raise -n/--passes, max 20).\n)\n")
+
+      builder = legacy_builder('main.tex', {})
+      out, = capture_io { Dir.chdir(dir) { builder.send(:analyze_output) } }
+      plain = strip_ansi(out)
+      assert_includes plain, '(1 alert)'
+      assert_includes plain, 'build did not converge'
+    end
+  end
+
+  # BibTeX keeps the first of two entries sharing a key and drops the other.
+  def test_repeated_bibliography_entry_is_an_alert_at_the_bib_line
+    Dir.mktmpdir do |dir|
+      FileUtils.mkdir_p(File.join(dir, 'junk'))
+      File.write(File.join(dir, 'junk', 'err_xelatex'), "(./main.tex\n)\n")
+      bib_log = File.join(dir, 'junk', 'bib.log')
+      File.write(bib_log,
+                 "Repeated entry---line 2 of file refs.bib\n : @article{k,\n :               author={B}\n" \
+                 "I'm skipping whatever remains of this entry\n")
+
+      builder = legacy_builder('main.tex', {})
+      builder.instance_variable_set(:@biberr, bib_log)
+      out, = capture_io { Dir.chdir(dir) { builder.send(:analyze_output) } }
+      plain = strip_ansi(out)
+      assert_includes plain, 'refs.bib'
+      assert_includes plain, 'Repeated entry---line 2 of file refs.bib'
+      assert_includes plain, 'Alerts: 1'
+    end
+  end
 end

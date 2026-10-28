@@ -1856,6 +1856,10 @@ module LaTeXDiagnostics
   SIMPLE_TEXT_CATEGORIES = [
     [/unused global option/i, :unused_global_option],
     [/invalid in math mode/i, :invalid_in_math_mode],
+    [/build did not converge/i, :unconverged_build],
+    [/Float too large for page/i, :float_too_large],
+    [/Repeated entry---|Duplicate entry key/i, :bib_repeated_entry],
+    [/pt too high/i, :overfull_vbox],
     [/Token not allowed in a PDF string/, :hyperref_token],
     [/float specifier changed to/i, :float_specifier]
   ].freeze
@@ -2135,12 +2139,27 @@ module LaTeXDiagnostics
     [alert_items, regular_warnings, whatevers]
   end
 
-  # Warnings leeni ranks as alerts: severe overfull boxes, and \documentclass
-  # options LaTeX ignored (a misspelled option silently changes the layout).
-  def promoted_warning_alert?(item, threshold)
-    return true if overfull_hbox?(item) && (item[:severity] || 0.0) >= threshold
+  # Warnings leeni ranks as alerts. Boxes and floats that overflow by at least
+  # the alert threshold lose content off the page; the text patterns are
+  # silent faults: ignored class options and font switches, a build whose
+  # cross-references never settled, and a bibliography entry BibTeX dropped.
+  PROMOTED_ALERT_TEXT = /unused global option|invalid in math mode|build did not converge|Repeated entry---|Duplicate entry key/i
 
-    item[:text].to_s.match?(/unused global option|invalid in math mode/i)
+  def promoted_warning_alert?(item, threshold)
+    return true if (overfull_hbox?(item) || overfull_vbox?(item)) && (item[:severity] || 0.0) >= threshold
+    return true if float_overflow_pt(item) >= threshold
+
+    item[:text].to_s.match?(PROMOTED_ALERT_TEXT)
+  end
+
+  def overfull_vbox?(item)
+    t = item[:type].to_s
+    (t.include?('Overfull') && t.include?('vbox')) || item[:raw_text].to_s =~ /\AOverfull\s+\\vbox/i
+  end
+
+  # "Float too large for page by 341.30pt": the overflow is clipped at the page edge.
+  def float_overflow_pt(item)
+    item[:text].to_s[/Float too large for page by ([\d.]+)pt/i, 1].to_f
   end
 
   def alert_as_warning?(item)
@@ -2532,8 +2551,9 @@ module LaTeXDiagnostics
     LaTeXUtils.safe_read(@biberr).each_line.with_index do |bl, bidx|
       if bl =~ BIB_WARNING_PATTERN
         line_str = bl =~ /line\s+(\d+)/i ? Regexp.last_match(1) : ''
-        formatted = format_diagnostic_line(line_str, bl.strip, :yellow)
-        warn_items << { file: './bibliography', line: line_str.to_i, line_str: line_str, text: bl.strip, formatted: formatted,
+        bib_file = bl[/of file (\S+?)\.?\s*$/i, 1] || './bibliography'
+        formatted = format_diagnostic_line(line_str, bl.strip, :yellow, file: bib_file)
+        warn_items << { file: bib_file, line: line_str.to_i, line_str: line_str, text: bl.strip, formatted: formatted,
                         index: 100_000 + bidx }
       elsif bl =~ BIB_ERROR_PATTERN
         formatted = @options[:emacs] ? bl.strip : highlight_line_numbers(bl.strip, :red, bright: true)

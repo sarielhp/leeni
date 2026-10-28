@@ -183,8 +183,9 @@ class LaTeXBibManager
   end
 
   def bibliography_failure_detail(output)
+    # BibTeX reports every database fault as "<message>---line N of file F".
     detail = output.to_s.each_line.find do |line|
-      line.match?(/I couldn't open database file|(?:ERROR|FATAL)\s+-/i)
+      line.match?(/I couldn't open database file|(?:ERROR|FATAL)\s+-|---line \d+ of file/i)
     end
     detail ? " #{detail.strip}." : ''
   end

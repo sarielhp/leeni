@@ -1259,6 +1259,26 @@ module LaTeXErrorCatalog
       why: 'A text font declaration or size switch was used inside math, where LaTeX ignores it, so the formula silently keeps its default look.',
       fix: 'Use the math equivalent (\\mathbf, \\mathit, \\mathsf, \\mathtt, \\mathrm) or wrap the whole formula: {\\large $...$}.'
     },
+    unconverged_build: {
+      title: 'Alert: Build Did Not Converge',
+      why: 'The pass budget ran out while LaTeX still asked for a rerun, so cross-references, page numbers, or the table of contents in the PDF may be stale.',
+      fix: 'Raise -n/--passes, or look for a construct that changes on every pass (a \\today in a label, a varying box width, a package warning asking for a rerun).'
+    },
+    float_too_large: {
+      title: 'Alert: Float Too Large for Page',
+      why: 'A figure or table is taller than the text height, so LaTeX places it anyway and the overflow is clipped at the page edge.',
+      fix: 'Scale the content down (width= or height= in \\includegraphics, \\resizebox, a smaller tabular), or split it across pages.'
+    },
+    overfull_vbox: {
+      title: 'Alert: Severe Overfull \\vbox',
+      why: 'A page or box is taller than its allotted height, so the bottom lines run into the margin or off the page.',
+      fix: 'Allow a page break (\\allowbreak, \\pagebreak), shorten the unbreakable block, or let the page be ragged with \\raggedbottom.'
+    },
+    bib_repeated_entry: {
+      title: 'Alert: Repeated Bibliography Entry',
+      why: 'Two entries in the .bib files share a key; BibTeX keeps the first and silently drops the other, so a corrected entry may never reach the PDF.',
+      fix: 'Rename or delete one of the entries at the reported .bib line.'
+    },
     unused_global_option: {
       title: 'Alert: Unused Global Option',
       why: 'An option passed to \\documentclass matched nothing in the class or any package, so LaTeX ignored it; a misspelled option silently leaves the default font size or layout in place.',

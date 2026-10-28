@@ -24,8 +24,8 @@ Diagnostics are organized into four severity levels:
 
 | Tier | Description | Examples | Default Behavior |
 | :--- | :--- | :--- | :--- |
-| **Errors** | Hard compilation failures that prevent PDF generation. | Syntax errors, undefined commands, runaway arguments, missing packages. | Highlighted in red; suppresses lower tiers so the root failure is immediately visible. |
-| **Alerts** | Serious structural issues or major layout defects. | Multiply-defined labels, overfull `\hbox` $\ge 24\text{pt}$, inverted labels before captions. | Highlighted in yellow/bold; always displayed. |
+| **Errors** | Hard compilation failures, plus silent flaws that corrupt the document while TeX still exits 0. | Syntax errors, undefined commands, runaway arguments, missing packages; unclosed groups at `\end{document}`, missing `\include` targets, missing glyphs, no pages of output, multiply-defined labels. | Highlighted in red; suppresses lower tiers so the root failure is immediately visible. |
+| **Alerts** | Serious structural issues or major layout defects. | Overfull `\hbox` $\ge 24\text{pt}$, inverted labels before captions, unused `\documentclass` options. | Highlighted in yellow/bold; always displayed. |
 | **Warnings** | Actionable layout and reference issues. | Overfull `\hbox` ($2.5\text{pt} < \text{pt} < 24\text{pt}$), underfull `\vbox`, undefined references, missing citations. | Displayed in normal output. Deduplicated per line. |
 | **Whatevers** | Minor cosmetic noise with negligible visual impact. | Micro overfull `\hbox` ($\le 2.5\text{pt}$), hyperref bookmark token removals, font substitution notices. | Suppressed from output; total count reported in the summary line (`Whatevers: N (suppressed)`). |
 
@@ -44,7 +44,7 @@ Standard tools like `latexmk` treat these as clean builds because the compiler d
 **Key Examples of Alerts:**
 - **Inverted `\label` Before `\caption`**: Placing `\label{fig:myfig}` before `\caption{...}` in a figure or table causes the cross-reference to secretly bind to the enclosing section number rather than the figure number. In the published paper, *"as seen in Figure 3"* will literally render as *"as seen in Figure 1"* because Section 1 was current when the label was defined!
 - **Severe Overfull `\hbox` ($\ge 24\text{pt}$)**: When an unhyphenated word, inline URL, or wide equation overflows the page margin by $8.5\text{mm}+$ ($1/3\text{rd}$ of an inch), text gets visibly clipped off the edge of the printed page.
-- **Multiply-Defined Labels**: Having two different sections or equations share the same `\label{eq:bound}` causes TeX to silently resolve citations to whichever happened to compile last.
+- **Multiply-Defined Labels**: Having two different sections or equations share the same `\label{eq:bound}` causes TeX to silently resolve references to whichever happened to compile last. `leeni` reports both definitions and fails the build (error tier); `alert_as_warning` can still downgrade the category.
 - **Type 3 (Bitmap) Fonts**: Low-resolution raster fonts embedded in the PDF that cause automatic rejection by journal submission portals (IEEE PDF eXpress, ACM TAPS).
 
 **How `leeni` Handles Alerts:**
@@ -264,7 +264,7 @@ Example JSON response:
 
 For an in-depth catalog of 55 common LaTeX compilation errors, their root causes, and minimal reproducer examples:
 
-- **[Master Error Index](errors/README.md)**: Catalog of 56 errors categorized by layer (TeX Primitive, LaTeX Kernel, Package).
+- **[Master Error Index](errors/README.md)**: Catalog of 59 errors categorized by layer (TeX Primitive, LaTeX Kernel, Package).
 - **[Troubleshooting Bibliography Errors](troubleshooting_bibliography_errors.md)**: Resolving cryptic `\printbibliography` crashes and pinpointing `.bib` database syntax errors.
 - **[Deep Dive: Underfull Boxes (`badness 10000`)](guides/underfull_boxes/README.md)**: Diagnosing and solving `Underfull \hbox` and `Underfull \vbox` warnings.
-- **Corpus Test Suite**: Run `tools/test_error_corpus` to verify all 56 reproducers against real LaTeX engines.
+- **Corpus Test Suite**: Run `tools/test_error_corpus` to verify all 59 reproducers against real LaTeX engines.

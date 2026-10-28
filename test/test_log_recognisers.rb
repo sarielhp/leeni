@@ -360,4 +360,71 @@ class TestLogRecognisers < Minitest::Test
       assert_equal 0, builder.send(:count_errors_in_log, 0, path)
     end
   end
+
+  # \include of a missing file only prints "No file foo.tex." and continues;
+  # the chapter is silently absent from the PDF.
+  def test_missing_include_target_is_an_error
+    log = <<~LOG
+      No file paper.aux.
+      No file chapter_missing.tex.
+      No file paper.bbl.
+      Output written on junk/paper.pdf (1 page).
+    LOG
+
+    with_log(log) do |path, content|
+      b = builder
+      assert_equal 1, b.send(:count_errors_in_log, 0, path),
+                   'a missing \\include target was not counted, or the .aux/.bbl notes were'
+      errors = b.send(:extract_errors, content)
+      assert_equal([:include_target_missing], errors.map { |e| e[:catalog_id] })
+      assert_equal 'chapter_missing.tex', errors.first[:catalog][:token]
+    end
+  end
+
+  # One error per distinct glyph and font, with the repeat count folded in.
+  def test_missing_characters_are_errors_folded_per_glyph
+    log = <<~LOG
+      Missing character: There is no 你 (U+4F60) in font [lmroman10-regular]:mapping=tex-text;!
+      Missing character: There is no 你 (U+4F60) in font [lmroman10-regular]:mapping=tex-text;!
+      Missing character: There is no ^^A in font cmr10!
+      Output written on junk/paper.pdf (1 page).
+    LOG
+
+    with_log(log) do |path, content|
+      b = builder
+      assert_equal 2, b.send(:count_errors_in_log, 0, path)
+      errors = b.send(:extract_errors, content)
+      assert_equal(%i[missing_character missing_character], errors.map { |e| e[:catalog_id] })
+      assert_includes errors[0][:text], 'in font lmroman10-regular'
+      assert_includes errors[0][:text], '(2 occurrences)'
+      assert_equal '你', errors[0][:catalog][:token]
+      refute_includes errors[1][:text], 'occurrences'
+    end
+  end
+
+  def test_no_pages_of_output_is_an_error
+    log = "(./paper.aux) )\nNo pages of output.\nTranscript written on paper.log.\n"
+
+    with_log(log) do |path, content|
+      b = builder
+      assert_equal 1, b.send(:count_errors_in_log, 0, path)
+      assert_equal([:no_pages_of_output], b.send(:extract_errors, content).map { |e| e[:catalog_id] })
+    end
+  end
+
+  # An empty output is a consequence of a real compiler error, and a
+  # bibliography-only body has no pages until the bibliography tool has run,
+  # so neither case may raise a second, misleading error.
+  def test_no_pages_of_output_is_not_promoted_when_explained
+    after_error = "./paper.tex:3: Undefined control sequence.\nl.3 \\typo\nNo pages of output.\n"
+    pending_bib = "No file paper.bbl.\nPackage biblatex Warning: Please (re)run Biber on the file:\nNo pages of output.\n"
+
+    with_log(after_error) do |_path, content|
+      refute_includes LaTeXUtils.filter_subcommand_noise(content), '[leeni] No pages of output'
+    end
+    with_log(pending_bib) do |path, content|
+      assert_equal 0, builder.send(:count_errors_in_log, 0, path)
+      refute_includes LaTeXUtils.filter_subcommand_noise(content), '[leeni]'
+    end
+  end
 end

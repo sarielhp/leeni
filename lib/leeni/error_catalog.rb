@@ -1055,6 +1055,39 @@ module LaTeXErrorCatalog
       doc_slug: '56_unclosed_group_at_end'
     },
     {
+      id: :include_target_missing,
+      pattern: /\\include target '(.+?)' not found/,
+      title: '\\include target not found',
+      token_extractor: ->(match, _block) { match[1] },
+      hint: lambda { |tok|
+        tok ? "Create '#{tok}' or fix the \\include name; LaTeX skips a missing \\include silently" : 'Fix the \\include name; LaTeX skips a missing \\include silently'
+      },
+      why: 'An \\include named a file that does not exist. Unlike \\input, \\include only notes "No file" in the log and continues, so the chapter is missing from the PDF.',
+      fix: 'Create the file, correct the name in \\include{...}, or remove the \\include.',
+      doc_slug: '57_include_target_missing'
+    },
+    {
+      id: :missing_character,
+      pattern: /Missing character: there is no (\S+)(?: \(U\+[0-9A-Fa-f]+\))? in font (.+?), so the glyph/,
+      title: 'Missing character: glyph not in font',
+      token_extractor: ->(match, _block) { match[1] },
+      hint: lambda { |tok|
+        tok ? "No glyph for '#{tok}' in the current font; switch fonts or replace the character" : 'No glyph in the current font; switch fonts or replace the character'
+      },
+      why: 'The current font has no glyph for a character in the source, so TeX typeset nothing in its place. TeX only notes this in the log and exits 0.',
+      fix: 'Load a font that covers the character (fontspec with xelatex or lualatex), use the LaTeX command for the symbol, or remove the character.',
+      doc_slug: '58_missing_character'
+    },
+    {
+      id: :no_pages_of_output,
+      pattern: /No pages of output: the document body typeset nothing/,
+      title: 'No pages of output',
+      hint: 'Document body produced no pages; check \\include targets, \\includeonly, and where \\end{document} sits',
+      why: 'TeX shipped out no pages, so no PDF was written. The body between \\begin{document} and \\end{document} typeset nothing, usually because an \\include target is missing, \\includeonly excludes everything, or \\end{document} is misplaced.',
+      fix: 'Make sure the document body contains typeset material and that every \\include target exists.',
+      doc_slug: '59_no_pages_of_output'
+    },
+    {
       id: :cannot_write_file,
       pattern: /I can't write on file\s+[`"'](?:"?)([^'"`]+?)(?:"?)['"`]/i,
       title: 'Cannot write to file',
@@ -1185,9 +1218,14 @@ module LaTeXErrorCatalog
 
   WARNING_EXPLANATIONS = {
     multiply_defined_label: {
-      title: 'Alert: Multiply-Defined Label',
-      why: 'Two or more \\label{...} tags share the identical key; references will be ambiguous.',
+      title: 'Error: Multiply-Defined Label',
+      why: 'Two or more \\label{...} tags share the identical key; every \\ref silently resolves to whichever definition came last. LaTeX only warns, leeni flags it as an error.',
       fix: 'Search your .tex sources for \\label{<key>} and rename or delete one.'
+    },
+    unused_global_option: {
+      title: 'Alert: Unused Global Option',
+      why: 'An option passed to \\documentclass matched nothing in the class or any package, so LaTeX ignored it; a misspelled option silently leaves the default font size or layout in place.',
+      fix: 'Fix the option spelling in \\documentclass[...] or remove it.'
     },
     overfull_hbox_alert: {
       title: 'Alert: Severe Overfull \\hbox (≥24pt)',

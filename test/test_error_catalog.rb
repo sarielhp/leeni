@@ -727,4 +727,26 @@ class TestErrorCatalog < Minitest::Test
     assert_equal :unclosed_group_at_end, item[:id]
     assert_equal '\\ifx', item[:token]
   end
+
+  def test_classify_promoted_silent_failures
+    text = "! [leeni] \\include target 'chapter_missing.tex' not found, so its contents were skipped " \
+           '(TeX only notes this; leeni flags it as an error).'
+    item = LaTeXErrorCatalog.classify(text, text.lines)
+    assert_equal :include_target_missing, item[:id]
+    assert_equal 'chapter_missing.tex', item[:token]
+    assert_equal '57_include_target_missing', item[:doc_slug]
+
+    text = '! [leeni] Missing character: there is no 你 (U+4F60) in font lmroman10-regular, so the glyph was dropped ' \
+           'from the PDF (2 occurrences) (TeX only notes this; leeni flags it as an error).'
+    item = LaTeXErrorCatalog.classify(text, text.lines)
+    assert_equal :missing_character, item[:id]
+    assert_equal '你', item[:token]
+    assert_equal '58_missing_character', item[:doc_slug]
+
+    text = '! [leeni] No pages of output: the document body typeset nothing, so no PDF was written ' \
+           '(TeX only notes this; leeni flags it as an error).'
+    item = LaTeXErrorCatalog.classify(text, text.lines)
+    assert_equal :no_pages_of_output, item[:id]
+    assert_equal '59_no_pages_of_output', item[:doc_slug]
+  end
 end

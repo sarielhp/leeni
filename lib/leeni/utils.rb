@@ -11,6 +11,7 @@ require 'fileutils'
 require 'io/console'
 require 'pathname'
 require_relative 'build_workspace'
+require_relative 'log_promoter'
 begin
   require 'unicode/display_width'
 rescue LoadError
@@ -277,35 +278,7 @@ module LaTeXUtils
     filtered = text.gsub(
       /(?:kpathsea: Running mktex\S+|mktex\S+: Running mf).*?(?:failed to make \S+|Transcript written on mfput\.log\.)\n?/m, ''
     )
-    promote_unclosed_groups(unwrap_log_lines(filtered))
-  end
-
-  UNCLOSED_GROUP_NOTICE = /^\(\\end occurred inside a group at level \d+\)\s*$/
-  UNCLOSED_GROUP_DETAIL = /^### (.+? group) \(level \d+\) entered at line (\d+) \((.+)\)\s*$/
-  UNCLOSED_CONDITIONAL = /^\(\\end occurred when (\\\w+) on line (\d+) was incomplete\)\s*$/
-  # TeX ends a run whose \end{document} sits inside an open group or conditional
-  # with a note and exit status 0; the note becomes a synthetic `!` error block.
-  def self.promote_unclosed_groups(text)
-    return text unless text.include?('\\end occurred')
-
-    armed = false
-    text.each_line.map do |line|
-      if line.match?(UNCLOSED_GROUP_NOTICE)
-        armed = true
-        ''
-      elsif armed && (m = line.match(UNCLOSED_GROUP_DETAIL))
-        unclosed_group_error("unclosed #{m[1]} opened by '#{m[3]}' on line #{m[2]}", m[2])
-      elsif (m = line.match(UNCLOSED_CONDITIONAL))
-        unclosed_group_error("unfinished #{m[1]} conditional started on line #{m[2]}", m[2])
-      else
-        armed = false unless line.strip.empty? || line.start_with?('###')
-        line
-      end
-    end.join
-  end
-
-  def self.unclosed_group_error(what, line_no)
-    "! [leeni] \\end{document} reached inside an #{what} (TeX only warns about this; leeni flags it as an error).\nl.#{line_no}\n"
+    LaTeXLogPromoter.promote(unwrap_log_lines(filtered))
   end
 
   def self.unwrap_log_lines(text, wrap_col = 79)

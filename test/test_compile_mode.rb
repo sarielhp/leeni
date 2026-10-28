@@ -212,7 +212,7 @@ class TestCompileMode < Minitest::Test
       File.write(File.join(dir, 'main.tex'), "\\documentclass{article}\n#{definition}" \
                                              "\\begin{document}\n\\input{chap1}\n\\input{chap2}\n\\end{document}\n")
       out, status = Open3.capture2e(@bin_path, '--compile', '--no-color', 'main.tex', chdir: dir)
-      assert_equal 0, status.exitstatus, "Expected exit 0. Output: #{out}"
+      assert_equal 1, status.exitstatus, "Expected exit 1, duplicate labels are errors. Output: #{out}"
 
       lines = out.lines.map(&:strip)
       loc1 = lines.find { |l| l.include?('chap1.tex:2:') && l.include?("label '#{label}' duplicate (also at chap2.tex:2)") }

@@ -54,8 +54,8 @@ class TestLeeniDiagnostics < LeeniTestBase
         (./main.tex
         LaTeX Warning: Reference `sec:unknown` undefined on page 1.
         Overfull \\hbox (15.0pt too wide) in paragraph at lines 10--15
+        Overfull \\hbox (30.0pt too wide) in paragraph at lines 20--21
         (./main.aux
-        LaTeX Warning: Label `sec:dup` multiply defined.
         )
         )
       LOG
@@ -70,9 +70,8 @@ class TestLeeniDiagnostics < LeeniTestBase
       end
 
       plain = strip_ansi(out)
-      assert_includes plain, '(1 alert)'
-      assert_includes plain, '(2 warnings)'
-      assert_includes plain, "label 'sec:dup' duplicate"
+      assert_includes plain, '(1 alert, 2 warnings)'
+      assert_includes plain, '30.00pt too wide'
       assert_includes plain, "undefined reference 'sec:unknown'"
       assert_includes plain, 'Errors: 0'
       assert_includes plain, 'Alerts: 1'
@@ -90,7 +89,7 @@ class TestLeeniDiagnostics < LeeniTestBase
       plain_supp = strip_ansi(out_supp)
       assert_includes plain_supp, '(1 alert)'
       refute_includes plain_supp, 'warnings)'
-      assert_includes plain_supp, "label 'sec:dup' duplicate"
+      assert_includes plain_supp, '30.00pt too wide'
       refute_includes plain_supp, "undefined reference 'sec:unknown'"
       assert_includes plain_supp, 'Warnings: 2'
       assert_includes plain_supp, '(❕ suppressed)'
@@ -212,7 +211,7 @@ class TestLeeniDiagnostics < LeeniTestBase
       builder = legacy_builder('main.tex', {})
       out, = capture_io do
         Dir.chdir(dir) do
-          builder.send(:analyze_output)
+          assert_raises(SystemExit) { builder.send(:analyze_output) }
         end
       end
       refute_includes out, 'Diagnostic Explanation'
@@ -221,12 +220,12 @@ class TestLeeniDiagnostics < LeeniTestBase
       expl_builder = legacy_builder('main.tex', explain: true)
       out_expl, = capture_io do
         Dir.chdir(dir) do
-          expl_builder.send(:analyze_output)
+          assert_raises(SystemExit) { expl_builder.send(:analyze_output) }
         end
       end
 
       plain_expl = strip_ansi(out_expl)
-      assert_includes plain_expl, 'Diagnostic Explanation: Alert: Multiply-Defined Label'
+      assert_includes plain_expl, 'Diagnostic Explanation: Error: Multiply-Defined Label'
       assert_includes plain_expl, 'Why: Two or more \label{...} tags share the identical key'
       assert_includes plain_expl, 'Fix: Search your .tex sources for \label{<key>}'
       assert_includes plain_expl, '┌─ Diagnostic Explanation'
@@ -349,7 +348,7 @@ class TestLeeniDiagnostics < LeeniTestBase
       builder = legacy_builder('main.tex', {})
       out, = capture_io do
         Dir.chdir(dir) do
-          builder.send(:analyze_output)
+          assert_raises(SystemExit) { builder.send(:analyze_output) }
         end
       end
       plain = strip_ansi(out)
@@ -1024,6 +1023,71 @@ class TestLeeniDiagnostics < LeeniTestBase
       assert alert20_pos < alert80_pos, 'Alert on line 20 should come before alert on line 80'
       assert alert80_pos < warn_ref_pos, 'All alerts should come before warnings'
       assert warn_ref_pos < warn10_pos, 'Warnings should be sorted by line number'
+    end
+  end
+
+  # Duplicate labels silently rebind every \ref, so they leave the alert tier
+  # and fail the build; the PDF is still exported because the per-pass gate
+  # only counts compiler errors.
+  def test_duplicate_labels_are_promoted_to_errors
+    Dir.mktmpdir do |dir|
+      FileUtils.mkdir_p(File.join(dir, 'junk'))
+      File.write(File.join(dir, 'junk', 'err_xelatex'), <<~LOG)
+        (./main.tex
+        LaTeX Warning: Reference `sec:unknown` undefined on page 1.
+        (./main.aux
+        LaTeX Warning: Label `sec:dup` multiply defined.
+        )
+        )
+      LOG
+
+      builder = legacy_builder('main.tex', {})
+      out, = capture_io do
+        Dir.chdir(dir) { assert_raises(SystemExit) { builder.send(:analyze_output) } }
+      end
+      plain = strip_ansi(out)
+      assert_includes plain, '(1 error)'
+      assert_includes plain, "label 'sec:dup' duplicate"
+      refute_includes plain, "Alert: label 'sec:dup'"
+      assert_includes plain, 'Errors: 1'
+      assert_includes plain, 'Alerts: 0'
+    end
+  end
+
+  # alert_as_warning is applied before the promotion, so a configured
+  # downgrade keeps duplicate labels out of the error tier.
+  def test_duplicate_label_downgrade_still_wins_over_promotion
+    Dir.mktmpdir do |dir|
+      FileUtils.mkdir_p(File.join(dir, 'junk'))
+      File.write(File.join(dir, 'junk', 'err_xelatex'), "(./main.tex\nLaTeX Warning: Label `sec:dup` multiply defined.\n)\n")
+
+      builder = legacy_builder('main.tex', alert_as_warning: ['multiply_defined_label'])
+      out, = capture_io { Dir.chdir(dir) { builder.send(:analyze_output) } }
+      plain = strip_ansi(out)
+      assert_includes plain, 'Errors: 0'
+      assert_includes plain, 'Warnings: 1'
+    end
+  end
+
+  # A misspelled \documentclass option is ignored by LaTeX and silently leaves
+  # the default layout in place, so it ranks as an alert rather than a warning.
+  def test_unused_global_option_is_an_alert
+    Dir.mktmpdir do |dir|
+      FileUtils.mkdir_p(File.join(dir, 'junk'))
+      File.write(File.join(dir, 'junk', 'err_xelatex'), <<~LOG)
+        (./main.tex
+        LaTeX Warning: Unused global option(s):
+            [11p,twocolum].
+        )
+      LOG
+
+      builder = legacy_builder('main.tex', {})
+      out, = capture_io { Dir.chdir(dir) { builder.send(:analyze_output) } }
+      plain = strip_ansi(out)
+      assert_includes plain, '(1 alert)'
+      assert_includes plain, 'Unused global option(s): [11p,twocolum]'
+      assert_includes plain, 'Alerts: 1'
+      assert_includes plain, 'Warnings: 0'
     end
   end
 end

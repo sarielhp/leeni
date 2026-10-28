@@ -1135,14 +1135,12 @@ module LaTeXDiagnostics
     classification = LaTeXErrorCatalog.classify(
       err_text, err_block, file: file_name, line: line_no, junk_dir: diagnostics_junk_dir
     )
-    if classification&.[](:id) == :file_not_found
-      resource_location = locate_missing_resource_request(classification[:token])
-      if resource_location
-        file_name, line_no = resource_location
-        classification = LaTeXErrorCatalog.classify(
-          err_text, err_block, file: file_name, line: line_no, junk_dir: diagnostics_junk_dir
-        )
-      end
+    source_location = locate_error_source(classification)
+    if source_location
+      file_name, line_no = source_location
+      classification = LaTeXErrorCatalog.classify(
+        err_text, err_block, file: file_name, line: line_no, junk_dir: diagnostics_junk_dir
+      )
     end
     cat_id = classification ? classification[:id] : :generic
     token = if cat_id == :undefined_control_sequence && classification&.[](:token)
@@ -1164,6 +1162,28 @@ module LaTeXDiagnostics
     }
     item[:formatted] = format_error_block(err_block, line_no, catalog: classification, item: item)
     [item, next_idx]
+  end
+
+  # TeX attributes some errors to no source position (a missing file, a glyph
+  # the font lacks); the position is recovered from the source tree instead.
+  def locate_error_source(classification)
+    case classification&.[](:id)
+    when :file_not_found, :include_target_missing
+      locate_missing_resource_request(classification[:token])
+    when :missing_character
+      locate_missing_character(classification[:token])
+    end
+  end
+
+  def locate_missing_character(glyph)
+    return nil if glyph.to_s.empty? || glyph.to_s.start_with?('^^')
+
+    collect_source_candidates.each do |file|
+      LaTeXUtils.safe_read(file).each_line.with_index(1) do |line, line_no|
+        return [file, line_no] if LaTeXUtils.strip_latex_comments(line).include?(glyph)
+      end
+    end
+    nil
   end
 
   def locate_missing_resource_request(resource)
@@ -1819,8 +1839,8 @@ module LaTeXDiagnostics
     ref_cat = reference_or_cite_category(txt)
     return ref_cat if ref_cat
 
-    return :hyperref_token if txt.include?('Token not allowed in a PDF string')
-    return :float_specifier if txt =~ /float specifier changed to/i
+    simple = simple_text_category(txt)
+    return simple if simple
     return :font_shape if txt.include?('Some font shapes were not available') ||
                           txt =~ /Font shape .* (?:undefined|not available)/i
     return :summary_warning if txt.include?('There were multiply-defined labels') ||
@@ -1829,6 +1849,17 @@ module LaTeXDiagnostics
     return :etex_allocation if txt.include?('Extended allocation already in use')
 
     :generic
+  end
+
+  SIMPLE_TEXT_CATEGORIES = [
+    [/unused global option/i, :unused_global_option],
+    [/Token not allowed in a PDF string/, :hyperref_token],
+    [/float specifier changed to/i, :float_specifier]
+  ].freeze
+
+  def simple_text_category(txt)
+    SIMPLE_TEXT_CATEGORIES.each { |pattern, category| return category if txt.match?(pattern) }
+    nil
   end
 
   def alert_overfull_pt
@@ -1976,9 +2007,7 @@ module LaTeXDiagnostics
     clean_content = LaTeXUtils.filter_subcommand_noise(content)
     warn_items ||= extract_warnings(clean_content, verbose: @options[:verbose])
     threshold = alert_overfull_pt
-    alert_boxes = warn_items.select do |w|
-      overfull_hbox?(w) && (w[:severity] || 0.0) >= threshold
-    end
+    alert_boxes = warn_items.select { |w| promoted_warning_alert?(w, threshold) }
     alert_boxes.each do |ab|
       ab[:base_color] = :red
       ab[:tier] = 'alerts'
@@ -2084,7 +2113,7 @@ module LaTeXDiagnostics
 
     threshold = alert_overfull_pt
     warn_items.each do |w|
-      next if overfull_hbox?(w) && ((w[:severity] || 0.0) >= threshold)
+      next if promoted_warning_alert?(w, threshold)
 
       if whatever_diagnostic?(w)
         whatevers << w
@@ -2101,6 +2130,14 @@ module LaTeXDiagnostics
     whatevers.each { |i| i[:tier] = 'whatevers' }
 
     [alert_items, regular_warnings, whatevers]
+  end
+
+  # Warnings leeni ranks as alerts: severe overfull boxes, and \documentclass
+  # options LaTeX ignored (a misspelled option silently changes the layout).
+  def promoted_warning_alert?(item, threshold)
+    return true if overfull_hbox?(item) && (item[:severity] || 0.0) >= threshold
+
+    item[:text].to_s.match?(/unused global option/i)
   end
 
   def alert_as_warning?(item)
@@ -2226,15 +2263,20 @@ module LaTeXDiagnostics
   def throttle_errors(errors)
     return [errors, nil] if (@options && (@options[:all] || @options[:emacs])) || errors.size <= 1
 
-    groups = errors.group_by { |e| format_display_path(e[:file]) }
+    # leeni's own findings (brace audit, promoted label errors) are never
+    # cascades of a compiler error, so they are shown regardless of file.
+    own, compiler = errors.partition { |e| e[:source] == :leeni }
+    return [errors, nil] if compiler.size <= 1
+
+    groups = compiler.group_by { |e| format_display_path(e[:file]) }
     first_file = primary_error_file(groups)
     file_errors = groups[first_file] || []
-    companion_errors = errors.select { |e| e[:companion_to] == first_file }
+    companion_errors = compiler.select { |e| e[:companion_to] == first_file }
     companion_files = companion_errors.map { |ce| format_display_path(ce[:file]) }.uniq
 
     return [errors, nil] if groups.size <= (1 + companion_files.size) && file_errors.size <= 10
 
-    displayed = file_errors.first(10) + companion_errors
+    displayed = own + file_errors.first(10) + companion_errors
     other_files = groups.keys.reject { |k| k == first_file || companion_files.include?(k) }
     cascade_info = {
       first_file: first_file,
@@ -2288,7 +2330,7 @@ module LaTeXDiagnostics
 
   COMPILER_BRACE_ERROR_PATTERN = /(?:Runaway argument\?|File ended while scanning use of|Extra \}, or forgotten \\endgroup|Extra \\endgroup|Too many \}'s|Missing \} inserted|Paragraph ended before .* was complete|\\begin\{.*\} ended by \\end\{.*\})/i
   COMPILER_BRACE_CASCADE_IDS = %i[
-    paragraph_ended_before_complete file_ended_while_scanning
+    paragraph_ended_before_complete file_ended_while_scanning no_pages_of_output
   ].freeze
 
   def compiler_indicates_brace_error?(content)
@@ -2582,8 +2624,31 @@ module LaTeXDiagnostics
 
     alert_items, reg_warns, what_items = partition_diagnostics(clean_content, raw_warns)
     errors = count_latex_errors(new_content, 0) + counts[:biberr]
+    promoted, alert_items = alert_items.partition { |item| error_grade_alert?(item) }
+    err_items.concat(promoted.map { |item| alert_as_error(item) })
+    errors += promoted.size
 
     display_analyzed_diagnostics(err_items, alert_items, reg_warns, what_items, errors)
+  end
+
+  # Duplicate labels silently rebind every \ref to the last definition, so they
+  # rank with compiler errors. An alert_as_warning downgrade still wins because
+  # partition_diagnostics applies it first.
+  ERROR_GRADE_ALERTS = %i[multiply_defined_label].freeze
+
+  def error_grade_alert?(item)
+    ERROR_GRADE_ALERTS.include?(diagnostic_category(item))
+  end
+
+  def alert_as_error(item)
+    err = item.dup
+    err[:tier] = 'errors'
+    err[:text] = err[:text].sub(/^Alert:\s*/, '')
+    err[:formatted] = format_diagnostic_line(err[:line_str], err[:text], :red, file: err[:file])
+    err[:err_block] ||= [err[:text]]
+    err[:source] ||= :leeni
+    err[:synthetic] = true
+    err
   end
 
   def display_analyzed_diagnostics(err_items, alert_items, reg_warns, what_items, errors)

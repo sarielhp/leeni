@@ -77,6 +77,10 @@ module LaTeXConfig
       // Treat compilation warnings as fatal errors (-W / --werror)
       "werror": false,
 
+      // Final-build profile (--final): undefined references and citations are
+      // errors, draft leftovers (\includeonly, draft, showkeys, ...) are alerts
+      "final": false,
+
       // Legacy REVTeX 4.0 compatibility files. Installed files are used only
       // for compiler subprocesses; project sources are never modified.
       "revtex4": {

@@ -57,6 +57,7 @@ l --json paper.tex
 | `-x` | `--explain` | flag | `false` | Print boxed plain-English explanations on first diagnostic occurrence. |
 | `-a` | `--all` | flag | `false` | Display all diagnostics (disables warning folding and whatever suppression). |
 | `-W` | `--werror` | flag | `false` | Treat alerts and warnings as fatal errors (exit code 1). |
+| *(none)* | `--final` | flag | `false` | Final-build profile: undefined references/citations, missing bib entries, unconverged builds and oversized floats are errors; draft leftovers (`\includeonly`, `draft`, `\linenumbers`, showkeys, todonotes) are alerts. Implied by `-z`, `-t`, `--arxiv`. |
 | `-r` | `--raw` | flag | `false` | Print unfiltered raw stdout/stderr from TeX compilers. |
 | `-s` | `--score` | flag | `false` | Suppress stdout; print numeric diagnostic counts only. |
 | `-v` | `--verbose` | flag | `false` | Verbose logging; show raw overfull snippets. |

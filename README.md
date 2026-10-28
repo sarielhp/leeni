@@ -99,6 +99,7 @@ l -f        # Force a rebuild even if files haven't changed
 l -llm      # Token-optimized plaintext build for AI coding agents
 l -x        # Show plain-English explanations and fixes for errors
 l --errors-only # Suppress alerts and warnings; fail only on real errors
+l --final       # Submission profile: undefined refs/cites are errors, draft leftovers are alerts (implied by -z, --arxiv)
 l -C        # Clean auxiliary and temporary files
 l -B        # Extract cited references into local .bib file
 l -r        # Print raw compiler output (debug mode)

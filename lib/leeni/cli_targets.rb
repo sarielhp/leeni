@@ -85,7 +85,7 @@ module LatexCLITargets
   # Submission staging consumes compiler recorder data and the reference PDF,
   # so it must always build fresh artifacts in the resolved junk directory.
   def arxiv_build_options(options)
-    options.merge(force: true)
+    options.merge(force: true, final: true)
   end
 
   def process_arxiv_target(target, options)
@@ -95,6 +95,7 @@ module LatexCLITargets
 
   def process_standard_target(target, options)
     options = options.merge(zip: true, inject_styles: true, verify: true, force: true) if options[:zip_alone]
+    options = options.merge(final: true) if options[:zip] || options[:verify]
     builder = LatexBuilder.new(target, options)
     exit 1 unless builder.run!
     return unless options[:zip] || options[:verify]

@@ -35,6 +35,7 @@ require_relative 'lib/leeni/utils'
 require_relative 'lib/leeni/help_manual'
 require_relative 'lib/leeni/cli_help'
 require_relative 'lib/leeni/brace_checker'
+require_relative 'lib/leeni/final_checks'
 require_relative 'lib/leeni/flattener'
 require_relative 'lib/leeni/meta_extractor'
 require_relative 'lib/leeni/bib_locator'
@@ -261,6 +262,7 @@ module LatexCLI
       help_style: cfg['help_style'] || (cfg['help_lines'] == true ? 'lines' : 'plain'),
       list_themes: false, show_config: false, no_env: is_env_free, verbose: false,
       trace: cfg['trace'] == true, emacs: cfg['emacs'] == true, werror: cfg['werror'] == true,
+      final: cfg['final'] == true,
       revtex4: cfg['revtex4'].is_a?(Hash) ? cfg['revtex4'] : {},
       alert_overfull_pt: (cfg['alert_overfull_pt'] || 24.0).to_f,
       whatever_overfull_pt: (cfg['whatever_overfull_pt'] || 2.5).to_f,
@@ -487,6 +489,9 @@ module LatexCLI
     opts.on('-W', '--werror', 'Treat compilation warnings as fatal errors and exit with non-zero status') do
       options[:werror] = true
       options[:explicit_werror] = true
+    end
+    opts.on('--final', 'Final-build profile: undefined references and citations, stale builds and oversized floats are errors; draft leftovers are alerts (implied by -z and --arxiv)') do
+      options[:final] = true
     end
     opts.on('--errors-only', 'Suppress alerts, warnings and Whatevers; only errors cause diagnostic failure') do
       options.merge!(suppress_alerts: true, suppress_warnings: true, suppress_whatevers: true,

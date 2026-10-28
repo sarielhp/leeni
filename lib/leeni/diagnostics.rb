@@ -1859,6 +1859,7 @@ module LaTeXDiagnostics
     [/build did not converge/i, :unconverged_build],
     [/Float too large for page/i, :float_too_large],
     [/Repeated entry---|Duplicate entry key/i, :bib_repeated_entry],
+    [/Missing database entr/i, :missing_bib_entry],
     [/pt too high/i, :overfull_vbox],
     [/Token not allowed in a PDF string/, :hyperref_token],
     [/float specifier changed to/i, :float_specifier]
@@ -2021,7 +2022,17 @@ module LaTeXDiagnostics
       ab[:text] = ab[:text].sub(/^Warning:/, 'Alert:')
       ab[:formatted] = format_diagnostic_line(ab[:line_str], ab[:text], :red, file: ab[:file])
     end
-    extract_label_alerts(clean_content) + alert_boxes + collect_source_label_alerts + collect_type3_font_alerts
+    extract_label_alerts(clean_content) + alert_boxes + collect_source_label_alerts + collect_type3_font_alerts +
+      collect_final_check_alerts
+  end
+
+  # --final only: drafting aids left in the source (\includeonly, draft, ...).
+  def collect_final_check_alerts
+    return [] unless @options[:final]
+
+    collect_source_candidates.flat_map { |f| LaTeXFinalChecks.scan(f) }.each do |a|
+      a[:formatted] = format_diagnostic_line(a[:line_str], a[:text], :red, file: a[:file])
+    end
   end
 
   def collect_source_label_alerts
@@ -2647,7 +2658,7 @@ module LaTeXDiagnostics
 
     alert_items, reg_warns, what_items = partition_diagnostics(clean_content, raw_warns)
     errors = count_latex_errors(new_content, 0) + counts[:biberr]
-    promoted, alert_items = alert_items.partition { |item| error_grade_alert?(item) }
+    promoted, alert_items, reg_warns = promote_error_grade_items(alert_items, reg_warns)
     err_items.concat(promoted.map { |item| alert_as_error(item) })
     errors += promoted.size
 
@@ -2656,17 +2667,28 @@ module LaTeXDiagnostics
 
   # Duplicate labels silently rebind every \ref to the last definition, so they
   # rank with compiler errors. An alert_as_warning downgrade still wins because
-  # partition_diagnostics applies it first.
+  # partition_diagnostics applies it first. With --final the document is about
+  # to leave the author's hands, so the ordinary drafting warnings join them.
   ERROR_GRADE_ALERTS = %i[multiply_defined_label].freeze
+  FINAL_ERROR_CATEGORIES = %i[undefined_reference undefined_citation missing_bib_entry unconverged_build float_too_large].freeze
 
   def error_grade_alert?(item)
-    ERROR_GRADE_ALERTS.include?(diagnostic_category(item))
+    category = diagnostic_category(item)
+    ERROR_GRADE_ALERTS.include?(category) || (@options[:final] && FINAL_ERROR_CATEGORIES.include?(category))
+  end
+
+  def promote_error_grade_items(alert_items, reg_warns)
+    promoted, alert_items = alert_items.partition { |item| error_grade_alert?(item) }
+    return [promoted, alert_items, reg_warns] unless @options[:final]
+
+    final_errors, reg_warns = reg_warns.partition { |w| FINAL_ERROR_CATEGORIES.include?(diagnostic_category(w)) }
+    [promoted + final_errors, alert_items, reg_warns]
   end
 
   def alert_as_error(item)
     err = item.dup
     err[:tier] = 'errors'
-    err[:text] = err[:text].sub(/^Alert:\s*/, '')
+    err[:text] = err[:text].sub(/^(?:Alert|Warning):\s*/, '')
     err[:formatted] = format_diagnostic_line(err[:line_str], err[:text], :red, file: err[:file])
     err[:err_block] ||= [err[:text]]
     err[:source] ||= :leeni

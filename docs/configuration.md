@@ -116,6 +116,14 @@ Downgraded items remain visible as warnings, with matching counts and output
 in terminal, JSON, and editor modes. Errors are unaffected; `--werror` still
 treats warnings as fatal.
 
+`"final": true` (or `--final`) switches on the final-build profile that `-z`,
+`-t` and `--arxiv` use automatically: undefined references and citations,
+missing bibliography entries, an unconverged build and floats too large for
+the page become errors, and draft leftovers in the source (`\includeonly`,
+the `draft` class or graphicx option, `\linenumbers`, and the showkeys,
+todonotes, draftwatermark and refcheck packages) are reported as alerts with
+category `draft_leftover`.
+
 Type 3 fonts can contain vector outlines or bitmap glyphs. When `mutool` from
 MuPDF is on PATH, leeni inspects all glyph programs of the detected Type 3
 fonts. If every program uses supported vector operations, this diagnostic

@@ -1259,6 +1259,11 @@ module LaTeXErrorCatalog
       why: 'A text font declaration or size switch was used inside math, where LaTeX ignores it, so the formula silently keeps its default look.',
       fix: 'Use the math equivalent (\\mathbf, \\mathit, \\mathsf, \\mathtt, \\mathrm) or wrap the whole formula: {\\large $...$}.'
     },
+    draft_leftover: {
+      title: 'Alert: Draft Leftover (--final)',
+      why: 'A drafting aid is still active in the source: \\includeonly drops chapters, the draft option boxes out figures, and showkeys, todonotes, lineno, draftwatermark or refcheck print marks that do not belong in a submitted document.',
+      fix: 'Remove or comment out the construct before packaging; for todonotes, load it with the disable option.'
+    },
     unconverged_build: {
       title: 'Alert: Build Did Not Converge',
       why: 'The pass budget ran out while LaTeX still asked for a rerun, so cross-references, page numbers, or the table of contents in the PDF may be stale.',

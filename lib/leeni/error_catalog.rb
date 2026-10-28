@@ -1068,7 +1068,7 @@ module LaTeXErrorCatalog
     },
     {
       id: :missing_character,
-      pattern: /Missing character: there is no (\S+)(?: \(U\+[0-9A-Fa-f]+\))? in font (.+?), so the glyph/,
+      pattern: /Missing character: there is no (\S+)(?: \([^)]*\))? in font (.+?), so the glyph/,
       title: 'Missing character: glyph not in font',
       token_extractor: ->(match, _block) { match[1] },
       hint: lambda { |tok|
@@ -1258,6 +1258,21 @@ module LaTeXErrorCatalog
       title: 'Alert: Command Invalid in Math Mode',
       why: 'A text font declaration or size switch was used inside math, where LaTeX ignores it, so the formula silently keeps its default look.',
       fix: 'Use the math equivalent (\\mathbf, \\mathit, \\mathsf, \\mathtt, \\mathrm) or wrap the whole formula: {\\large $...$}.'
+    },
+    duplicate_destination: {
+      title: 'Alert: Duplicate Hyperlink Destination',
+      why: 'Two anchors in the PDF share a name, so pdfTeX kept the first and every link to that name lands there. Usually page numbering restarted without hyperref knowing, or a \\hypertarget name was reused.',
+      fix: 'Give each anchor a unique name; for restarted page numbers use \\pagenumbering with distinct styles or hypersetup{pageanchor=false} for the front matter.'
+    },
+    mixed_page_sizes: {
+      title: 'Alert: Mixed Page Sizes',
+      why: 'Not every page of the PDF has the same dimensions, typically because an included PDF figure or an \\includepdf page carries its own page size. Journals and arXiv reject such files.',
+      fix: 'Crop or scale the included PDF to the page, or set the paper size explicitly with the geometry package.'
+    },
+    invisible_character: {
+      title: 'Warning: Invisible Character in Source',
+      why: 'A zero-width, non-breaking, or bidirectional control character is in the source, usually pasted from a browser or PDF. It compiles but produces odd spacing, forbids line breaks, or corrupts copy and search in the PDF.',
+      fix: 'Delete the character at the reported column; an editor that shows invisible characters, or a search for the code point, will find it.'
     },
     draft_leftover: {
       title: 'Alert: Draft Leftover (--final)',

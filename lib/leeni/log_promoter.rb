@@ -11,7 +11,8 @@
 # ==============================================================================
 
 module LaTeXLogPromoter
-  TRIGGER = /\\end occurred|^No file \S+\.tex\.|^Missing character: |^No pages of output\./
+  TRIGGER = /\\end occurred|^No file \S+\.tex\.|^Missing character: |^No pages of output\.|^pdfTeX warning \(ext4\): destination/
+  DUPLICATE_DESTINATION = /^pdfTeX warning \(ext4\): destination with the same identifier \(name\{(.+?)\}\) has been already used, duplicate ignored/
   UNCLOSED_GROUP_NOTICE = /^\(\\end occurred inside a group at level \d+\)\s*$/
   UNCLOSED_GROUP_DETAIL = /^### (.+? group) \(level \d+\) entered at line (\d+) \((.+)\)\s*$/
   UNCLOSED_CONDITIONAL = /^\(\\end occurred when (\\\w+) on line (\d+) was incomplete\)\s*$/
@@ -55,6 +56,8 @@ module LaTeXLogPromoter
       error("\\include target '#{m[1]}' not found, so its contents were skipped")
     elsif (m = line.match(MISSING_CHARACTER))
       rewrite_missing_character(m[1], m[2], state)
+    elsif (m = line.match(DUPLICATE_DESTINATION))
+      rewrite_duplicate_destination(m[1], state)
     elsif line.match?(NO_PAGES) && !state[:skip_no_pages]
       error('No pages of output: the document body typeset nothing, so no PDF was written')
     else
@@ -70,7 +73,17 @@ module LaTeXLogPromoter
     state[:seen][key] = true
     count = state[:counts][key]
     times = count > 1 ? " (#{count} occurrences)" : ''
-    error("Missing character: there is no #{glyph} in font #{font_name(font)}, so the glyph was dropped from the PDF#{times}")
+    error("Missing character: there is no #{visible_glyph(glyph)} in font #{font_name(font)}, " \
+          "so the glyph was dropped from the PDF#{times}")
+  end
+
+  # A zero-width or control character would vanish from the message too; name
+  # it by code point instead ("U+200B (invisible character)").
+  def self.visible_glyph(glyph)
+    first = glyph.to_s[0]
+    return glyph unless first && first != ' ' && first.match?(/\A[\p{Cf}\p{Zs}\p{Cc}\p{Mn}]\z/)
+
+    format('U+%04X (invisible character)', first.ord)
   end
 
   # xetex spells the font as `[lmroman10-regular]:mapping=tex-text;`; keep the name.
@@ -78,10 +91,26 @@ module LaTeXLogPromoter
     font.sub(/:.*\z/, '').delete('[]"').strip
   end
 
+  # pdfTeX's duplicate-destination note is not a LaTeX warning, so the warning
+  # scanner never sees it; it becomes one (an alert downstream), once per name.
+  # Links to a duplicated anchor all land on its first occurrence.
+  def self.rewrite_duplicate_destination(name, state)
+    key = [:destination, name]
+    return '' if state[:seen][key]
+
+    state[:seen][key] = true
+    count = state[:counts][key]
+    times = count > 1 ? " (#{count} occurrences)" : ''
+    "LaTeX Warning: Duplicate hyperlink destination '#{name}'#{times}; every link to it lands on the first occurrence.\n\n"
+  end
+
   def self.missing_character_counts(text)
     text.each_line.with_object(Hash.new(0)) do |line, counts|
-      m = line.match(MISSING_CHARACTER)
-      counts[[m[1], m[2]]] += 1 if m
+      if (m = line.match(MISSING_CHARACTER))
+        counts[[m[1], m[2]]] += 1
+      elsif (m = line.match(DUPLICATE_DESTINATION))
+        counts[[:destination, m[1]]] += 1
+      end
     end
   end
 

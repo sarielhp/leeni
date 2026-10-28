@@ -34,6 +34,7 @@ module LatexBundler
     cli_help.rb
     brace_checker.rb
     final_checks.rb
+    pdf_checks.rb
     flattener.rb
     meta_extractor.rb
     bib_locator.rb

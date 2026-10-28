@@ -12,7 +12,7 @@ module LeeniTestSuite
     test_error_catalog.rb test_flattener.rb test_jsonc_parser.rb
     test_brace_checker.rb test_author_names.rb test_compile_format.rb
     test_diagnostic_record.rb test_presenters.rb
-    test_log_recognisers.rb test_deep_diagnostics.rb test_diagnostic_formatting.rb test_final_checks.rb
+    test_log_recognisers.rb test_deep_diagnostics.rb test_diagnostic_formatting.rb test_final_checks.rb test_pdf_checks.rb
     test_repair_failures.rb test_config.rb test_color_theme.rb test_cli_spellings.rb
     test_author_verification.rb test_visual_verification.rb test_compatibility.rb
     test_arxiv_worker.rb test_arxiv_fixups.rb test_sample_arxiv.rb test_bump.rb

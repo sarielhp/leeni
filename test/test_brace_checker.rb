@@ -177,4 +177,20 @@ class TestBraceChecker < Minitest::Test
     source = "\\begin{figure}\n\\label{a}\n\\caption{c}\n\\end{figure}\n"
     assert_equal 1, LaTeXBraceChecker.scan_inverted_labels('doc.tex', source).size
   end
+
+  def test_invisible_characters_are_reported_with_column_and_capped
+    Dir.mktmpdir('leeni_invisible') do |dir|
+      path = File.join(dir, 'doc.tex')
+      File.write(path, "Plain line.\nA\u200Bzero width and a\u00A0nbsp. % \u200B in a comment\n")
+      items = LaTeXBraceChecker.check_invisible_characters(path)
+      assert_equal([[2, 2, 'zero-width space U+200B'], [2, 19, 'non-breaking space U+00A0']],
+                   items.map { |i| [i[:line], i[:col], i[:text][/\((.+?)\)/, 1]] })
+      assert(items.all? { |i| i[:alert_type] == :invisible_character })
+
+      File.write(path, Array.new(9) { "x\u200By" }.join("\n"))
+      capped = LaTeXBraceChecker.check_invisible_characters(path)
+      assert_equal 6, capped.size
+      assert_includes capped.last[:text], '4 more invisible characters'
+    end
+  end
 end

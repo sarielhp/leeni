@@ -1173,4 +1173,42 @@ class TestLeeniDiagnostics < LeeniTestBase
       assert_includes plain, 'Alerts: 1'
     end
   end
+
+  # pdfTeX's duplicate-destination note is not a LaTeX warning; it is
+  # normalised into one and ranked as an alert, once per anchor name.
+  def test_duplicate_hyperlink_destinations_are_alerts_once_per_name
+    Dir.mktmpdir do |dir|
+      FileUtils.mkdir_p(File.join(dir, 'junk'))
+      File.write(File.join(dir, 'junk', 'err_xelatex'), <<~LOG)
+        (./main.tex
+        pdfTeX warning (ext4): destination with the same identifier (name{page.1}) has been already used, duplicate ignored
+        pdfTeX warning (ext4): destination with the same identifier (name{page.1}) has been already used, duplicate ignored
+        pdfTeX warning (ext4): destination with the same identifier (name{dup}) has been already used, duplicate ignored
+        [2]
+        )
+      LOG
+
+      builder = legacy_builder('main.tex', {})
+      out, = capture_io { Dir.chdir(dir) { builder.send(:analyze_output) } }
+      plain = strip_ansi(out)
+      assert_includes plain, '(2 alerts)'
+      assert_includes plain, "Duplicate hyperlink destination 'page.1' (2 occurrences)"
+      assert_includes plain, "Duplicate hyperlink destination 'dup';"
+    end
+  end
+
+  def test_invisible_source_characters_are_warnings
+    Dir.mktmpdir do |dir|
+      Dir.chdir(dir) do
+        FileUtils.mkdir_p('junk')
+        File.write('main.tex', "\\documentclass{article}\n\\begin{document}\nA\u200Bword.\n\\end{document}\n")
+        File.write('junk/err_xelatex', "(./main.tex\n)\n")
+        builder = legacy_builder('main.tex', {})
+        out, = capture_io { builder.send(:analyze_output) }
+        plain = strip_ansi(out)
+        assert_includes plain, '(1 warning)'
+        assert_includes plain, 'invisible character (zero-width space U+200B) at column 2'
+      end
+    end
+  end
 end

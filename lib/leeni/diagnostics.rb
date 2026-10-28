@@ -1180,6 +1180,8 @@ module LaTeXDiagnostics
   def locate_missing_character(glyph)
     return nil if glyph.to_s.empty? || glyph.to_s.start_with?('^^')
 
+    # An invisible glyph is named by code point in the message; search for the character itself.
+    glyph = [Regexp.last_match(1).hex].pack('U') if glyph =~ /\AU\+([0-9A-Fa-f]{4,6})\z/
     collect_source_candidates.each do |file|
       LaTeXUtils.safe_read(file).each_line.with_index(1) do |line, line_no|
         return [file, line_no] if LaTeXUtils.strip_latex_comments(line).include?(glyph)
@@ -1860,6 +1862,7 @@ module LaTeXDiagnostics
     [/Float too large for page/i, :float_too_large],
     [/Repeated entry---|Duplicate entry key/i, :bib_repeated_entry],
     [/Missing database entr/i, :missing_bib_entry],
+    [/Duplicate hyperlink destination/i, :duplicate_destination],
     [/pt too high/i, :overfull_vbox],
     [/Token not allowed in a PDF string/, :hyperref_token],
     [/float specifier changed to/i, :float_specifier]
@@ -2023,7 +2026,26 @@ module LaTeXDiagnostics
       ab[:formatted] = format_diagnostic_line(ab[:line_str], ab[:text], :red, file: ab[:file])
     end
     extract_label_alerts(clean_content) + alert_boxes + collect_source_label_alerts + collect_type3_font_alerts +
-      collect_final_check_alerts
+      collect_page_size_alerts + collect_final_check_alerts
+  end
+
+  # An A4 or landscape page inside a letter document, usually an included PDF.
+  def collect_page_size_alerts
+    target_pdf = resolve_target_pdf
+    groups = target_pdf && LaTeXPdfChecks.page_sizes(target_pdf)
+    return [] unless groups
+
+    msg = LaTeXPdfChecks.page_size_message(groups)
+    [{
+      file: target_pdf, line: 0, line_str: '', text: msg, formatted: format_diagnostic_line('', msg, :red),
+      alert_type: :mixed_page_sizes, tier: 'alerts', base_color: :red, index: 60_001
+    }]
+  end
+
+  def collect_invisible_character_warnings
+    collect_source_candidates.flat_map { |f| LaTeXBraceChecker.check_invisible_characters(f) }.each do |w|
+      w[:formatted] = format_diagnostic_line(w[:line_str], w[:text], :yellow, file: w[:file])
+    end
   end
 
   # --final only: drafting aids left in the source (\includeonly, draft, ...).
@@ -2154,7 +2176,7 @@ module LaTeXDiagnostics
   # the alert threshold lose content off the page; the text patterns are
   # silent faults: ignored class options and font switches, a build whose
   # cross-references never settled, and a bibliography entry BibTeX dropped.
-  PROMOTED_ALERT_TEXT = /unused global option|invalid in math mode|build did not converge|Repeated entry---|Duplicate entry key/i
+  PROMOTED_ALERT_TEXT = /unused global option|invalid in math mode|build did not converge|Repeated entry---|Duplicate entry key|Duplicate hyperlink destination/i
 
   def promoted_warning_alert?(item, threshold)
     return true if (overfull_hbox?(item) || overfull_vbox?(item)) && (item[:severity] || 0.0) >= threshold
@@ -2652,6 +2674,7 @@ module LaTeXDiagnostics
     counts = collect_diagnostic_counts(new_content)
     clean_content = LaTeXUtils.filter_subcommand_noise(new_content)
     raw_warns = extract_warnings(clean_content, verbose: @options[:verbose])
+    raw_warns.concat(collect_invisible_character_warnings)
     err_items = extract_errors(clean_content)
     append_bib_diagnostics!(raw_warns, err_items) if counts[:cbib].positive?
     consolidate_missing_bib_entries!(raw_warns)

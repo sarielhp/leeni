@@ -55,6 +55,48 @@ class LaTeXBraceChecker
     scan_inverted_labels(path, content)
   end
 
+  INVISIBLE_CHARACTERS = {
+    0x00A0 => 'non-breaking space', 0x00AD => 'soft hyphen', 0x200B => 'zero-width space',
+    0x200C => 'zero-width non-joiner', 0x200D => 'zero-width joiner', 0x2060 => 'word joiner',
+    0xFEFF => 'byte-order mark', 0x2028 => 'line separator', 0x2029 => 'paragraph separator',
+    0x202A => 'bidi embedding', 0x202B => 'bidi embedding', 0x202C => 'bidi pop',
+    0x202D => 'bidi override', 0x202E => 'bidi override'
+  }.to_h { |code, name| [code.chr(Encoding::UTF_8), format('%<name>s U+%<code>04X', name: name, code: code)] }.freeze
+  INVISIBLE_PATTERN = Regexp.union(INVISIBLE_CHARACTERS.keys)
+  MAX_INVISIBLE_REPORTS = 5
+
+  # Characters pasted from browsers and PDFs that typeset as nothing or as an
+  # unbreakable space, so they survive compilation and corrupt spacing and
+  # search in the PDF. Reported as warnings, at most a few per file.
+  def self.check_invisible_characters(path)
+    return [] unless File.file?(path)
+
+    content = LaTeXUtils.safe_read(path).encode('UTF-8', invalid: :replace, undef: :replace)
+    found = content.each_line.with_index(1).flat_map do |raw, line_no|
+      LaTeXUtils.strip_latex_comments(raw).enum_for(:scan, INVISIBLE_PATTERN).map do
+        invisible_item(path, line_no, Regexp.last_match.begin(0) + 1, INVISIBLE_CHARACTERS[Regexp.last_match(0)])
+      end
+    end
+    cap_invisible_reports(path, found)
+  end
+
+  def self.invisible_item(path, line_no, col, name)
+    {
+      type: :warn, file: path, line: line_no, line_str: line_no.to_s, col: col,
+      text: "Warning: invisible character (#{name}) at column #{col}",
+      alert_type: :invisible_character, base_color: :yellow, index: 70_000 + line_no
+    }
+  end
+
+  def self.cap_invisible_reports(path, found)
+    return found if found.size <= MAX_INVISIBLE_REPORTS
+
+    rest = found.size - MAX_INVISIBLE_REPORTS
+    summary = invisible_item(path, found[MAX_INVISIBLE_REPORTS][:line], 1, 'more')
+    summary[:text] = "Warning: #{rest} more invisible characters in this file (first at line #{found[MAX_INVISIBLE_REPORTS][:line]})"
+    found.first(MAX_INVISIBLE_REPORTS) << summary
+  end
+
   def self.scan_inverted_labels(path, content)
     alerts = []
     float_stack = []

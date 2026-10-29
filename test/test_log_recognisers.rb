@@ -402,6 +402,46 @@ class TestLogRecognisers < Minitest::Test
     end
   end
 
+  # \tracinglostchars=3: pdfTeX/XeTeX raise "! Missing character" and LuaTeX
+  # adds an l.<line> context; either way the error carries the exact line.
+  def test_missing_character_error_form_keeps_exact_line
+    log = <<~LOG
+      ! Missing character: There is no Ł ("141) in font cmmi12.
+      l.162 $\\L_u$
+                  . Note, that this
+      ! Missing character: There is no Ł ("141) in font cmmi12.
+      l.170 $\\L_v$
+
+      Output written on paper.pdf (1 page).
+    LOG
+
+    with_log(log) do |_path, content|
+      errors = builder.send(:extract_errors, content)
+      assert_equal([:missing_character], errors.map { |e| e[:catalog_id] })
+      assert_equal 162, errors.first[:line].to_i
+      assert_includes errors.first[:text], '(2 occurrences)'
+      refute_includes errors.first[:text], 'TeX only notes this'
+      assert_equal 'Ł', errors.first[:catalog][:token]
+    end
+  end
+
+  # leeni runs TeX with -file-line-error, so the error names an \input file.
+  def test_missing_character_file_line_form_keeps_file_and_line
+    log = <<~LOG
+      ./chapters/intro.tex:162: Missing character: There is no Ł ("141) in font cmmi12.
+      l.162 $\\L_u$
+
+      Output written on paper.pdf (1 page).
+    LOG
+
+    with_log(log) do |_path, content|
+      errors = builder.send(:extract_errors, content)
+      assert_equal([:missing_character], errors.map { |e| e[:catalog_id] })
+      assert_equal 162, errors.first[:line].to_i
+      assert_includes errors.first[:file].to_s, 'intro.tex'
+    end
+  end
+
   def test_no_pages_of_output_is_an_error
     log = "(./paper.aux) )\nNo pages of output.\nTranscript written on paper.log.\n"
 

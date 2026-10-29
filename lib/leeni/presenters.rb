@@ -78,9 +78,12 @@ module Leeni
     end
 
     def render_diagnostics(errors: [], alerts: [], warnings: [], whatevers: [], log_tail: nil, file: nil, io: $stderr)
-      # 1. When errors are present, suppress warnings/alerts completely to focus attention
+      # 1. When errors are present, suppress warnings to focus attention. Alerts
+      #    stay: they are silent faults and often name the cause of the error
+      #    ("command \L invalid in math mode" behind a missing glyph).
       if errors.any?
         render_errors(errors, file: file, io: io)
+        render_folded_tiers(sort_by_location(alerts), [], io: io) unless @options[:suppress_alerts]
         return
       end
 

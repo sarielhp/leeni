@@ -173,6 +173,20 @@ class TestBraceChecker < Minitest::Test
     assert_empty LaTeXBraceChecker.scan_inverted_labels('doc.tex', source)
   end
 
+  # A \label on an \item of a list inside a figure names the item, not the
+  # figure (36_frechet: an algorithm written as an enumerate in a minipage).
+  def test_label_on_list_item_in_figure_is_not_an_inverted_label
+    source = "\\begin{figure}\n\\begin{minipage}{1in}\n\\begin{compactenumA}\n" \
+             "\\item\n\\label{step_a}\nx\n\\end{compactenumA}\n\\end{minipage}\n" \
+             "\\begin{equation}\nx\\label{eq:a}\n\\end{equation}\n\\caption{c}\n\\label{f}\n\\end{figure}\n"
+    assert_empty LaTeXBraceChecker.scan_inverted_labels('doc.tex', source)
+  end
+
+  def test_label_in_layout_env_before_caption_is_still_reported
+    source = "\\begin{figure}\n\\begin{center}\n\\label{a}\n\\end{center}\n\\caption{c}\n\\end{figure}\n"
+    assert_equal 1, LaTeXBraceChecker.scan_inverted_labels('doc.tex', source).size
+  end
+
   def test_real_inverted_label_is_still_reported
     source = "\\begin{figure}\n\\label{a}\n\\caption{c}\n\\end{figure}\n"
     assert_equal 1, LaTeXBraceChecker.scan_inverted_labels('doc.tex', source).size

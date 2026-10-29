@@ -38,7 +38,16 @@ class LaTeXBraceChecker
   MACRO_DEFINITION_PATTERN = /\\(?:(?:re)?new(?:command|environment)|providecommand|
                                DeclareRobustCommand|(?:e|g|x)?def)\b/x
 
-  LABEL_TOKEN_PATTERN = /\\(?:begin\{(figure\*?|table\*?|algorithm|listing|subfigure|subtable|equation\*|align\*|gather\*|multline\*|flalign\*)\}|end\{(figure\*?|table\*?|algorithm|listing|subfigure|subtable|equation\*|align\*|gather\*|multline\*|flalign\*)\}|caption\b|subcaption\b|label\{([^}]+)\})/
+  LABEL_CONTAINER_ENVS = (FLOAT_ENVS + UNNUMBERED_MATH_ENVS).freeze
+  LABEL_TOKEN_PATTERN = /\\(?:(begin|end)\{([^}]+)\}|caption\b|subcaption\b|label\{([^}]+)\})/
+
+  # Environments nested in a float that only arrange content. A \label inside
+  # them still names the float, so it is checked. Any other nested environment
+  # (an enumerate, equation, theorem, custom list) steps its own counter, so a
+  # \label there names an item or equation, not the float, and is skipped.
+  LAYOUT_ENVS = %w[minipage center flushleft flushright raggedright raggedleft
+                   tabular tabular* tabularx tabulary adjustbox tikzpicture
+                   tiny scriptsize footnotesize small normalsize large Large].freeze
   VERBATIM_START_PATTERN = /\\begin\{(#{Regexp.union(VERBATIM_ENVS).source})\}/
 
   def self.check_file(path)
@@ -138,23 +147,35 @@ class LaTeXBraceChecker
 
   def self.handle_label_token(match, line_no, path, float_stack, alerts)
     full = match[0]
-    if full.start_with?('\\begin')
-      push_label_float(match[1], line_no, float_stack)
-    elsif full.start_with?('\\end')
-      pop_label_float(match[2], float_stack)
+    if match[1] == 'begin'
+      push_label_env(match[2], line_no, float_stack)
+    elsif match[1] == 'end'
+      pop_label_env(match[2], float_stack)
     elsif full.start_with?('\\caption') || full.start_with?('\\subcaption')
       float_stack.last[:has_caption] = true if float_stack.any?
-    elsif full.start_with?('\\label') && float_stack.any?
+    elsif full.start_with?('\\label') && float_stack.any? && float_stack.last[:nested].empty?
       check_label_alert(path, line_no, match[3], float_stack.last, alerts)
     end
   end
 
-  def self.push_label_float(env, line_no, float_stack)
-    float_stack << { env: env, line: line_no, has_caption: false, unnumbered: UNNUMBERED_MATH_ENVS.include?(env) }
+  def self.push_label_env(env, line_no, float_stack)
+    if LABEL_CONTAINER_ENVS.include?(env)
+      float_stack << { env: env, line: line_no, has_caption: false, nested: [],
+                       unnumbered: UNNUMBERED_MATH_ENVS.include?(env) }
+    elsif float_stack.any? && !LAYOUT_ENVS.include?(env)
+      float_stack.last[:nested] << env
+    end
   end
 
-  def self.pop_label_float(env, float_stack)
-    float_stack.pop if float_stack.any? && float_stack.last[:env] == env
+  def self.pop_label_env(env, float_stack)
+    return if float_stack.empty?
+
+    current = float_stack.last
+    if current[:nested].last == env
+      current[:nested].pop
+    elsif current[:env] == env
+      float_stack.pop
+    end
   end
 
   def self.check_label_alert(path, line_no, key, current_float, alerts)

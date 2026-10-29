@@ -8,16 +8,22 @@
 # that does not exist, a glyph missing from the font, or a body that typeset
 # no pages at all. Each note is rewritten here into a synthetic `!` error
 # block so that every downstream recogniser treats it like a compiler error.
+# With \tracinglostchars=3 (set by leeni) TeX itself raises a missing glyph as
+# an error, "! Missing character: ..." in pdfTeX and XeTeX; that form is folded
+# into the same message so the hint and repeat count stay the same. The level
+# is set after the preamble, since packages may reset it. TeX resets its
+# 100-error limit every paragraph, so only 100+ lost glyphs in one paragraph
+# can stop a run.
 # ==============================================================================
 
 module LaTeXLogPromoter
-  TRIGGER = /\\end occurred|^No file \S+\.tex\.|^Missing character: |^No pages of output\.|^pdfTeX warning \(ext4\): destination/
+  TRIGGER = /\\end occurred|^No file \S+\.tex\.|^(?:! |.+?:\d+: )?Missing character: |^No pages of output\.|^pdfTeX warning \(ext4\): destination/
   DUPLICATE_DESTINATION = /^pdfTeX warning \(ext4\): destination with the same identifier \(name\{(.+?)\}\) has been already used, duplicate ignored/
   UNCLOSED_GROUP_NOTICE = /^\(\\end occurred inside a group at level \d+\)\s*$/
   UNCLOSED_GROUP_DETAIL = /^### (.+? group) \(level \d+\) entered at line (\d+) \((.+)\)\s*$/
   UNCLOSED_CONDITIONAL = /^\(\\end occurred when (\\\w+) on line (\d+) was incomplete\)\s*$/
   MISSING_INCLUDE = /^No file (\S+\.tex)\.\s*$/
-  MISSING_CHARACTER = /^Missing character: There is no (.+?) in font (.+?)!?\s*$/
+  MISSING_CHARACTER = /^(?:! |(?<at>.+?:\d+: ))?Missing character: There is no (?<glyph>.+?) in font (?<font>.+?)[.!]?\s*$/
   NO_PAGES = /^No pages of output\.\s*$/
 
   COMPILER_ERROR = /^(?:!\s+\S|Runaway argument\?|Error:\s|.+?:\d+:\s+(?!warning\b)(?!\(see\b)\S)/i
@@ -55,7 +61,7 @@ module LaTeXLogPromoter
     elsif (m = line.match(MISSING_INCLUDE))
       error("\\include target '#{m[1]}' not found, so its contents were skipped")
     elsif (m = line.match(MISSING_CHARACTER))
-      rewrite_missing_character(m[1], m[2], state)
+      rewrite_missing_character(m, state)
     elsif (m = line.match(DUPLICATE_DESTINATION))
       rewrite_duplicate_destination(m[1], state)
     elsif line.match?(NO_PAGES) && !state[:skip_no_pages]
@@ -66,15 +72,18 @@ module LaTeXLogPromoter
   end
 
   # One error per distinct glyph and font; TeX repeats the note per occurrence.
-  def self.rewrite_missing_character(glyph, font, state)
-    key = [glyph, font]
+  # A -file-line-error prefix ("./ch.tex:162: ") is kept so the error stays
+  # with the file that lost the glyph.
+  def self.rewrite_missing_character(match, state)
+    key = [match[:glyph], match[:font]]
     return '' if state[:seen][key]
 
     state[:seen][key] = true
     count = state[:counts][key]
     times = count > 1 ? " (#{count} occurrences)" : ''
-    error("Missing character: there is no #{visible_glyph(glyph)} in font #{font_name(font)}, " \
-          "so the glyph was dropped from the PDF#{times}")
+    text = error("Missing character: there is no #{visible_glyph(match[:glyph])} in font #{font_name(match[:font])}, " \
+                 "so the glyph was dropped from the PDF#{times}", note: false)
+    match[:at] ? text.sub(/\A! /, match[:at]) : text
   end
 
   # A zero-width or control character would vanish from the message too; name
@@ -107,15 +116,16 @@ module LaTeXLogPromoter
   def self.missing_character_counts(text)
     text.each_line.with_object(Hash.new(0)) do |line, counts|
       if (m = line.match(MISSING_CHARACTER))
-        counts[[m[1], m[2]]] += 1
+        counts[[m[:glyph], m[:font]]] += 1
       elsif (m = line.match(DUPLICATE_DESTINATION))
         counts[[:destination, m[1]]] += 1
       end
     end
   end
 
-  def self.error(what, line_no = nil)
+  def self.error(what, line_no = nil, note: true)
     tail = line_no ? "\nl.#{line_no}\n" : "\n"
-    "! [leeni] #{what} (TeX only notes this; leeni flags it as an error).#{tail}"
+    suffix = note ? ' (TeX only notes this; leeni flags it as an error)' : ''
+    "! [leeni] #{what}#{suffix}.#{tail}"
   end
 end

@@ -53,6 +53,20 @@ class TestPresenters < Minitest::Test
     refute_includes io.string, 'minor warning'
   end
 
+  # An alert often names the cause of the error (\L in math behind a missing
+  # glyph), so it is kept next to the errors; warnings still are not.
+  def test_agent_presenter_keeps_alerts_when_errors_exist
+    presenter = Leeni::AgentPresenter.new
+    errs = [{ file: 'main.tex', line: 162, tier: 'errors', message: 'missing character' }]
+    alerts = [{ file: 'main.tex', line: 162, tier: 'alerts', message: 'command \\L invalid in math mode' }]
+    warns = [{ file: 'main.tex', line: 10, tier: 'warnings', message: 'minor warning' }]
+    io = StringIO.new
+    presenter.render_diagnostics(errors: errs, alerts: alerts, warnings: warns, io: io)
+    assert_includes io.string, 'invalid in math mode'
+    refute_includes io.string, 'minor warning'
+    assert_operator io.string.index('missing character'), :<, io.string.index('invalid in math mode')
+  end
+
   def test_json_presenter
     presenter = Leeni::JsonPresenter.new
     result = Leeni::DiagnosticResult.new(

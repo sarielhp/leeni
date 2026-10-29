@@ -2456,8 +2456,10 @@ module LaTeXDiagnostics
   def report_llm_mode_errors(errors, content, io: $stderr)
     log_tail = errors.empty? ? content : nil
     records = errors.map { |e| normalize_diagnostic(e, 'errors') }
+    alerts, = partition_diagnostics(content, extract_warnings(content, verbose: false))
+    alert_records = alerts.map { |a| normalize_diagnostic(a, 'alerts') }
     presenter = LaTeXAgentPresenter.new(@options)
-    presenter.render_diagnostics(errors: records, log_tail: log_tail, file: @filename, io: io)
+    presenter.render_diagnostics(errors: records, alerts: alert_records, log_tail: log_tail, file: @filename, io: io)
   end
 
   def report_json_mode_errors(errors, content, io: $stdout)

@@ -62,7 +62,9 @@ class LatexBuilder
 
   BIBLATEX_HOOK = '\AtBeginDocument{\@ifpackageloaded{biblatex}{\AtEveryBibitem{\typeout{BIB_ENTRY: \thefield{entrykey}}}}{}}'
 
-  RUNTIME_HOOK = "\\makeatletter#{LABEL_HOOK}#{BIBLATEX_HOOK}\\makeatother".freeze
+  # Lost glyphs become errors with their source line (see log_promoter.rb).
+  LOST_CHARS_HOOK = '\ifdefined\AddToHook\AddToHook{begindocument/end}{\tracinglostchars=3 }\fi'
+  RUNTIME_HOOK = "\\makeatletter#{LABEL_HOOK}#{BIBLATEX_HOOK}#{LOST_CHARS_HOOK}\\makeatother".freeze
 
   def initialize(target, options)
     @options = options

@@ -257,7 +257,6 @@ class LaTeXBibManager
   end
 
   def execute_bibliography(tool)
-    discover_bib_files.each { |b| FileUtils.cp(b, File.join(junk_dir, '')) }
     cmd = if tool == :biber
             ['biber', *biber_encoding_options, '--input-directory', '.', '--output-directory', '.', bfilename]
           else
@@ -275,8 +274,8 @@ class LaTeXBibManager
   end
 
   # BibTeX and Biber run inside the build directory. Their search paths are
-  # pointed at the project instead of copying styles/ there: TeX reads files
-  # from its output directory first, so such copies hid later edits.
+  # pointed at the project instead of copying styles, .bst and .bib files
+  # there: copies go stale, and TeX reads its output directory first.
   def bibliography_search_env
     root = File.expand_path('.')
     dirs = [root, File.join(root, 'styles')] +

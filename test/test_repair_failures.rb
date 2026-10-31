@@ -168,7 +168,7 @@ class TestRepairFailures < Minitest::Test
   end
 
   def test_archive_extraction_failure_does_not_announce_verification
-    { LatexPackager => :verify_archive!, LatexArxivPackager => :verify_arxiv_sandbox! }.each do |klass, method|
+    { LatexArxivPackager => :verify_arxiv_sandbox! }.each do |klass, method|
       with_project do |builder|
         out, err = capture_io do
           Open3.stub(:capture2e, ['broken archive', Status.new(9)]) do

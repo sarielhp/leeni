@@ -548,7 +548,7 @@ class TestLeeniBuild < LeeniTestBase
         assert status.success?, "l -z -t failed: #{stdout}"
         assert File.file?('paper.zip')
         assert_includes stdout, 'Created portable zip: paper.zip'
-        assert_includes stdout, 'Verifying archive portability in isolated sandbox'
+        assert_includes stdout, 'Rebuilding in the sandbox with --no-env'
         assert_includes stdout, '[VERIFIED]'
         assert_includes stdout, 'Text layout exact match confirmed'
       end

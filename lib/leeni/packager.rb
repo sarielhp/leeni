@@ -56,7 +56,7 @@ class LatexPackager
     end
 
     zip_filename = @options[:zip_name] || "#{@bfilename}.zip"
-    return package_from_sandbox(zip_filename) if @options[:zip_alone]
+    return package_from_sandbox(zip_filename) if @options[:zip_alone] || @options[:verify]
 
     candidate = stage_and_create_zip(zip_filename)
     return false unless candidate
@@ -66,8 +66,8 @@ class LatexPackager
     FileUtils.rm_f(candidate) if candidate && File.file?(candidate)
   end
 
-  # --zip-alone archives the sandbox it has just checked, so the zip is
-  # exactly what built without the environment.
+  # -t and --zip-alone archive the sandbox they have just checked, so the
+  # zip is exactly what built without the environment.
   def package_from_sandbox(zip_filename)
     sandbox = LatexSandbox.new(@builder)
     unless sandbox.run!
@@ -79,8 +79,7 @@ class LatexPackager
     return false unless zip_directory(sandbox.paper_dir, candidate, zip_filename, '*.synctex.gz', '*.bak')
 
     File.rename(candidate, zip_filename)
-    puts Rainbow("==> Created portable zip: #{zip_filename}").green.bright
-    zip_filename
+    announce_zip(zip_filename)
   ensure
     FileUtils.rm_f(candidate) if candidate && File.file?(candidate)
   end
@@ -101,12 +100,11 @@ class LatexPackager
   end
 
   def publish_packaged_archive(candidate, zip_filename)
-    if @options[:verify] && !verify_archive!(candidate)
-      warn Rainbow("[FAIL] Verification failed. Preserved existing #{zip_filename}.").red.bright
-      return false
-    end
-
     File.rename(candidate, zip_filename)
+    announce_zip(zip_filename)
+  end
+
+  def announce_zip(zip_filename)
     kind = @options[:zip_flat] ? 'flat ' : ''
     puts Rainbow("==> Created portable #{kind}zip: #{zip_filename}").green.bright
     zip_filename
@@ -354,26 +352,6 @@ class LatexPackager
     LaTeXPackagingShared.copy_preserving_path(src, dest_root, recursive: true)
   end
 
-  def verify_archive!(zip_filename)
-    zip_abs = File.expand_path(zip_filename)
-    puts Rainbow('==> Verifying archive portability in isolated sandbox...').cyan.bright
-
-    unless LaTeXUtils.command_available?('unzip')
-      warn Rainbow("[ERROR] 'unzip' command not found in PATH! Cannot verify archive.").red.bright
-      return false
-    end
-
-    Dir.mktmpdir('leeni_verify_') do |tmpdir|
-      unzip_out, unzip_stat = Open3.capture2e('unzip', '-q', zip_abs, '-d', tmpdir)
-      unless unzip_stat.success?
-        warn Rainbow("[FAIL] Failed to extract #{zip_filename}: #{unzip_out}").red.bright
-        return false
-      end
-
-      run_sandbox_compile(tmpdir)
-    end
-  end
-
   def run_sandbox_compile(tmpdir)
     bundled_pdf = File.join(tmpdir, "#{@bfilename}.pdf")
     backup_pdf = File.join(tmpdir, "#{@bfilename}.pdf.bundled")
@@ -423,9 +401,8 @@ class LatexPackager
 
   def verified_message
     return '[VERIFIED] Converted project compiles with --no-env and matches the original PDF.' if @options[:make_indep]
-    return "[VERIFIED] Sandbox build with --no-env matches #{@bfilename}.pdf." if @options[:sandbox] || @options[:zip_alone]
 
-    '[VERIFIED] Archive successfully verified: self-contained and compiles in clean environment.'
+    "[VERIFIED] Sandbox build with --no-env matches #{@bfilename}.pdf."
   end
 
   def verify_clean_diagnostics(output)
@@ -469,7 +446,7 @@ class LatexPackager
       matching = !pages[0].empty? && pages[0].size == pages[1].size &&
                  pages[0].zip(pages[1]).all? { |left, right| File.size(left).positive? && FileUtils.compare_file(left, right) }
       unless matching
-        warn Rainbow('[FAIL] Rebuilt PDF pages differ visually from the bundled PDF.').red.bright
+        warn Rainbow("[FAIL] Rebuilt PDF pages differ visually from #{@bfilename}.pdf.").red.bright
         return false
       end
       puts Rainbow(' -- All PDF pages match visually at 150 dpi.').green
@@ -491,7 +468,7 @@ class LatexPackager
     end
 
     unless File.file?(orig_pdf) && File.file?(new_pdf)
-      warn Rainbow(' -- PDF text comparison failed: bundled or rebuilt PDF is missing.').red.bright
+      warn Rainbow(" -- PDF text comparison failed: #{@bfilename}.pdf or the rebuilt PDF is missing.").red.bright
       return false
     end
 
@@ -500,11 +477,11 @@ class LatexPackager
     return false unless s1.success? && s2.success?
 
     if t1 == t2
-      puts Rainbow(' -- Text layout exact match confirmed between bundled PDF and test build.').green
+      puts Rainbow(" -- Text layout exact match confirmed between #{@bfilename}.pdf and the --no-env rebuild.").green
       return true
     end
 
-    warn Rainbow(' -- PDF text layout differs between bundled PDF and test build.').red.bright
+    warn Rainbow(" -- PDF text layout differs between #{@bfilename}.pdf and the --no-env rebuild.").red.bright
     false
   end
 

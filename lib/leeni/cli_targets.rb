@@ -127,7 +127,7 @@ module LatexCLITargets
     built = builder.run!
     prune_cache_if_due(options)
     exit 1 unless built
-    exit 1 if options[:sandbox] && !options[:zip_alone] && !LatexSandbox.new(builder).run!
+    exit 1 if options[:sandbox] && !options[:zip_alone] && !options[:verify] && !LatexSandbox.new(builder).run!
     return unless options[:zip] || options[:verify]
 
     packager = LatexPackager.new(builder)

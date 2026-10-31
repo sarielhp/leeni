@@ -8,7 +8,7 @@
 # ==============================================================================
 
 module LatexBuildRuntime
-  STYLE_COPY_EXTS = %w[.sty .cls .clo .def .fd .cfg .bst .bbx .cbx .lbx .dbx .ldf].freeze
+  STYLE_COPY_EXTS = %w[.sty .cls .clo .def .fd .cfg .bst .bbx .cbx .lbx .dbx .ldf .bib].freeze
 
   EXTERNAL_TRACKED_EXTS = %w[.tex .sty .cls .clo .def .fd .cfg .bbx .cbx .lbx .dbx .ldf .rtx .lua
                              .pdf .png .jpg .jpeg .eps .mps].freeze
@@ -138,11 +138,11 @@ module LatexBuildRuntime
     remove_stale_style_copies(dir)
   end
 
-  # Older builds copied styles/ and .bst files here for BibTeX. TeX reads
-  # its output directory first, so those copies would shadow the project's
-  # files; TeX never writes such files itself.
+  # Older builds copied styles/, .bst and .bib files here for BibTeX. TeX
+  # reads its output directory first, so those copies would shadow the
+  # project's files; TeX never writes such files itself.
   def remove_stale_style_copies(dir)
-    copies = Dir.glob(File.join(dir, 'styles', '**', '*')) + Dir.glob(File.join(dir, '*.bst'))
+    copies = Dir.glob(File.join(dir, 'styles', '**', '*')) + Dir.glob(File.join(dir, '*.{bst,bib}'))
     copies.each { |path| FileUtils.rm_f(path) if STYLE_COPY_EXTS.include?(File.extname(path).downcase) }
   end
 

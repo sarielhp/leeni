@@ -657,14 +657,14 @@ class LatexBuilder
     end
 
     fls_file = File.join(@junk_dir, "#{@bfilename}.fls")
-    deps = extract_fls_dependencies(fls_file) if deps.empty? && File.exist?(fls_file)
+    deps = extract_fls_dependencies(fls_file) + external_fls_dependencies(fls_file) if deps.empty? && File.exist?(fls_file)
 
     if deps.empty?
       with_lock do
         setup_environment
         junk_dir_create
         run_latex_pass('_1')
-        deps = extract_fls_dependencies(fls_file)
+        deps = extract_fls_dependencies(fls_file) + external_fls_dependencies(fls_file)
       end
     end
 

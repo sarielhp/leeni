@@ -11,7 +11,7 @@ class TestConfigSave < Minitest::Test
 
   def test_config_save_local_default
     Dir.mktmpdir('leeni_save_local') do |dir|
-      out, stderr, status = Open3.capture3(BIN, '-I', '--config-save', chdir: dir)
+      out, stderr, status = Open3.capture3(BIN, '--index', '--config-save', chdir: dir)
       assert status.success?, "CLI failed with: #{stderr}"
       assert_includes out, 'Saved index to local configuration'
 
@@ -25,7 +25,7 @@ class TestConfigSave < Minitest::Test
   def test_config_save_local_toggle_no_index
     Dir.mktmpdir('leeni_toggle_index') do |dir|
       # First enable
-      _out, stderr, status = Open3.capture3(BIN, '-I', '--config-save', chdir: dir)
+      _out, stderr, status = Open3.capture3(BIN, '--index', '--config-save', chdir: dir)
       assert status.success?, "CLI failed with: #{stderr}"
 
       # Then disable
@@ -42,7 +42,7 @@ class TestConfigSave < Minitest::Test
   def test_config_save_global
     Dir.mktmpdir('leeni_save_global') do |home_dir|
       env = { 'HOME' => home_dir }
-      out, stderr, status = Open3.capture3(env, BIN, '-I', '--config-save', '--global', chdir: home_dir)
+      out, stderr, status = Open3.capture3(env, BIN, '--index', '--config-save', '--global', chdir: home_dir)
       assert status.success?, "CLI failed with: #{stderr}"
       assert_includes out, 'Saved index to global configuration'
 
@@ -66,7 +66,7 @@ class TestConfigSave < Minitest::Test
       JSONC
       File.write(local_cfg, initial)
 
-      out, stderr, status = Open3.capture3(BIN, '-I', '-e', 'pdflatex', '--config-save', chdir: dir)
+      out, stderr, status = Open3.capture3(BIN, '--index', '-e', 'pdflatex', '--config-save', chdir: dir)
       assert status.success?, "CLI failed with: #{stderr}"
       assert_includes out, 'Saved index, engine to local configuration'
 

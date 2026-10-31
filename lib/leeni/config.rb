@@ -322,6 +322,7 @@ module LaTeXConfig
     *.idx
     *.ind
     *.ilg
+    old_ver_*.zip
   ].freeze
 
   DEFAULT_GITIGNORE_TEMPLATE = <<~GITIGNORE
@@ -352,6 +353,9 @@ module LaTeXConfig
     *.idx
     *.ind
     *.ilg
+
+    # Backups of the originals written by leeni -I (--make-indep)
+    old_ver_*.zip
 
     # Editor and OS noise
     *~

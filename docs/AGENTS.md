@@ -24,6 +24,7 @@ This document provides architectural guidelines, core invariants, development wo
   - `build_runtime.rb`: Locking, cache workspace preparation, compiler execution, timeouts, and LaTeX passes.
   - `packager.rb`: Portable zip archive bundler (`-z`), active figure source discovery, and styles isolation.
   - `arxiv.rb`: Sanitized, flattened arXiv submission packager and sandbox verification.
+  - `make_indep.rb`: In-place `--make-indep` (`-I`) conversion so a paper compiles with `--no-env`; verified in a sandbox before the project is touched, originals saved to `old_ver_yy_mm_dd_hh_mm.zip`.
   - `cli_targets.rb`: CLI target dispatch for builds, metadata, bibliography extraction, and arXiv workflows.
 - **Workflow & Quality Tooling** (`tools/`):
   - [`tools/gate_audit_code`](tools/gate_audit_code): High-performance AST metrics auditor enforcing cognitive complexity, depth, and method sizing.

@@ -126,7 +126,7 @@ class TestLeeniCLI < LeeniTestBase
           %w[-llm], %w[--llm], %w[--agent], %w[--json],
           %w[--config-show], %w[--theme-list],
           %w[--styles-inject], %w[--no-styles-inject],
-          %w[-I], %w[--index], %w[--no-index], %w[--config-save], %w[--global], %w[--local]
+          %w[-I], %w[--make-indep], %w[--index], %w[--no-index], %w[--config-save], %w[--global], %w[--local]
         ]
         opts = LatexCLI.build_default_options({}, 'l', [])
         sample_parser = LatexCLI.build_option_parser(opts)

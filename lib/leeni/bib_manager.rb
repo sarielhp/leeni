@@ -274,7 +274,10 @@ class LaTeXBibManager
     @builder.engine_name == 'pdflatex' ? ['--output_safechars'] : []
   end
 
+  # BibTeX runs inside the build directory, where it only sees the .bst
+  # files placed next to the aux file.
   def copy_style_files_for_bibtex
+    Dir['*.bst'].each { |bst| FileUtils.cp(bst, File.join(junk_dir, File.basename(bst))) }
     return unless File.directory?('styles')
 
     FileUtils.mkdir_p(File.join(junk_dir, 'styles'))

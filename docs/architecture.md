@@ -76,6 +76,7 @@ The codebase is organized into modular files under `lib/leeni/`:
 | `flattener.rb` | Recursive subfile inliner and comment sanitizer for arXiv packages. |
 | `meta_extractor.rb` | Source parser extracting Title, Authors, and MathJax-compatible Abstract. |
 | `arxiv.rb` | arXiv submission manager, biblatex version shielding, and visual page verification. |
+| `make_indep.rb` | In-place conversion to an environment-free project (`-I`): styles to `styles/`, cited entries to `<doc>.bib`, sandbox check, `old_ver_*.zip` backup. |
 | `cli_targets.rb` | CLI target dispatch for compilation, metadata, bibliography extraction, and arXiv workflows. |
 
 ---

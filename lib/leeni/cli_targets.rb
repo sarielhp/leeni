@@ -35,7 +35,9 @@ module LatexCLITargets
   def process_target(target, options)
     exit LeeniReport.run(target, options) if options[:report]
 
-    if options[:meta_only]
+    if options[:make_indep]
+      process_make_indep_target(target, options)
+    elsif options[:meta_only]
       process_meta_target(target, options)
     elsif options[:arxiv]
       process_arxiv_target(target, options)
@@ -44,6 +46,19 @@ module LatexCLITargets
     else
       process_standard_target(target, options)
     end
+  end
+
+  # Builds with the current environment first: the recorder file it leaves
+  # behind lists every style, figure and input the conversion has to move.
+  def process_make_indep_target(target, options)
+    problem = LatexIndependizer.styles_dir_problem(File.dirname(target))
+    if problem
+      warn Rainbow("[FAIL] #{problem}").red.bright
+      exit 1
+    end
+    builder = LatexBuilder.new(target, options.merge(force: true, no_env: false))
+    exit 1 unless builder.run!
+    exit 1 unless LatexIndependizer.new(builder).run!
   end
 
   def process_bib_extract_target(target, options)

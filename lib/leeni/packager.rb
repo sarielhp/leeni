@@ -16,6 +16,8 @@ require_relative 'flattener'
 require_relative 'packaging_shared'
 
 class LatexPackager
+  STYLE_EXTS = %w[.sty .cls .clo .def .bbx .cbx .rtx].freeze
+
   attr_reader :builder, :filename, :bfilename, :bdir, :options
 
   def initialize(builder)
@@ -76,7 +78,7 @@ class LatexPackager
     content.each_line do |line|
       next unless line.start_with?('INPUT ')
 
-      path = line.sub(/^INPUT\s+/, '').strip
+      path = LaTeXPackagingShared.project_twin(line.sub(/^INPUT\s+/, '').strip, junk_dir, STYLE_EXTS)
       next if path.empty? || path.start_with?("#{junk_dir}/") || path.start_with?('junk/') ||
               path.start_with?('.junk/') || system_texmf_file?(path)
 
@@ -94,7 +96,7 @@ class LatexPackager
 
   def categorize_fls_dep(clean_path, styles, figures, tex_inputs)
     case File.extname(clean_path).downcase
-    when '.sty', '.cls', '.clo', '.def', '.bbx', '.cbx', '.rtx'
+    when *STYLE_EXTS
       styles << clean_path
     when '.pdf', '.png', '.jpg', '.jpeg', '.eps', '.mps'
       figures << clean_path unless clean_path.end_with?("#{@bfilename}.pdf")
@@ -201,11 +203,20 @@ class LatexPackager
     stage_styles(deps[:styles], stage_dir)
 
     discover_local_bib_files.each { |f| copy_preserving_path(f, stage_dir) if File.file?(f) }
+    local_bib_styles.each { |f| copy_preserving_path(f, stage_dir) }
     (deps[:figures] + fig_sources).uniq.each { |f| copy_preserving_path(f, stage_dir) if File.file?(f) }
 
     extra_files = Array(@options[:extra_files]).flat_map { |g| Dir.glob(g).empty? ? [g] : Dir.glob(g) }
     extra_files.uniq.each { |f| copy_preserving_path(f, stage_dir) if File.exist?(f) }
     true
+  end
+
+  # BibTeX reruns in the sandbox, so a .bst kept next to the paper must travel.
+  def local_bib_styles
+    styles = Dir.glob(File.join(junk_dir, '**', '*.aux')).flat_map do |aux|
+      LaTeXUtils.safe_read(aux).scan(/\\bibstyle\{([^}]+)\}/).flatten
+    end
+    styles.uniq.map { |style| "#{style.strip}.bst" }.select { |bst| File.file?(bst) }
   end
 
   def stage_flattened_main_tex(stage_dir, has_styles: false)
@@ -239,6 +250,8 @@ class LatexPackager
     FileUtils.rm_f(candidate)
     succeeded = Dir.mktmpdir('leeni_stage_') do |stage_dir|
       return false unless stage_all_assets(stage_dir, deps, fig_sources)
+
+      LaTeXPackagingShared.drop_nested_archives!(stage_dir)
 
       zip_out, zip_status = Dir.chdir(stage_dir) { Open3.capture2e('zip', '-q', '-r', candidate, '.') }
       unless zip_status.success? && File.file?(candidate) && File.size(candidate).positive?
@@ -358,10 +371,27 @@ class LatexPackager
     end
     return false if @options[:zip_alone] && !verify_clean_diagnostics(compile_out)
     return false unless verify_pdf_diff(backup_pdf, new_pdf)
-    return false if @options[:zip_alone] && !verify_pdf_visual_match(backup_pdf, new_pdf)
+    return false if visual_check? && !verify_pdf_visual_match(backup_pdf, new_pdf)
 
-    puts Rainbow('[VERIFIED] Archive successfully verified: self-contained and compiles in clean environment.').green.bright
+    puts Rainbow(verified_message).green.bright
     true
+  end
+
+  # --zip-alone requires the page comparison; --make-indep runs it whenever
+  # pdftoppm is installed, since its text check alone misses swapped figures.
+  def visual_check?
+    return true if @options[:zip_alone]
+    return false unless @options[:make_indep]
+    return true if LaTeXUtils.command_available?('pdftoppm')
+
+    puts Rainbow(" -- Page comparison skipped: 'pdftoppm' is unavailable.").yellow
+    false
+  end
+
+  def verified_message
+    return '[VERIFIED] Converted project compiles with --no-env and matches the original PDF.' if @options[:make_indep]
+
+    '[VERIFIED] Archive successfully verified: self-contained and compiles in clean environment.'
   end
 
   def verify_clean_diagnostics(output)
@@ -447,4 +477,7 @@ class LatexPackager
   def sandbox_environment(tmpdir)
     LaTeXPackagingShared.sandbox_environment(tmpdir)
   end
+
+  # Also used by --make-indep to check a converted project tree.
+  public :run_sandbox_compile
 end

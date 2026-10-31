@@ -2143,7 +2143,16 @@ module LaTeXDiagnostics
                    txt =~ /Font shape .* (?:undefined using|tried instead|defaults substituted)/i ||
                    txt.include?('Extended allocation already in use')
 
-    false
+    path_prefixed_package?(txt)
+  end
+
+  # A package found through \input@path (styles/ from -z --styles-inject or
+  # --make-indep) is requested as `styles/foo' by the LaTeX kernel, so its own
+  # \ProvidesPackage{foo} looks like a mismatch. Same name, so harmless.
+  def path_prefixed_package?(txt)
+    pattern = %r{requested (?:package|class) .(?:[^'`]*/)([^'`/]+)', but the (?:package|class) provides .([^'`]+)'}
+    match = txt.gsub(/\s+/, ' ').match(pattern)
+    match && match[1] == match[2]
   end
 
   def partition_diagnostics(clean_content, warn_items)

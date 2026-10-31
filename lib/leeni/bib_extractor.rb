@@ -34,6 +34,19 @@ class LaTeXBibExtractor
     end
   end
 
+  # Writes the cited entries to stage_file; the caller is in the document directory.
+  def extract_cited_to(stage_file)
+    biblatex? ? extract_biblatex(stage_file) : extract_bibtex(stage_file)
+  end
+
+  def biblatex?
+    bcf_path = File.join(junk_dir, "#{@bfilename}.bcf")
+    return false unless File.file?(bcf_path) && File.size(bcf_path).positive?
+
+    content = LaTeXUtils.safe_read(bcf_path)
+    content.include?('<bcf:controlfile') || content.include?('<bcf:citekey')
+  end
+
   private
 
   def junk_dir
@@ -66,14 +79,6 @@ class LaTeXBibExtractor
 
     puts "==> Compiling #{@filename} to generate bibliography tracking data..."
     @builder.run_in_current_directory!
-  end
-
-  def biblatex?
-    bcf_path = File.join(junk_dir, "#{@bfilename}.bcf")
-    return false unless File.file?(bcf_path) && File.size(bcf_path).positive?
-
-    content = LaTeXUtils.safe_read(bcf_path)
-    content.include?('<bcf:controlfile') || content.include?('<bcf:citekey')
   end
 
   def determine_target_file

@@ -49,7 +49,7 @@ l --json paper.tex
 | `-u` | `--single-pass`| flag | `false` | Execute exactly 1 LaTeX pass without BibTeX/Biber or convergence passes. |
 | `-n` | `--passes` | integer (1–10)| `5` | Maximum number of LaTeX compilation passes. |
 | `-b` | `--[no-]bib` | boolean | auto | Force or skip bibliography pass (Biber or BibTeX). |
-| `-I` | `--[no-]index` | boolean | `false` | Run `makeindex` when `.idx` changes. |
+| *(none)* | `--[no-]index` | boolean | `false` | Run `makeindex` when `.idx` changes. |
 | `-e` | `--engine` | `x`,`l`,`p` | `x` (`xelatex`)| Compiler: `x` (`xelatex`), `l` (`lualatex`), `p` (`pdflatex`). |
 | `-c` | `--clean` | flag | `false` | Remove the project cache and root auxiliary files before building. |
 | `-C` | `--clean-only` | flag | `false` | Remove the project cache, legacy junk directories, and root auxiliary files, then exit. |
@@ -69,6 +69,8 @@ l --json paper.tex
 | `-z` | `--zip` | flag | `false` | Create self-contained portable zip archive of paper, styles, and figures. |
 | `-Z` | `--zip-flat` | flag | `false` | Create portable zip with flattened/inlined `.tex` source. |
 | `-t` | `--verify` | flag | `false` | Test portable zip in isolated `/tmp` sandbox with clean environment. |
+| `-I` | `--make-indep` | flag | `false` | Convert the paper in place to compile with `--no-env` (styles to `styles/`, cited entries to `<doc>.bib`); verified in a sandbox first; originals saved in `old_ver_yy_mm_dd_hh_mm.zip`. |
+| *(none)* | `--dry-run` | flag | `false` | With `-I`: run the sandbox check and print copies and diffs; change nothing. |
 | `-B` | `--bib-extract`| flag | `false` | Extract cited references into local standalone `.bib` file. |
 | `--arxiv`| *(none)* | flag | `false` | Produce submission-ready, comment-stripped arXiv archive. |
 | `--meta` | *(none)* | flag | `false` | Extract sanitized metadata and write `arxiv_<file>_meta.txt`. |

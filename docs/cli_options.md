@@ -28,7 +28,7 @@ All long options accept either `-` or `--` and allow internal dashes to be omitt
 | `-u`, `--single-pass` | Build | Execute a single LaTeX pass only (no BibTeX or rerun loops). |
 | `-n`, `--passes NUM` | Build | Maximum compilation passes allowed (1-10, default: 5). |
 | `-b`, `--[no-]bib` | Build | Explicitly enable or skip bibliography pass. |
-| `-I`, `--[no-]index` | Build | Run makeindex when `.idx` changes. |
+| `--[no-]index` | Build | Run makeindex when `.idx` changes. |
 | `-e`, `--engine ENG` | Build | Compiler engine: `x` (`xelatex`), `l` (`lualatex`), `p` (`pdflatex`). |
 | `--timeout SEC` | Build | Maximum timeout allowed per compiler pass (default: 180s). |
 | `-T`, `--time` | Build | Show execution wall-clock time breakdown per pass. |
@@ -52,6 +52,8 @@ All long options accept either `-` or `--` and allow internal dashes to be omitt
 | `--zip-alone` | Packaging | Bundle styles and verify an isolated build with no errors or alerts and matching PDF. |
 | `-Z`, `--zip-flat` | Packaging | Create self-contained portable zip archive with inlined `.tex`. |
 | `-t`, `--verify` | Packaging | Verify portability by testing compilation in `/tmp` sandbox. |
+| `-I`, `--make-indep` | Packaging | Convert the paper in place to compile with `--no-env`; originals saved in `old_ver_yy_mm_dd_hh_mm.zip`. |
+| `--dry-run` | Packaging | With `-I`: check the conversion and show the changes without making them. |
 | `-B`, `--bib-extract` | Packaging | Extract cited bibliography entries into local `.bib` file. |
 | `--arxiv` | arXiv | Prepare sanitized, flattened, submission-ready arXiv zip package. |
 | `--meta` | arXiv | Extract paper metadata and write `arxiv_<file>_meta.txt`. |
@@ -106,10 +108,10 @@ Explicitly enables or disables the bibliography pass. By default, `leeni` automa
 l --no-bib paper.tex
 ```
 
-### `-I`, `--[no-]index`
+### `--[no-]index`
 Runs `makeindex` automatically whenever the `.idx` file changes.
 ```bash
-l -I book.tex
+l --index book.tex
 ```
 
 ### `-e`, `--engine ENGINE`
@@ -233,7 +235,7 @@ l --json paper.tex
 ## 4. Paper Packaging & Portability {#packaging}
 
 ### `-z`, `--zip`
-Creates a self-contained portable `.zip` archive containing the paper, active figures, styles, and compiled `.bbl` without system TeX Live packages.
+Creates a self-contained portable `.zip` archive containing the paper, active figures, styles, a local `.bst`, and compiled `.bbl` without system TeX Live packages. Archives are never nested: `.zip` files (such as `old_ver_*.zip` backups) are left out even when named after `--`.
 ```bash
 l -z paper.tex
 ```
@@ -263,6 +265,22 @@ l -Z paper.tex
 Tests the generated `.zip` package by unpacking it into an isolated `/tmp/leeni_verify_XXXX` sandbox and compiling it with `--no-env` to ensure 100% self-contained portability.
 ```bash
 l -z -t paper.tex
+```
+
+### `-I`, `--make-indep`
+Converts the paper in place so it compiles with `--no-env`:
+
+- styles, classes and inputs found through `TEXINPUTS`, `TEXMFHOME`, `TEXMFLOCAL` or similar search paths are copied into `styles/`, and the main file gets {% raw %}`\def\input@path{{styles/}}`{% endraw %};
+- files the sources name by a path outside the project (`\input{../shared}`, `\includegraphics{/abs/fig}`) are copied into `styles/` under a unique name and every reference to them is rewritten, including references inside other copied files; `\graphicspath` entries outside the project become `styles/`;
+- a file found through a search path keeps the part of its path that the sources spell out: `\input{sub/x}` found as `../sub/x.tex` through `TEXINPUTS=../` becomes `styles/sub/x.tex`;
+- a `.bst` file found through `BSTINPUTS` is copied next to the paper;
+- the cited entries of `.bib` files outside the project are extracted into `<doc>.bib` (with `bibtool` for BibTeX, `biber` for biblatex), and `\bibliography` / `\addbibresource` are pointed at it.
+
+The converted tree is first rebuilt with `--no-env` in a `/tmp` sandbox and its PDF text compared with the original; if that fails, nothing is changed. Otherwise the originals of every changed file are saved in `old_ver_yy_mm_dd_hh_mm.zip`, together with `leeni-make-indep-new-files.txt` listing the files that were added. Running it again on a converted paper changes nothing. If `styles/` is a symbolic link (for example to a shared styles collection), or any file it would write is one, it stops with an error instead of writing through the link; an existing real `styles/` directory is used as is. Fonts from a personal TeX tree cannot be moved this way and are reported.
+Add `--dry-run` to run the sandbox check and print what would be copied, plus a diff of every file that would be edited, without changing anything.
+```bash
+l -I paper.tex
+l -I --dry-run paper.tex
 ```
 
 ### `-B`, `--bib-extract`

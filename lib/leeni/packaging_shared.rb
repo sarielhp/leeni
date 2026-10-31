@@ -48,6 +48,27 @@ module LaTeXPackagingShared
     recursive ? FileUtils.cp_r(src, dest) : FileUtils.cp(src, dest)
   end
 
+  # The bibliography pass copies styles/ into the build directory, and TeX
+  # reads files from its output directory first, so the recorder lists those
+  # copies. Maps such a copy back to the project file it came from.
+  def project_twin(path, junk_dir, exts)
+    workspace = File.expand_path(junk_dir) + File::SEPARATOR
+    expanded = File.expand_path(path)
+    return path unless expanded.start_with?(workspace)
+
+    twin = expanded.delete_prefix(workspace)
+    exts.include?(File.extname(twin).downcase) && File.file?(twin) ? twin : path
+  end
+
+  # Archives never carry other archives: old_ver_*.zip backups, earlier
+  # bundles or report zips picked up through a directory or a glob.
+  def drop_nested_archives!(stage_dir)
+    Dir.glob(File.join(stage_dir, '**', '*.zip'), File::FNM_CASEFOLD).each do |path|
+      File.delete(path)
+      puts " -- Left out archive #{path.delete_prefix(stage_dir + File::SEPARATOR)}"
+    end
+  end
+
   def realpath_or(path, fallback)
     File.realpath(path)
   rescue StandardError

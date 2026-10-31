@@ -56,6 +56,7 @@ require_relative 'lib/leeni/builder'
 require_relative 'lib/leeni/packager'
 require_relative 'lib/leeni/arxiv'
 require_relative 'lib/leeni/bib_extractor'
+require_relative 'lib/leeni/make_indep'
 require_relative 'lib/leeni/cli_targets'
 
 module LatexCLI
@@ -141,6 +142,22 @@ module LatexCLI
       exit 2
     end
     options[:emacs] = false if options[:compile]
+    validate_make_indep!(options, prog_name)
+  end
+
+  def self.validate_make_indep!(options, prog_name)
+    if options[:dry_run] && !options[:make_indep]
+      warn "#{prog_name}: error: --dry-run only applies to -I/--make-indep"
+      exit 2
+    end
+    return unless options[:make_indep]
+
+    clashing = { zip: '--zip', arxiv: '--arxiv', bib_extract: '--bib-extract', meta_only: '--meta', no_env: '--no-env' }
+               .select { |key, _| options[key] }.values
+    return if clashing.empty?
+
+    warn "#{prog_name}: error: --make-indep cannot be combined with #{clashing.join(', ')}"
+    exit 2
   end
 
   # Every script under tools/ handles this; the binary end users actually run
@@ -315,7 +332,8 @@ module LatexCLI
 
   def self.build_zip_options(cfg, extra_cli_files)
     {
-      zip: false, zip_alone: false, zip_flat: cfg.dig('zip', 'flat') == true, verify: false, zip_name: nil,
+      make_indep: false, dry_run: false, zip: false, zip_alone: false,
+      zip_flat: cfg.dig('zip', 'flat') == true, verify: false, zip_name: nil,
       inject_styles: (cfg.dig('zip', 'styles_inject') || cfg.dig('zip', 'inject_styles')) == true,
       fig_sources: cfg.dig('zip', 'fig_sources') || ['.fig', '.ipe', '.svg', '.asy', '.gp', '.gnuplot', '.py', '.R'],
       extra_files: (Array(cfg.dig('zip', 'include')) + extra_cli_files).uniq
@@ -447,7 +465,7 @@ module LatexCLI
       options[:explicit_passes] = true
     end
     opts.on('-b', '--[no-]bib', 'Explicitly enable or skip bibliography pass (default: auto-detect)') { |v| options[:bib] = v }
-    opts.on('-I', '--[no-]index', 'Run makeindex pass when .idx changes (default: false or config)') do |v|
+    opts.on('--[no-]index', 'Run makeindex pass when .idx changes (default: false or config)') do |v|
       options[:index] = v
       options[:explicit_index] = true
     end
@@ -553,6 +571,12 @@ module LatexCLI
     opts.on('--bib-name NAME', 'Specify custom output filename for extracted bibliography') do |v|
       options[:bib_extract] = true
       options[:bib_extract_name] = v
+    end
+    opts.on('-I', '--make-indep', 'Convert the paper in place to compile with --no-env: copy external styles to styles/, extract cited entries to <doc>.bib; originals saved in old_ver_yy_mm_dd_hh_mm.zip') do
+      options[:make_indep] = true
+    end
+    opts.on('--dry-run', 'With -I: check the conversion in the sandbox and show the changes without making them') do
+      options[:dry_run] = true
     end
     opts.on('--[no-]styles-inject', 'Enable or disable isolating harvested styles into styles/ and injecting \input@path') do |v|
       options[:inject_styles] = v

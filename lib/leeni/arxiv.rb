@@ -169,7 +169,7 @@ class LatexArxivPackager
     fls_content.each_line do |line|
       next unless line =~ /^INPUT\s+(\S+)/
 
-      p = Regexp.last_match(1)
+      p = LaTeXPackagingShared.project_twin(Regexp.last_match(1), junk_dir, %w[.sty .cls .def])
       next if p.include?('/usr/share/texlive') || p.include?('texmf-dist')
       next unless p =~ /\.(sty|cls|def)$/i
 
@@ -235,6 +235,7 @@ class LatexArxivPackager
 
     candidate = archive_candidate_path(zip_filename)
     FileUtils.rm_f(candidate)
+    LaTeXPackagingShared.drop_nested_archives!(stage_dir)
     zip_out, status = Dir.chdir(stage_dir) do
       Open3.capture2e('zip', '-q', '-r', candidate, '.')
     end

@@ -52,7 +52,7 @@ All long options accept either `-` or `--` and allow internal dashes to be omitt
 | `--sandbox` | Packaging | Rebuild from an isolated copy kept in the cache with `--no-env` and compare the PDFs. |
 | `--zip-alone` | Packaging | `--sandbox` with strict checks (no errors or alerts), then zip the sandbox. |
 | `-Z`, `--zip-flat` | Packaging | Create self-contained portable zip archive with inlined `.tex`. |
-| `-t`, `--verify` | Packaging | Verify portability by testing compilation in `/tmp` sandbox. |
+| `-t`, `--verify` | Packaging | Check the zip's contents in the cache sandbox with `--no-env`, then zip that sandbox. |
 | `-I`, `--make-indep` | Packaging | Convert the paper in place to compile with `--no-env`; originals saved in `old_ver_yy_mm_dd_hh_mm.zip`. |
 | `--dry-run` | Packaging | With `-I`: check the conversion and show the changes without making them. |
 | `-B`, `--bib-extract` | Packaging | Extract cited bibliography entries into local `.bib` file. |
@@ -270,7 +270,7 @@ l -Z paper.tex
 ```
 
 ### `-t`, `--verify`
-Tests the generated `.zip` package by unpacking it into an isolated `/tmp/leeni_verify_XXXX` sandbox and compiling it with `--no-env` to ensure 100% self-contained portability.
+Builds the archive's contents in the paper's sandbox in the cache (the one `--sandbox` uses), compiles it with `--no-env`, compares the PDF text with the paper's PDF, and zips the sandbox only when they match.
 ```bash
 l -z -t paper.tex
 ```

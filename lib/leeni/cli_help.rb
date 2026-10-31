@@ -216,7 +216,7 @@ module LatexCLI
 
       5. Portable Paper Bundling & Verification:
          l -z                           Bundle paper, active styles, and figures into paper.zip
-         l -z -t                        Bundle paper into zip and verify build in /tmp sandbox
+         l -z -t                        Bundle paper into zip, verified in the cache sandbox
          l --zip-alone                  Bundle styles and verify a clean build with matching PDF
          l -z -- figs/extra.png         Include extra supplemental files in the portable bundle
 

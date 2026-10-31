@@ -569,7 +569,7 @@ module LatexCLI
       options[:zip] = true
       options[:zip_flat] = true
     end
-    opts.on('-t', '--verify', 'Verify self-contained portability by testing compilation in /tmp sandbox') do
+    opts.on('-t', '--verify', 'Check the zip contents in the cache sandbox with --no-env before zipping them') do
       options[:verify] = true
       options[:zip] = true
     end

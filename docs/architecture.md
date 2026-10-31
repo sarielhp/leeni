@@ -72,7 +72,7 @@ The codebase is organized into modular files under `lib/leeni/`:
 | `error_catalog.rb` | Declarative catalog of 55 TeX/LaTeX compilation errors with token extractors and explanations. |
 | `builder.rb` | Orchestrator managing convergence, caching, bibliography scheduling, and output finalization. |
 | `build_runtime.rb` | Build locking, workspace preparation, compiler process execution, timeouts, and individual LaTeX passes. |
-| `packager.rb` | Bundler for portable paper zip archives (`-z`) and `/tmp` sandbox verifier (`-t`). |
+| `packager.rb` | Bundler for portable paper zip archives (`-z`) staging shared with the cache sandbox (`-t`, `--zip-alone`, `--sandbox`). |
 | `flattener.rb` | Recursive subfile inliner and comment sanitizer for arXiv packages. |
 | `meta_extractor.rb` | Source parser extracting Title, Authors, and MathJax-compatible Abstract. |
 | `arxiv.rb` | arXiv submission manager, biblatex version shielding, and visual page verification. |

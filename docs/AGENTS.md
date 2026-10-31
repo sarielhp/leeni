@@ -96,9 +96,9 @@ Any modifications to compilation logic must honor the following invariants:
    - Supports supplementary assets via trailing `-- <files...>`.
    - Default `inject_styles: false` places styles in root for universal journal compatibility without modifying `.tex` source code.
 5. **Sandbox Portability Verification (`-t` / `--verify`)**:
-   - Unpacks bundle into `/tmp/leeni_verify_XXXX` sandbox.
+   - Stages the bundle into the persistent cache sandbox (`$XDG_CACHE_HOME/leeni/sandboxes/<project>/paper`, shared with `--sandbox` and `--zip-alone`).
    - Compiles with `leeni --no-env` (wiping ambient `TEXINPUTS`, `BIBINPUTS`, `TEXMFHOME`).
-   - Compares PDF text layout against bundled PDF with `pdftotext -layout`.
+   - Compares PDF text layout against the paper's PDF with `pdftotext -layout`, then zips the sandbox.
 6. **Agent & LLM Compilation Profile (`-llm` / `--agent`)**:
    - Autonomous coding agents must invoke `l -llm [file.tex]`.
    - Guaranteed plaintext: zero ANSI escape codes (`\e[...]`), zero OSC 8 terminal hyperlinks (`\e]8;;`).

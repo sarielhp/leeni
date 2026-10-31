@@ -118,10 +118,10 @@ l -z -t paper.tex
 ```
 
 The verification engine:
-1. Unpacks the generated `.zip` package into an isolated `/tmp/leeni_verify_XXXX` sandbox.
-2. Compiles the document with `l --no-env` (stripping all user environment variables like `TEXINPUTS`).
-3. Compares the resulting PDF text against the original build using `pdftotext -layout`.
-4. Cleans up the sandbox directory upon verification success.
+1. Copies the files the archive will contain into the paper's sandbox in the cache (`$XDG_CACHE_HOME/leeni/sandboxes/<project>/paper`), re-copying only changed files; the same sandbox `--sandbox` and `--zip-alone` use.
+2. Compiles it with `l --no-env` (stripping all user environment variables like `TEXINPUTS`), with its own `HOME` and TeX trees.
+3. Compares the resulting PDF text against the paper's PDF using `pdftotext -layout`.
+4. Zips the sandbox only when the check passes, so the archive is exactly what was verified.
 
 ### Offline Bubblewrap Sandbox (`tools/bws_run`)
 For strict offline testing, `tools/bws_run` compiles documents inside an unprivileged [Bubblewrap](https://github.com/containers/bubblewrap) container:

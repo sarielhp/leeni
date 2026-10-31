@@ -137,6 +137,7 @@ module LeeniCachePruner
              entries.select { |e| e[:status] == :idle }.sort_by { |e| e[:last_activity] }
     chosen = limit ? doomed.first(limit) : doomed
     removed = chosen.select { |e| remove(e[:dir]) }
+    remove_orphan_sandboxes
     counts = entries.group_by { |e| e[:status] }.transform_values(&:size)
     { days: days, removed: removed.map { |e| e[:dir] },
       removed_orphans: removed.count { |e| e[:status] == :orphan },
@@ -148,7 +149,21 @@ module LeeniCachePruner
     return false unless File.expand_path(dir).start_with?("#{File.expand_path(projects_dir)}/")
 
     FileUtils.rm_rf(dir)
+    FileUtils.rm_rf(File.join(sandboxes_dir, File.basename(dir)))
     !File.exist?(dir)
+  end
+
+  def sandboxes_dir
+    File.join(LeeniBuildWorkspace.cache_home, 'leeni', 'sandboxes')
+  end
+
+  # A sandbox outlives nothing: once its project's build cache is gone, so is it.
+  def remove_orphan_sandboxes
+    return unless File.directory?(sandboxes_dir)
+
+    Dir.children(sandboxes_dir).each do |name|
+      FileUtils.rm_rf(File.join(sandboxes_dir, name)) unless File.directory?(File.join(projects_dir, name))
+    end
   end
 
   # One line for the terminal after a build or for --doctor prune.

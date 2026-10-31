@@ -49,7 +49,8 @@ All long options accept either `-` or `--` and allow internal dashes to be omitt
 | `-llm`, `--agent` | Diagnostics | Token-optimized mode for AI agents (zero ANSI, folded warnings, silent on success). |
 | `--json` | Diagnostics | Output structured compilation and diagnostic results as JSON. |
 | `-z`, `--zip` | Packaging | Create self-contained portable zip archive of paper. |
-| `--zip-alone` | Packaging | Bundle styles and verify an isolated build with no errors or alerts and matching PDF. |
+| `--sandbox` | Packaging | Rebuild from an isolated copy kept in the cache with `--no-env` and compare the PDFs. |
+| `--zip-alone` | Packaging | `--sandbox` with strict checks (no errors or alerts), then zip the sandbox. |
 | `-Z`, `--zip-flat` | Packaging | Create self-contained portable zip archive with inlined `.tex`. |
 | `-t`, `--verify` | Packaging | Verify portability by testing compilation in `/tmp` sandbox. |
 | `-I`, `--make-indep` | Packaging | Convert the paper in place to compile with `--no-env`; originals saved in `old_ver_yy_mm_dd_hh_mm.zip`. |
@@ -240,8 +241,15 @@ Creates a self-contained portable `.zip` archive containing the paper, active fi
 l -z paper.tex
 ```
 
+### `--sandbox`
+After the normal build, copies every file the paper used into a sandbox kept in the cache (`$XDG_CACHE_HOME/leeni/sandboxes/<project>/paper`): sources, figures, the `.bbl`, local `.bib` and `.bst` files, and styles from outside the project in `styles/` with the LaTeX search path added. The sandbox is rebuilt there with `--no-env`, using its own `HOME` and TeX trees, and its PDF is compared with the paper's (text layout, plus rendered pages when `pdftoppm` is installed). Between runs only changed files are copied and files the paper no longer uses are deleted, so the sandbox build is incremental. The project and its PDF are never changed. `l -c`/`-C` and the daily cache pruning remove the sandbox together with the build cache.
+
+```bash
+l --sandbox paper.tex
+```
+
 ### `--zip-alone`
-Creates a portable ZIP with required non-system styles in `styles/` and injects the LaTeX search path into the packaged source. Forces a fresh initial build, extracts the archive into a new temporary directory, and rebuilds with `--no-env`. Verification requires a newly generated, nonempty PDF, zero errors and alerts, identical extracted text layout, and identical rendered pages at 150 dpi. Requires `pdftotext` and `pdftoppm`; verification failure preserves any existing archive. Standard LaTeX packages must still be installed.
+Runs `--sandbox` with a forced rebuild and strict checks, then zips the sandbox, so the archive is exactly what built without the environment (minus SyncTeX files). Verification requires a newly generated, nonempty PDF, zero errors and alerts, identical extracted text layout, and identical rendered pages at 150 dpi. Requires `pdftotext` and `pdftoppm`; verification failure preserves any existing archive. Standard LaTeX packages must still be installed.
 
 ```bash
 l --zip-alone paper.tex

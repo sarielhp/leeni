@@ -8,6 +8,11 @@
 # ==============================================================================
 
 module LatexBuildRuntime
+  STYLE_COPY_EXTS = %w[.sty .cls .clo .def .fd .cfg .bst .bbx .cbx .lbx .dbx .ldf].freeze
+
+  EXTERNAL_TRACKED_EXTS = %w[.tex .sty .cls .clo .def .fd .cfg .bbx .cbx .lbx .dbx .ldf .rtx .lua
+                             .pdf .png .jpg .jpeg .eps .mps].freeze
+
   private
 
   def canonical_build_dir
@@ -130,6 +135,15 @@ module LatexBuildRuntime
     target_subdirs = (@options && @options[:junk_subdirs]) || LaTeXUtils::DEFAULT_JUNK_SUBDIRS
     target_subdirs.each { |subdir| FileUtils.mkdir_p(File.join(dir, subdir), mode: 0o700) }
     mirror_project_subdirs_to_junk if @options && @options[:auto_mirror_subdirs] == true
+    remove_stale_style_copies(dir)
+  end
+
+  # Older builds copied styles/ and .bst files here for BibTeX. TeX reads
+  # its output directory first, so those copies would shadow the project's
+  # files; TeX never writes such files itself.
+  def remove_stale_style_copies(dir)
+    copies = Dir.glob(File.join(dir, 'styles', '**', '*')) + Dir.glob(File.join(dir, '*.bst'))
+    copies.each { |path| FileUtils.rm_f(path) if STYLE_COPY_EXTS.include?(File.extname(path).downcase) }
   end
 
   def mirror_project_subdirs_to_junk
@@ -242,9 +256,25 @@ module LatexBuildRuntime
   def trace_command(env, cmd, cwd = Dir.pwd) = LaTeXUtils.trace_command(env, cmd, cwd)
   def trace_status(status) = LaTeXUtils.trace_status(status)
 
-  def capture_pass_output(cmd_args)
+  # Files outside the project from personal trees (TEXINPUTS, TEXMFHOME,
+  # TEXMFLOCAL, ../): editing one must trigger a rebuild. The distribution
+  # and font files are left out; hashing those on every run is slow.
+  def external_fls_dependencies(fls_path)
+    return [] unless File.exist?(fls_path)
+
+    skip = [File.expand_path('.'), File.expand_path(@junk_dir)].map { |dir| dir + File::SEPARATOR }
+    paths = File.foreach(fls_path).filter_map do |line|
+      File.expand_path(line.sub(/\AINPUT\s+/, '').strip) if line.start_with?('INPUT ')
+    end
+    paths.uniq.select do |abs|
+      EXTERNAL_TRACKED_EXTS.include?(File.extname(abs).downcase) && !abs.start_with?(*skip) &&
+        File.file?(abs) && !LaTeXUtils.system_tex_file?(abs)
+    end
+  end
+
+  def capture_pass_output(cmd_args, extra_env = {})
     timeout = (@options[:timeout] || ENV['LEENI_TIMEOUT'] || ENV['LATEX_IT_TIMEOUT'] || self.class::DEFAULT_PASS_TIMEOUT).to_i
-    env = pass_environment
+    env = pass_environment.merge(extra_env)
     trace_command(env, cmd_args) if @options[:trace]
     out, status = capture_command(env, cmd_args, timeout)
     trace_status(status) if @options[:trace]

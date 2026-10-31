@@ -23,6 +23,12 @@ module LeeniBuildWorkspace
     File.join(cache_home, 'leeni', 'projects', "#{name}-#{hash}")
   end
 
+  # --sandbox and --zip-alone keep their sandbox beside the build caches, so
+  # the build's own *.aux scans never see the sandbox build's files.
+  def sandbox_dir(dir = '.')
+    File.join(cache_home, 'leeni', 'sandboxes', File.basename(cache_dir(dir)))
+  end
+
   def resolve(dir = '.', configured = nil)
     dir ||= '.'
     value = configured.to_s.strip

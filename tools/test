@@ -2,7 +2,9 @@
 # frozen_string_literal: true
 
 # Tiered leeni test runner. The full tier includes every test file.
+require 'fileutils'
 require 'open3'
+require 'tmpdir'
 require 'optparse'
 require 'etc'
 
@@ -25,6 +27,7 @@ module LeeniTestSuite
     test_build_cache.rb test_vim_integration.rb test_destructive_paths.rb test_zip_alone.rb
     test_arxiv.rb test_config_save.rb test_code_metrics.rb test_convergence_loop.rb
     test_sample_arxiv_review.rb test_arxiv_cycle.rb test_emacs_auctex.rb test_cache_recovery.rb test_report.rb
+    test_make_indep.rb test_sandbox.rb
   ].freeze
   FULL_TESTS = Dir.glob(File.expand_path('../test/test_*.rb', __dir__)).map { |path| File.basename(path) }.freeze
   TIERS = { fast: FAST_TESTS, medium: MEDIUM_TESTS + FAST_TESTS,
@@ -45,6 +48,7 @@ module LeeniTestSuite
     queue = Queue.new
     # Queue longest-running tests first to optimize thread pool utilization
     files.each { |name| queue << name }
+    test_cache # create it before the worker threads share it
     failures = []
     mutex = Mutex.new
     max_workers = begin
@@ -74,8 +78,14 @@ module LeeniTestSuite
     exit 1
   end
 
+  # Every run gets its own build cache, so test projects never pile up in
+  # the real ~/.cache/leeni.
+  def self.test_cache
+    @test_cache ||= Dir.mktmpdir('leeni_test_cache_').tap { |dir| at_exit { FileUtils.rm_rf(dir) } }
+  end
+
   def self.run_test(file)
-    Open3.capture2e('ruby', '-w', '-I.', file)
+    Open3.capture2e({ 'XDG_CACHE_HOME' => test_cache }, 'ruby', '-w', '-I.', file)
   end
 
   def self.abort_failure(label, output)

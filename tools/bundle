@@ -57,6 +57,7 @@ module LatexBundler
     packaging_shared.rb
     packager.rb
     arxiv.rb
+    sandbox.rb
     make_indep.rb
     cli_targets.rb
   ].freeze

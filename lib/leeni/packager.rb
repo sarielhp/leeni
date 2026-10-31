@@ -32,6 +32,16 @@ class LatexPackager
     Dir.chdir(File.expand_path(@bdir)) { do_package }
   end
 
+  # Copies everything the paper uses into stage_dir (-z staging, --sandbox).
+  # The caller is in the document directory, after a build.
+  def stage_into(stage_dir)
+    deps = collect_fls_dependencies(File.join(junk_dir, "#{@bfilename}.fls"))
+    return false unless stage_all_assets(stage_dir, deps, discover_figure_sources(deps[:figures]))
+
+    LaTeXPackagingShared.drop_nested_archives!(stage_dir)
+    true
+  end
+
   private
 
   def junk_dir
@@ -45,16 +55,49 @@ class LatexPackager
       return false unless @builder.run_in_current_directory!
     end
 
-    deps = collect_fls_dependencies(fls_path)
-    fig_sources = discover_figure_sources(deps[:figures])
     zip_filename = @options[:zip_name] || "#{@bfilename}.zip"
+    return package_from_sandbox(zip_filename) if @options[:zip_alone]
 
-    candidate = stage_and_create_zip(zip_filename, deps, fig_sources)
+    candidate = stage_and_create_zip(zip_filename)
     return false unless candidate
 
     publish_packaged_archive(candidate, zip_filename)
   ensure
     FileUtils.rm_f(candidate) if candidate && File.file?(candidate)
+  end
+
+  # --zip-alone archives the sandbox it has just checked, so the zip is
+  # exactly what built without the environment.
+  def package_from_sandbox(zip_filename)
+    sandbox = LatexSandbox.new(@builder)
+    unless sandbox.run!
+      warn Rainbow("[FAIL] Verification failed. Preserved existing #{zip_filename}.").red.bright
+      return false
+    end
+
+    candidate = archive_candidate_path(zip_filename)
+    return false unless zip_directory(sandbox.paper_dir, candidate, zip_filename, '*.synctex.gz', '*.bak')
+
+    File.rename(candidate, zip_filename)
+    puts Rainbow("==> Created portable zip: #{zip_filename}").green.bright
+    zip_filename
+  ensure
+    FileUtils.rm_f(candidate) if candidate && File.file?(candidate)
+  end
+
+  def zip_directory(dir, candidate, zip_filename, *excluded)
+    unless LaTeXUtils.command_available?('zip')
+      warn Rainbow("[ERROR] 'zip' command not found in PATH! Cannot create archive.").red.bright
+      return false
+    end
+
+    FileUtils.rm_f(candidate)
+    args = excluded.empty? ? [] : ['-x', *excluded]
+    out, status = Open3.capture2e('zip', '-q', '-r', candidate, '.', *args, chdir: dir)
+    return true if status.success? && File.file?(candidate) && File.size(candidate).positive?
+
+    warn Rainbow("[FAIL] Failed to create #{zip_filename}: #{out}").red.bright
+    false
   end
 
   def publish_packaged_archive(candidate, zip_filename)
@@ -240,25 +283,10 @@ class LatexPackager
     true
   end
 
-  def stage_and_create_zip(zip_filename, deps, fig_sources)
-    unless LaTeXUtils.command_available?('zip')
-      warn Rainbow("[ERROR] 'zip' command not found in PATH! Cannot create archive.").red.bright
-      return false
-    end
-
+  def stage_and_create_zip(zip_filename)
     candidate = archive_candidate_path(zip_filename)
-    FileUtils.rm_f(candidate)
     succeeded = Dir.mktmpdir('leeni_stage_') do |stage_dir|
-      return false unless stage_all_assets(stage_dir, deps, fig_sources)
-
-      LaTeXPackagingShared.drop_nested_archives!(stage_dir)
-
-      zip_out, zip_status = Dir.chdir(stage_dir) { Open3.capture2e('zip', '-q', '-r', candidate, '.') }
-      unless zip_status.success? && File.file?(candidate) && File.size(candidate).positive?
-        warn Rainbow("[FAIL] Failed to create #{zip_filename}: #{zip_out}").red.bright
-        return false
-      end
-      true
+      stage_into(stage_dir) && zip_directory(stage_dir, candidate, zip_filename)
     end
     succeeded ? candidate : false
   ensure
@@ -350,18 +378,14 @@ class LatexPackager
     bundled_pdf = File.join(tmpdir, "#{@bfilename}.pdf")
     backup_pdf = File.join(tmpdir, "#{@bfilename}.pdf.bundled")
     FileUtils.mv(bundled_pdf, backup_pdf) if File.file?(bundled_pdf)
+    compile_in_sandbox(tmpdir, backup_pdf, tmpdir)
+  end
 
-    ruby_bin = RbConfig.ruby
-    script_bin = LEENI_EXECUTABLE
-    cmd = [ruby_bin, script_bin, '--no-env', '--engine', @builder.engine_name]
-    cmd += ['--json', '--all', '--force'] if @options[:zip_alone]
-    cmd << '--errors-only' if @options[:errors_only]
-    cmd << '--werror' if @options[:errors_only] && @options[:werror]
-    cmd += ['--timeout', @options[:timeout].to_s] if @options[:timeout]
-    cmd << @filename
-
-    compile_out, compile_err, compile_stat = Open3.capture3(sandbox_environment(tmpdir), *cmd, chdir: tmpdir)
-    new_pdf = File.join(tmpdir, "#{@bfilename}.pdf")
+  # Builds the paper in dir with --no-env (HOME and TeX trees under env_root)
+  # and compares the result with reference_pdf.
+  def compile_in_sandbox(dir, reference_pdf, env_root)
+    compile_out, compile_err, compile_stat = Open3.capture3(sandbox_environment(env_root), *sandbox_command, chdir: dir)
+    new_pdf = File.join(dir, "#{@bfilename}.pdf")
 
     unless compile_stat.success? && File.file?(new_pdf) && File.size(new_pdf).positive?
       warn Rainbow('[FAIL] Verification failed! Document did not compile in clean environment.').red.bright
@@ -370,18 +394,27 @@ class LatexPackager
       return false
     end
     return false if @options[:zip_alone] && !verify_clean_diagnostics(compile_out)
-    return false unless verify_pdf_diff(backup_pdf, new_pdf)
-    return false if visual_check? && !verify_pdf_visual_match(backup_pdf, new_pdf)
+    return false unless verify_pdf_diff(reference_pdf, new_pdf)
+    return false if visual_check? && !verify_pdf_visual_match(reference_pdf, new_pdf)
 
     puts Rainbow(verified_message).green.bright
     true
+  end
+
+  def sandbox_command
+    cmd = [RbConfig.ruby, LEENI_EXECUTABLE, '--no-env', '--engine', @builder.engine_name]
+    cmd += ['--json', '--all', '--force'] if @options[:zip_alone]
+    cmd << '--errors-only' if @options[:errors_only]
+    cmd << '--werror' if @options[:errors_only] && @options[:werror]
+    cmd += ['--timeout', @options[:timeout].to_s] if @options[:timeout]
+    cmd << @filename
   end
 
   # --zip-alone requires the page comparison; --make-indep runs it whenever
   # pdftoppm is installed, since its text check alone misses swapped figures.
   def visual_check?
     return true if @options[:zip_alone]
-    return false unless @options[:make_indep]
+    return false unless @options[:make_indep] || @options[:sandbox]
     return true if LaTeXUtils.command_available?('pdftoppm')
 
     puts Rainbow(" -- Page comparison skipped: 'pdftoppm' is unavailable.").yellow
@@ -390,6 +423,7 @@ class LatexPackager
 
   def verified_message
     return '[VERIFIED] Converted project compiles with --no-env and matches the original PDF.' if @options[:make_indep]
+    return "[VERIFIED] Sandbox build with --no-env matches #{@bfilename}.pdf." if @options[:sandbox] || @options[:zip_alone]
 
     '[VERIFIED] Archive successfully verified: self-contained and compiles in clean environment.'
   end
@@ -479,5 +513,5 @@ class LatexPackager
   end
 
   # Also used by --make-indep to check a converted project tree.
-  public :run_sandbox_compile
+  public :run_sandbox_compile, :compile_in_sandbox
 end

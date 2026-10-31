@@ -8,6 +8,7 @@
 # ==============================================================================
 
 require 'fileutils'
+require 'open3'
 require 'io/console'
 require 'pathname'
 require_relative 'build_workspace'
@@ -458,6 +459,7 @@ module LaTeXUtils
     end
 
     remove_workspace(LeeniBuildWorkspace.cache_dir(target_dir))
+    FileUtils.rm_rf(LeeniBuildWorkspace.sandbox_dir(target_dir))
     clean_custom_workspace(target_dir, workspace_dir) if workspace_dir
   end
 
@@ -476,6 +478,26 @@ module LaTeXUtils
     return unless File.read(File.join(path, '.leeni_workspace')).strip == LeeniBuildWorkspace.project_root(target_dir)
 
     remove_workspace(path)
+  end
+
+  SYSTEM_TEX_TREES = '$TEXMFDIST:$TEXMFLOCAL:$TEXMFSYSVAR:$TEXMFSYSCONFIG:$TEXMFVAR:$TEXMFMAIN'
+
+  # The TeX trees kpathsea still searches once --no-env has cleared the
+  # user's variables: the distribution, not personal additions.
+  def self.system_tex_trees
+    @system_tex_trees ||= begin
+      env = TEX_ENV_VARS.to_h { |var| [var, nil] }
+      out, status = Open3.capture2e(env, 'kpsewhich', "--expand-var=#{SYSTEM_TEX_TREES}")
+      trees = status.success? ? out.strip.split(File::PATH_SEPARATOR) : []
+      trees.map { |tree| File.expand_path(tree.delete_prefix('!!')) }.reject { |tree| tree == '/' }.uniq
+    rescue SystemCallError
+      []
+    end
+  end
+
+  def self.system_tex_file?(path)
+    expanded = File.expand_path(path)
+    system_tex_trees.any? { |tree| expanded.start_with?(tree + File::SEPARATOR) }
   end
 
   def self.reset_latex_environment!

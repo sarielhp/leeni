@@ -386,19 +386,21 @@ class TestRepairFailures < Minitest::Test
     end
   end
 
-  def test_copy_style_files_for_bibtex_copies_from_styles_to_junk_styles
+  # BibTeX and Biber search the project and styles/ instead of getting copies
+  # in the build directory, where TeX would read them before the originals.
+  def test_bibliography_search_paths_point_at_the_project
     with_project do |builder|
       FileUtils.mkdir_p('styles')
-      File.write('styles/sample.bst', '% custom bst')
-      FileUtils.mkdir_p('styles/junk')
-      File.write('styles/junk/ignored.txt', 'do not copy')
+      root = File.expand_path('.')
+      saved = ENV.fetch('BSTINPUTS', nil)
+      ENV['BSTINPUTS'] = '/shared/bst:'
+      env = builder.send(:bib_manager).bibliography_search_env
 
-      builder.send(:copy_style_files_for_bibtex)
-
-      assert File.directory?('junk/styles')
-      assert File.file?('junk/styles/sample.bst')
-      assert_equal '% custom bst', File.read('junk/styles/sample.bst')
-      refute File.exist?('junk/styles/junk')
+      assert_equal "#{root}:#{root}/styles:/shared/bst:", env['BSTINPUTS']
+      assert env['BIBINPUTS'].start_with?("#{root}:#{root}/styles:")
+      refute File.exist?('junk/styles')
+    ensure
+      ENV['BSTINPUTS'] = saved
     end
   end
 

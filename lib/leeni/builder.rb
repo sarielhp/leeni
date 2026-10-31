@@ -543,7 +543,7 @@ class LatexBuilder
     @input_snapshots = {}
     files = [@filename] + Dir['*.tex'].select { |f| File.file?(f) } + discover_bib_files
     fls_file = File.join(@junk_dir, "#{@bfilename}.fls")
-    files.concat(extract_fls_dependencies(fls_file)) if File.exist?(fls_file)
+    files.concat(extract_fls_dependencies(fls_file) + external_fls_dependencies(fls_file)) if File.exist?(fls_file)
     files.uniq.each do |f|
       next unless File.file?(f)
 
@@ -600,7 +600,7 @@ class LatexBuilder
 
   def collect_active_dependencies
     fls_path = File.join(@junk_dir, "#{@bfilename}.fls")
-    deps = extract_fls_dependencies(fls_path)
+    deps = extract_fls_dependencies(fls_path) + external_fls_dependencies(fls_path)
     deps << @filename if File.exist?(@filename)
     discover_bib_files.each { |b| deps << b }
     deps.uniq
@@ -689,7 +689,6 @@ class LatexBuilder
 
   def current_citation_keys(aux_contents = nil) = bib_manager.current_citation_keys(aux_contents)
   def needs_bib_pass?(tool, loga, aux_contents = nil) = bib_manager.needs_bib_pass?(tool, loga, aux_contents)
-  def copy_style_files_for_bibtex = bib_manager.copy_style_files_for_bibtex
   def collect_bib_candidates(bibdata_str, files) = bib_manager.collect_bib_candidates(bibdata_str, files)
   def extract_aux_bib_files(aux_contents = nil) = bib_manager.extract_aux_bib_files(aux_contents)
 

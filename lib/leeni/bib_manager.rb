@@ -261,10 +261,10 @@ class LaTeXBibManager
     cmd = if tool == :biber
             ['biber', *biber_encoding_options, '--input-directory', '.', '--output-directory', '.', bfilename]
           else
-            copy_style_files_for_bibtex
             ['bibtex', bfilename]
           end
-    Dir.chdir(junk_dir) { @builder.capture_pass_output(cmd) }
+    search_env = bibliography_search_env
+    Dir.chdir(junk_dir) { @builder.capture_pass_output(cmd, search_env) }
   end
 
   # pdfLaTeX reads the .bbl best as TeX accent macros. LuaLaTeX and XeLaTeX read UTF-8, and
@@ -274,17 +274,25 @@ class LaTeXBibManager
     @builder.engine_name == 'pdflatex' ? ['--output_safechars'] : []
   end
 
-  # BibTeX runs inside the build directory, where it only sees the .bst
-  # files placed next to the aux file.
-  def copy_style_files_for_bibtex
-    Dir['*.bst'].each { |bst| FileUtils.cp(bst, File.join(junk_dir, File.basename(bst))) }
-    return unless File.directory?('styles')
+  # BibTeX and Biber run inside the build directory. Their search paths are
+  # pointed at the project instead of copying styles/ there: TeX reads files
+  # from its output directory first, so such copies hid later edits.
+  def bibliography_search_env
+    root = File.expand_path('.')
+    dirs = [root, File.join(root, 'styles')] +
+           Array(options[:bib_dirs] || LaTeXUtils::DEFAULT_BIB_DIRS).map { |dir| File.expand_path(dir.to_s, root) }
+    dirs = dirs.uniq.select { |dir| File.directory?(dir) }
+    { 'BSTINPUTS' => search_path(dirs, ENV.fetch('BSTINPUTS', nil)),
+      'BIBINPUTS' => search_path(dirs, ENV.fetch('BIBINPUTS', nil)) }
+  end
 
-    FileUtils.mkdir_p(File.join(junk_dir, 'styles'))
-    Dir['styles/*'].each do |s|
-      base = File.basename(s)
-      FileUtils.cp_r(s, File.join(junk_dir, 'styles/')) unless base == junk_dir || ['junk', '.junk'].include?(base)
-    end
+  # An unset variable keeps the default search after the project
+  # directories (trailing colon); a set one is appended unchanged.
+  def search_path(dirs, current)
+    current = current.to_s
+    return "#{dirs.join(File::PATH_SEPARATOR)}#{File::PATH_SEPARATOR}" if current.empty?
+
+    (dirs + [current]).join(File::PATH_SEPARATOR)
   end
 
   def compute_aux_hash

@@ -56,6 +56,7 @@ require_relative 'lib/leeni/builder'
 require_relative 'lib/leeni/packager'
 require_relative 'lib/leeni/arxiv'
 require_relative 'lib/leeni/bib_extractor'
+require_relative 'lib/leeni/sandbox'
 require_relative 'lib/leeni/make_indep'
 require_relative 'lib/leeni/cli_targets'
 
@@ -146,13 +147,18 @@ module LatexCLI
   end
 
   def self.validate_make_indep!(options, prog_name)
+    if options[:sandbox] && (options[:arxiv] || options[:meta_only] || options[:bib_extract])
+      warn "#{prog_name}: error: --sandbox cannot be combined with --arxiv, --meta or --bib-extract"
+      exit 2
+    end
     if options[:dry_run] && !options[:make_indep]
       warn "#{prog_name}: error: --dry-run only applies to -I/--make-indep"
       exit 2
     end
     return unless options[:make_indep]
 
-    clashing = { zip: '--zip', arxiv: '--arxiv', bib_extract: '--bib-extract', meta_only: '--meta', no_env: '--no-env' }
+    clashing = { zip: '--zip', arxiv: '--arxiv', bib_extract: '--bib-extract', meta_only: '--meta', no_env: '--no-env',
+                 sandbox: '--sandbox' }
                .select { |key, _| options[key] }.values
     return if clashing.empty?
 
@@ -332,7 +338,7 @@ module LatexCLI
 
   def self.build_zip_options(cfg, extra_cli_files)
     {
-      make_indep: false, dry_run: false, zip: false, zip_alone: false,
+      make_indep: false, dry_run: false, sandbox: false, zip: false, zip_alone: false,
       zip_flat: cfg.dig('zip', 'flat') == true, verify: false, zip_name: nil,
       inject_styles: (cfg.dig('zip', 'styles_inject') || cfg.dig('zip', 'inject_styles')) == true,
       fig_sources: cfg.dig('zip', 'fig_sources') || ['.fig', '.ipe', '.svg', '.asy', '.gp', '.gnuplot', '.py', '.R'],
@@ -554,6 +560,10 @@ module LatexCLI
     opts.on('-z', '--zip', 'Create a self-contained portable zip archive of paper, styles, and figures') { options[:zip] = true }
     opts.on('--zip-alone', 'Bundle styles and verify an isolated rebuild with no errors or alerts and matching PDF') do
       options.merge!(zip_alone: true, zip: true, inject_styles: true, verify: true, force: true)
+    end
+    opts.on('--sandbox', 'After building, rebuild from an isolated copy with --no-env (kept in the cache) and compare the PDFs') do
+      options[:sandbox] = true
+      options[:inject_styles] = true
     end
     opts.on('-Z', '--zip-flat', 'Create a self-contained portable zip archive with inlined/flattened .tex') do
       options[:zip] = true

@@ -24,7 +24,6 @@ class LatexIndependizer
                  .pdf .png .jpg .jpeg .eps .mps].freeze
   TEXT_EXTS = %w[.tex .sty .cls].freeze
   FONT_EXTS = %w[.tfm .vf .pfb .otf .ttf .enc .map].freeze
-  SYSTEM_TREES = '$TEXMFDIST:$TEXMFLOCAL:$TEXMFSYSVAR:$TEXMFSYSCONFIG:$TEXMFVAR:$TEXMFMAIN'
   NEW_FILES_LIST = 'leeni-make-indep-new-files.txt'
   SKIP_IN_SANDBOX = %w[.git .hg .svn junk .junk].freeze
 
@@ -132,21 +131,7 @@ class LatexIndependizer
   end
 
   def system_file?(path)
-    expanded = File.expand_path(path)
-    system_trees.any? { |tree| expanded.start_with?(tree + File::SEPARATOR) }
-  end
-
-  # The trees kpathsea still searches once --no-env has cleared the user's
-  # variables. Files under them need no copying.
-  def system_trees
-    @system_trees ||= begin
-      env = LaTeXUtils::TEX_ENV_VARS.to_h { |var| [var, nil] }
-      out, status = Open3.capture2e(env, 'kpsewhich', "--expand-var=#{SYSTEM_TREES}")
-      trees = status.success? ? out.strip.split(File::PATH_SEPARATOR) : []
-      trees.map { |tree| File.expand_path(tree.delete_prefix('!!')) }.reject { |tree| tree == '/' }.uniq
-    rescue SystemCallError
-      []
-    end
+    LaTeXUtils.system_tex_file?(path)
   end
 
   def warn_about_fonts(inputs)

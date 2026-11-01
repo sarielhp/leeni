@@ -36,6 +36,9 @@ This creates `.l.jsonc` pre-populated with default settings and comments:
   // Maximum number of compilation passes (1-10)
   "passes": 5,
 
+  // Skip PDF output on passes certain to be followed by another (--[no-]draft-passes)
+  "draft_passes": false,
+
   // Fast incremental mode: reuse aux files and avoid redundant passes
   "fast": false,
 

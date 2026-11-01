@@ -22,10 +22,12 @@ require_relative 'diagnostics'
 require_relative 'brace_checker'
 require_relative 'bib_manager'
 require_relative 'build_runtime'
+require_relative 'index_pass'
 
 class LatexBuilder
   include LaTeXDiagnostics
   include LatexBuildRuntime
+  include LatexIndexPass
 
   attr_reader :options, :filename, :bfilename, :bdir, :engine_name, :biberr, :input_snapshots, :build_start_time
 
@@ -46,7 +48,6 @@ class LatexBuilder
   BIBLATEX_USE = /\\(?:usepackage|RequirePackage)\s*(?:\[[^\]]*\])?\s*\{[^}]*\bbiblatex\b/
   BIBLATEX_BBL_HEADER = 'biblatex bbl format'
   MAX_BIB_RUNS = 2
-  MAX_INDEX_FAILURES = 2
   # TeX error context ("l.12 ...") and the trace header echo document text, which
   # can contain rerun phrases without TeX asking for a rerun.
   ECHOED_SOURCE_LINE = /\A(?:l\.\d+ |\(cd )/
@@ -228,10 +229,12 @@ class LatexBuilder
   end
 
   # What a caller (--json) needs to reuse the build: the engine that ran, the build directory,
-  # the LaTeX passes run now (0 when up to date) and whether the passes converged.
+  # the LaTeX passes run now (0 when up to date; draft_passes of them wrote no PDF) and
+  # whether the passes converged.
   def build_report
     report = { engine: @engine_name, build_dir: @junk_dir && File.expand_path(@junk_dir), passes: @latex_passes.to_i,
                up_to_date: @up_to_date == true, converged: @cacheable_build != false }
+    report[:draft_passes] = @draft_passes if @draft_passes.to_i.positive?
     report[:recovery] = @recovery_case if @recovery_case
     report
   end
@@ -285,8 +288,9 @@ class LatexBuilder
     end
   end
 
-  def log_pass_start(engine, pass, first: false)
-    log_activity_start(engine, "Building #{@bfilename}.pdf (#{engine} pass #{pass})...", suffix: " (#{pass})", first: first)
+  def log_pass_start(engine, pass, first: false, draft: false)
+    label = draft ? "#{pass}, draft" : pass.to_s
+    log_activity_start(engine, "Building #{@bfilename}.pdf (#{engine} pass #{label})...", suffix: " (#{label})", first: first)
   end
 
   def log_bib_start(tool, first: false) = log_activity_start(tool, "Running #{tool} on #{@bfilename}...", first: first)
@@ -306,13 +310,6 @@ class LatexBuilder
 
     log_bib_start(bib_tool, first: false)
     [run_bib_pass(bib_tool, curr_aux), true]
-  end
-
-  def check_and_run_index_pass
-    return false unless @options[:index] && needs_index_pass?
-
-    log_index_start(first: false)
-    run_index_pass || (needs_index_pass? && run_index_pass)
   end
 
   # A bib run only helps if another LaTeX pass can follow it, so at the pass cap
@@ -415,10 +412,13 @@ class LatexBuilder
 
   def run_convergence_loop
     @cacheable_build = true
+    @draft_reasons_used = []
+    @last_pass_draft = false
     max_passes = @options[:passes] || LaTeXUtils::DEFAULT_PASSES
     pass = 0
     bib_runs = 0
     curr_aux = nil
+    unconverged = nil
     aux_before = compute_aux_hash
     @side_state = nil
     side_state_changed?
@@ -426,13 +426,12 @@ class LatexBuilder
 
     loop do
       pass += 1
-      log_pass_start(@engine_name, pass, first: pass == 1 && bib_runs.zero?)
-      return false unless run_latex_pass("_#{pass}")
+      return false unless run_convergence_pass(pass, max_passes, first: pass == 1)
       break if @options[:single_pass]
 
       curr_aux = compute_aux_hash
       status_ok, bib_ran_now = handle_convergence_bib_step(bib_runs, pass, curr_aux, pass < max_passes)
-      return false unless status_ok
+      return abandon_after_draft(pass) unless status_ok
 
       if bib_ran_now
         bib_runs += 1
@@ -447,68 +446,21 @@ class LatexBuilder
       aux_before = curr_aux
       seen_aux.clear if index_ran
       cycling = aux_cycle?(seen_aux, curr_aux)
-      if rerun && (pass >= max_passes || cycling)
-        report_unconverged(pass, cycling)
-        break
-      end
-
-      break unless rerun
+      unconverged = { cycling: cycling } if rerun && (pass >= max_passes || cycling)
+      break if unconverged || !rerun
     end
-    @cacheable_build = false if !@options[:single_pass] && bib_unsatisfied_at_exit?(bib_runs, pass, curr_aux)
+    finish_convergence(pass, bib_runs, curr_aux, unconverged)
+  end
+
+  # The last pass must write the PDF: a draft that ended the loop gets a regular pass.
+  def finish_convergence(pass, bib_runs, curr_aux, unconverged)
+    last = regular_pass_after_draft(pass)
+    return false unless last
+
+    curr_aux = compute_aux_hash if last != pass
+    report_unconverged(last, unconverged[:cycling]) if unconverged
+    @cacheable_build = false if !@options[:single_pass] && bib_unsatisfied_at_exit?(bib_runs, last, curr_aux)
     true
-  end
-
-  def log_index_start(first: false) = log_activity_start('makeindex', "Running makeindex on #{@bfilename}...", first: first)
-
-  def needs_index_pass?
-    idx = File.join(@junk_dir, "#{@bfilename}.idx")
-    return false unless File.file?(idx) && File.size(idx).positive?
-    return false if @index_failures.to_i >= MAX_INDEX_FAILURES
-
-    Digest::SHA256.file(idx).hexdigest != @last_idx_hash || !File.file?(File.join(@junk_dir, "#{@bfilename}.ind"))
-  end
-
-  def run_index_pass
-    puts '' if @options[:trace] || @options[:raw]
-    t0 = Process.clock_gettime(Process::CLOCK_MONOTONIC) if @options[:time]
-    idx_file = File.join(@junk_dir, "#{@bfilename}.idx")
-    return false unless File.file?(idx_file)
-
-    idx_hash = Digest::SHA256.file(idx_file).hexdigest
-    cmd = ['makeindex', '-q', "#{@bfilename}.idx"]
-    out, status = Dir.chdir(@junk_dir) { capture_pass_output(cmd) }
-    File.write(File.join(@junk_dir, "#{@bfilename}.ilg"), out) unless out.empty?
-
-    if @options[:time]
-      t1 = Process.clock_gettime(Process::CLOCK_MONOTONIC)
-      printf(' [%s]', Rainbow(format('%.2fs', t1 - t0)).green)
-    end
-    record_index_result(status.success?, idx_hash)
-  end
-
-  # The hash is recorded only on success so a failed makeindex is retried (up to
-  # MAX_INDEX_FAILURES) instead of being treated as done, and it is reported.
-  def record_index_result(success, idx_hash)
-    if success
-      @last_idx_hash = idx_hash
-      @index_failures = 0
-    else
-      @index_failures = @index_failures.to_i + 1
-      @cacheable_build = false
-      warn "\nmakeindex failed; the index may be missing or stale. See #{File.join(@junk_dir, "#{@bfilename}.ilg")}."
-    end
-    success
-  end
-
-  def index_stale?(state = nil)
-    idx = File.join(@junk_dir, "#{@bfilename}.idx")
-    return false unless File.file?(idx) && File.size(idx).positive?
-
-    ind = File.join(@junk_dir, "#{@bfilename}.ind")
-    return true unless File.file?(ind)
-    return Digest::SHA256.file(idx).hexdigest != state['idx_sha'] if state.is_a?(Hash) && state['idx_sha']
-
-    File.mtime(idx) > File.mtime(ind)
   end
 
   def bib_files_newer_than_bbl? = bib_manager.bib_files_newer_than_bbl?

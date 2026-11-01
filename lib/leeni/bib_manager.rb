@@ -398,10 +398,20 @@ class LaTeXBibManager
     bcf = File.join(junk_dir, "#{bfilename}.bcf")
     return true if tool == :biber && bcf_changed?(bcf)
 
-    bbl_mtime = File.mtime(fnbbl)
-    return true if discover_bib_files(aux_contents).any? { |b| bib_file_changed?(b, bbl_mtime) }
+    return true if bib_database_changed?(aux_contents)
 
     @last_bib_citations && current_citation_keys(aux_contents) != @last_bib_citations
+  end
+
+  # True when a bibliography database the document names is newer than the .bbl
+  # or differs from what the last bib run read. It depends on inputs only, so it
+  # is known before a LaTeX pass runs (draft passes rely on that).
+  def bib_database_changed?(aux_contents = nil)
+    fnbbl = File.join(junk_dir, "#{bfilename}.bbl")
+    return false unless File.file?(fnbbl)
+
+    bbl_mtime = File.mtime(fnbbl)
+    discover_bib_files(aux_contents).any? { |b| bib_file_changed?(b, bbl_mtime) }
   end
 
   # True when what the last bibtex/biber run consumed no longer matches what the

@@ -295,6 +295,7 @@ module LatexCLI
       fast: is_lw || cfg['fast'] == true,
       update_on_diff: cfg['update_on_diff'] == true,
       relatex_synctex: cfg['relatex_synctex'] == true, explicit_relatex_synctex: false, synctex_status: false,
+      draft_passes: cfg['draft_passes'] != false,
       bib: cfg['bib'],
       passes: (cfg['passes'] || LaTeXUtils::DEFAULT_PASSES).to_i.clamp(1, LaTeXUtils::MAX_PASSES),
       timeout: cfg['timeout'],
@@ -475,6 +476,9 @@ module LatexCLI
     opts.on('--[no-]index', 'Run makeindex pass when .idx changes (default: false or config)') do |v|
       options[:index] = v
       options[:explicit_index] = true
+    end
+    opts.on('--[no-]draft-passes', 'Skip PDF output on passes certain to be followed by another (default: on)') do |v|
+      options[:draft_passes] = v
     end
     opts.on('-i') { raise OptionParser::InvalidOption }
     opts.on('-e', '--engine ENGINE', 'Compiler engine: x (xelatex), l (lualatex), or p (pdflatex)') do |v|

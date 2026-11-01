@@ -28,6 +28,7 @@ All long options accept either `-` or `--` and allow internal dashes to be omitt
 | `-u`, `--single-pass` | Build | Execute a single LaTeX pass only (no BibTeX or rerun loops). |
 | `-n`, `--passes NUM` | Build | Maximum compilation passes allowed (1-10, default: 5). |
 | `-b`, `--[no-]bib` | Build | Explicitly enable or skip bibliography pass. |
+| `--[no-]draft-passes` | Build | Skip PDF output on passes certain to be followed by another (default: on). |
 | `--[no-]index` | Build | Run makeindex when `.idx` changes. |
 | `-e`, `--engine ENG` | Build | Compiler engine: `x` (`xelatex`), `l` (`lualatex`), `p` (`pdflatex`). |
 | `--timeout SEC` | Build | Maximum timeout allowed per compiler pass (default: 180s). |
@@ -109,6 +110,12 @@ l -n 2 paper.tex
 Explicitly enables or disables the bibliography pass. By default, `leeni` automatically detects whether BibTeX or Biber is required based on auxiliary files (`.aux` / `.bcf`).
 ```bash
 l --no-bib paper.tex
+```
+
+### `--[no-]draft-passes`
+On by default (config key `"draft_passes"`). A LaTeX pass runs in draft mode (`-draftmode` for pdflatex and lualatex, `-no-pdf` for xelatex: aux files, log and diagnostics as usual, no PDF) only when leeni knows before running it that another pass follows: a bibliography tool is certain to run after the first pass (no `.bbl` yet while the sources cite from a `\bibliography`/`\addbibresource` database, `--bib`, or a `.bib` changed since the last run), or makeindex is (`--index` with no `.ind` yet), and `-n` leaves room for another pass. Passes that rerun only because labels may have changed stay regular, as do `-u`, `--raw` and dvi engines. The last pass always writes the PDF: when a draft pass turns out to be the last one (the tool did not run or failed), a regular pass follows at once. `--json` reports the count as `build.draft_passes`.
+```bash
+l --no-draft-passes paper.tex
 ```
 
 ### `--[no-]index`

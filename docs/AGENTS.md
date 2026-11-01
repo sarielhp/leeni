@@ -23,6 +23,8 @@ This document provides architectural guidelines, core invariants, development wo
   - `builder.rb`: Compilation lifecycle manager, convergence scheduler, caching, and output finalization.
   - `build_runtime.rb`: Locking, cache workspace preparation, compiler execution, timeouts, and LaTeX passes.
   - `relatex_synctex.rb`: Opt-in background `relatex synctex` run (lualatex, `relatex_synctex`): shared pinned build date, pid file and log in the build directory, stopped on failure and by the next build.
+  - `draft_passes.rb`: Draft LaTeX passes (`-draftmode`, xelatex `-no-pdf`) only before a pass that is certain to follow (bibliography or index tool known to run); a draft that ends the loop gets a regular pass at once.
+  - `index_pass.rb`: makeindex pass for `--index`: when it runs, running it, and index staleness for the build cache.
   - `packager.rb`: Portable zip archive bundler (`-z`), active figure source discovery, and styles isolation.
   - `arxiv.rb`: Sanitized, flattened arXiv submission packager and sandbox verification.
   - `sandbox.rb`: `--sandbox` check in a persistent cache sandbox (`$XDG_CACHE_HOME/leeni/sandboxes/`), rebuilt with `--no-env`; `--zip-alone` zips it.

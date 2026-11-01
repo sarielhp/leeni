@@ -8,11 +8,13 @@
 # ==============================================================================
 
 require_relative 'relatex_synctex'
+require_relative 'draft_passes'
 
 module LatexBuildRuntime
   # SyncTeX goes out before the PDF in finalize_build_outputs: a relatex SyncTeX
   # run waits for the PDF, and its word-level file must not be overwritten after it.
   include LeeniRelatexSynctex::Hooks
+  include LatexDraftPasses
 
   STYLE_COPY_EXTS = %w[.sty .cls .clo .def .fd .cfg .bst .bbx .cbx .lbx .dbx .ldf .bib].freeze
 
@@ -338,6 +340,7 @@ module LatexBuildRuntime
     command = build_latex_pass_cmd
     write_pass_header(pass_log, command)
     output, status = capture_pass_output(command)
+    output = strip_draft_notice(output)
     exit_status = process_exit_status(status)
     File.open(pass_log, 'a') { |file| file.write(output) }
     report_process_failure(status, exit_status)
@@ -379,7 +382,7 @@ module LatexBuildRuntime
     latexoptions = ENV['LATEXOPTIONS'] || ''
     prefix = latexoptions.empty? ? latexopts : "#{latexoptions} "
     input = "#{prefix}#{self.class::RUNTIME_HOOK}\\input{#{@filename}}"
-    [@engine_name] + @latex_flags + [input]
+    [@engine_name] + @latex_flags + draft_pass_flags + [input]
   end
 
   def write_pass_header(pass_log, command)

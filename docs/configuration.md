@@ -42,6 +42,12 @@ This creates `.l.jsonc` pre-populated with default settings and comments:
   // Enable diff-based PDF replacement (requires pdftotext)
   "update_on_diff": false,
 
+  // lualatex only: a background `relatex synctex` replaces NAME.synctex.gz with a
+  // verified word-level one (--[no-]relatex-synctex; off when relatex is not on PATH).
+  // Both builds share one pinned date (SOURCE_DATE_EPOCH, FORCE_SOURCE_DATE).
+  // `l --synctex-status` shows the outcome.
+  "relatex_synctex": false,
+
   // Help screen visual style: "plain" (default) or "lines" (subdued horizontal dividers)
   "help_style": "plain",
 

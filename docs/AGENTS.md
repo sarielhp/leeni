@@ -22,6 +22,7 @@ This document provides architectural guidelines, core invariants, development wo
   - `diagnostics.rb`: LaTeX compilation log diagnostic analysis, AUCTeX error extraction, and 4-tier categorization.
   - `builder.rb`: Compilation lifecycle manager, convergence scheduler, caching, and output finalization.
   - `build_runtime.rb`: Locking, cache workspace preparation, compiler execution, timeouts, and LaTeX passes.
+  - `relatex_synctex.rb`: Opt-in background `relatex synctex` run (lualatex, `relatex_synctex`): shared pinned build date, pid file and log in the build directory, stopped on failure and by the next build.
   - `packager.rb`: Portable zip archive bundler (`-z`), active figure source discovery, and styles isolation.
   - `arxiv.rb`: Sanitized, flattened arXiv submission packager and sandbox verification.
   - `sandbox.rb`: `--sandbox` check in a persistent cache sandbox (`$XDG_CACHE_HOME/leeni/sandboxes/`), rebuilt with `--no-env`; `--zip-alone` zips it.

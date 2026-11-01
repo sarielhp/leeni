@@ -50,6 +50,11 @@ module LaTeXConfig
       // Only update target PDF if extracted text content changed (requires pdftotext)
       "update_on_diff": false,
 
+      // lualatex only: run `relatex synctex` in the background so a verified
+      // word-level NAME.synctex.gz replaces the line-level one (--[no-]relatex-synctex).
+      // Off when relatex is not on PATH; l --synctex-status shows the outcome.
+      "relatex_synctex": false,
+
       // Display execution timing diagnostics per pass (-T / --time)
       "time": false,
 
@@ -440,6 +445,7 @@ module LaTeXConfig
     [:engine_explicit, 'engine', ->(opts) { opts[:engine] }],
     [:explicit_passes, 'passes', ->(opts) { opts[:passes] }],
     [:explicit_update_on_diff, 'update_on_diff', ->(opts) { opts[:update_on_diff] }],
+    [:explicit_relatex_synctex, 'relatex_synctex', ->(opts) { opts[:relatex_synctex] }],
     [:explicit_time, 'time', ->(opts) { opts[:time] }],
     [:explicit_raw, 'raw', ->(opts) { opts[:raw] }],
     [:explicit_trace, 'trace', ->(opts) { opts[:trace] }],

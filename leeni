@@ -294,6 +294,7 @@ module LatexCLI
       show_help: false, show_help_all: false, show_main: false, clean_only: false,
       fast: is_lw || cfg['fast'] == true,
       update_on_diff: cfg['update_on_diff'] == true,
+      relatex_synctex: cfg['relatex_synctex'] == true, explicit_relatex_synctex: false, synctex_status: false,
       bib: cfg['bib'],
       passes: (cfg['passes'] || LaTeXUtils::DEFAULT_PASSES).to_i.clamp(1, LaTeXUtils::MAX_PASSES),
       timeout: cfg['timeout'],
@@ -502,6 +503,13 @@ module LatexCLI
     opts.on('--update-if-changed', 'Only replace target PDF if extracted text changed (prevents viewer reloads)') do
       options[:update_on_diff] = true
       options[:explicit_update_on_diff] = true
+    end
+    opts.on('--[no-]relatex-synctex', 'With lualatex, let a background relatex replace the SyncTeX with a word-level one') do |v|
+      options[:relatex_synctex] = v
+      options[:explicit_relatex_synctex] = true
+    end
+    opts.on('--synctex-status', 'Show whether the background relatex SyncTeX run is alive, with its log tail, and exit') do
+      options[:synctex_status] = true
     end
     opts.on('--[no-]mirror-subdirs', 'Mirror project subdirectories into build directory (default: false)') do |v|
       options[:auto_mirror_subdirs] = v

@@ -125,7 +125,17 @@ module LaTeXHelpManual
       '      Only replace target PDF if extracted text content changed, preventing external',
       '      PDF viewers from reloading on visually identical rebuilds.',
       '      Example:',
-      '        l --update-if-changed paper.tex'
+      '        l --update-if-changed paper.tex',
+      '',
+      '  --[no-]relatex-synctex',
+      '      With lualatex, run `relatex synctex` in the background (detached, nice 19) with a',
+      '      shared pinned build date; it replaces NAME.synctex.gz with a word-level one only if',
+      '      its PDF is byte-identical. Off when relatex is not on PATH (config: relatex_synctex).',
+      '      Example:',
+      '        l -e lualatex --relatex-synctex paper.tex',
+      '',
+      '  --synctex-status',
+      '      Show whether the background relatex SyncTeX run is alive, with its log tail.'
     ].join("\n")
   end
 

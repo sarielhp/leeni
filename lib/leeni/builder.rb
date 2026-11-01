@@ -143,6 +143,7 @@ class LatexBuilder
     @build_result = run_build_steps
     @build_result != 'failed'
   ensure
+    finish_relatex_synctex(@build_result)
     record_build_finish if @build_started
   end
 
@@ -154,6 +155,7 @@ class LatexBuilder
       return 'up_to_date'
     end
 
+    start_relatex_synctex
     snapshot_build_inputs!
     FileUtils.rm_f(File.join(@junk_dir, '.build_state.json'))
     clean_pass_logs
@@ -199,9 +201,9 @@ class LatexBuilder
     junk_synctex = File.join(@junk_dir, "#{@bfilename}.synctex.gz")
 
     unless @options[:no_export]
-      update_target_file(junk_pdf, "#{@bfilename}.pdf", update_on_diff: @options[:update_on_diff])
-      update_target_file(junk_bbl, "#{@bfilename}.bbl") if LaTeXUtils.bbl_has_entries?(junk_bbl)
       update_target_file(junk_synctex, "#{@bfilename}.synctex.gz")
+      update_target_file(junk_bbl, "#{@bfilename}.bbl") if LaTeXUtils.bbl_has_entries?(junk_bbl)
+      update_target_file(junk_pdf, "#{@bfilename}.pdf", update_on_diff: @options[:update_on_diff])
     end
 
     if @options[:time]

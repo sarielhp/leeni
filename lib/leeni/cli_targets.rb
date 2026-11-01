@@ -34,6 +34,7 @@ module LatexCLITargets
 
   def process_target(target, options)
     exit LeeniReport.run(target, options) if options[:report]
+    return print_synctex_status(target, options) if options[:synctex_status]
 
     if options[:make_indep]
       process_make_indep_target(target, options)
@@ -59,6 +60,13 @@ module LatexCLITargets
     builder = LatexBuilder.new(target, options.merge(force: true, no_env: false))
     exit 1 unless builder.run!
     exit 1 unless LatexIndependizer.new(builder).run!
+  end
+
+  def print_synctex_status(target, options)
+    Dir.chdir(File.expand_path(File.dirname(target))) do
+      junk_dir = LatexBuilder.new(File.basename(target), options).junk_dir
+      puts LeeniRelatexSynctex.status_lines(junk_dir)
+    end
   end
 
   def process_bib_extract_target(target, options)

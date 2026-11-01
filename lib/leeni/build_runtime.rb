@@ -7,7 +7,13 @@
 # process execution, timeouts, and individual LaTeX passes.
 # ==============================================================================
 
+require_relative 'relatex_synctex'
+
 module LatexBuildRuntime
+  # SyncTeX goes out before the PDF in finalize_build_outputs: a relatex SyncTeX
+  # run waits for the PDF, and its word-level file must not be overwritten after it.
+  include LeeniRelatexSynctex::Hooks
+
   STYLE_COPY_EXTS = %w[.sty .cls .clo .def .fd .cfg .bst .bbx .cbx .lbx .dbx .ldf .bib].freeze
 
   EXTERNAL_TRACKED_EXTS = %w[.tex .sty .cls .clo .def .fd .cfg .bbx .cbx .lbx .dbx .ldf .rtx .lua
@@ -226,7 +232,7 @@ module LatexBuildRuntime
   def pass_environment
     env = LaTeXCompatibility.compiler_environment(@options, ENV.to_h, @filename).dup
     env['max_print_line'] ||= '2048'
-    env
+    env.merge(relatex_date_environment)
   end
 
   def kill_process_group(pid)

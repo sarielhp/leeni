@@ -34,6 +34,8 @@ All long options accept either `-` or `--` and allow internal dashes to be omitt
 | `-T`, `--time` | Build | Show execution wall-clock time breakdown per pass. |
 | `--no-export` | Build | Leave the working tree untouched; outputs stay in the build directory. |
 | `--update-if-changed` | Build | Only replace target PDF if extracted text changed (`pdftotext`). |
+| `--[no-]relatex-synctex` | Build | With lualatex, a background `relatex` replaces the SyncTeX with a verified word-level one. |
+| `--synctex-status` | Build | Show whether the background relatex SyncTeX run is alive, with its log tail. |
 | `-c`, `--clean` | Cleaning | Clean the project cache and regenerable root files before compiling. |
 | `-C`, `--clean-only` | Cleaning | Clean the project cache and root auxiliary files, then exit. |
 | `--junk-dir DIR` | Cleaning | Override the XDG cache build directory. |
@@ -128,6 +130,18 @@ l -e lualatex paper.tex
 Uses `pdftotext` to extract and compare text layout between the newly compiled PDF and the existing target. If text layout has not changed, the target file is not overwritten, preventing PDF viewer reload flicker on non-visual edits.
 ```bash
 l --update-if-changed paper.tex
+```
+
+### `--[no-]relatex-synctex`
+Opt-in, lualatex only, and silently off when `relatex` is not on `PATH` (config key `"relatex_synctex"`). When a rebuild starts, leeni stops the previous run's relatex, pins one build time (`SOURCE_DATE_EPOCH=<now>`, `FORCE_SOURCE_DATE=1`, unless `SOURCE_DATE_EPOCH` is already set) for its own passes, and starts `relatex synctex . --main FILE.tex --for FILE.pdf` detached (own process group, `nice 19`), which outlives leeni. Once leeni's PDF is in the working tree, relatex installs a word-level `FILE.synctex.gz` only if its own PDF is byte-identical; a viewer that re-reads the SyncTeX file picks it up without a PDF reload. A failed build stops it. The pid file and log (`relatex_synctex.pid`, `relatex_synctex.log`) live in the project build directory. Not used with `--no-export`, `-z`, `-t`, `--sandbox`, `--arxiv` or `-I`.
+```bash
+l -e lualatex --relatex-synctex paper.tex
+```
+
+### `--synctex-status`
+Prints whether the background relatex SyncTeX run is still alive and the last lines of its log, then exits.
+```bash
+l --synctex-status paper.tex
 ```
 
 ### `-T`, `--time`

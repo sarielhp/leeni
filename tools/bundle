@@ -51,6 +51,7 @@ module LatexBundler
     presenters.rb
     diagnostics.rb
     bib_manager.rb
+    relatex_synctex.rb
     build_runtime.rb
     builder.rb
     bib_extractor.rb

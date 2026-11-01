@@ -295,7 +295,7 @@ module LatexCLI
       fast: is_lw || cfg['fast'] == true,
       update_on_diff: cfg['update_on_diff'] == true,
       relatex_synctex: cfg['relatex_synctex'] == true, explicit_relatex_synctex: false, synctex_status: false,
-      draft_passes: cfg['draft_passes'] != false,
+      draft_passes: cfg['draft_passes'] == true,
       bib: cfg['bib'],
       passes: (cfg['passes'] || LaTeXUtils::DEFAULT_PASSES).to_i.clamp(1, LaTeXUtils::MAX_PASSES),
       timeout: cfg['timeout'],

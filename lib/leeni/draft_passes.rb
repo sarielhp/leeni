@@ -34,7 +34,7 @@ module LatexDraftPasses
   private
 
   def draft_passes_enabled?
-    @options[:draft_passes] != false && !@options[:single_pass] && !@options[:raw] && DRAFT_FLAGS.key?(@engine_name)
+    @options[:draft_passes] == true && !@options[:single_pass] && !@options[:raw] && DRAFT_FLAGS.key?(@engine_name)
   end
 
   # Why pass PASS may be a draft (:bib or :index), or nil when it must be regular.

@@ -86,7 +86,7 @@ module LaTeXHelpManual
       '      Certain means a bibliography or index tool will run after it: a fresh build',
       '      whose sources cite from a database, a changed .bib, or a missing .ind',
       '      (--index), with -n leaving room for another pass. The last pass is always a',
-      '      regular one. On by default (config: draft_passes).',
+      '      regular one. Off by default (config: draft_passes).',
       '      Example:',
       '        l --no-draft-passes paper.tex',
       '',

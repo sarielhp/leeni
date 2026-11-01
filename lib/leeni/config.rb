@@ -47,7 +47,7 @@ module LaTeXConfig
       // Draft mode (no PDF) for a pass certain to be followed by another, such as
       // the pass before biber/bibtex on a fresh build; the last pass is always
       // regular (--[no-]draft-passes).
-      "draft_passes": true,
+      "draft_passes": false,
 
       // Run makeindex on target when .idx changes (-I / --[no-]index)
       "index": false,

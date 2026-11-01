@@ -31,7 +31,8 @@ class TestDraftPasses < Minitest::Test
         File.write('paper.tex', tex)
         File.write('body.tex', "See \\cite{knuth}.\n")
         File.write('refs.bib', "@book{knuth, author={D. Knuth}, title={T}, year={1984}, publisher={P}}\n")
-        yield LatexBuilder.new('paper.tex', { engine: 'lualatex', passes: 5, lock: false, bib: nil, junk_dir: 'junk' }.merge(opts))
+        defaults = { engine: 'lualatex', passes: 5, lock: false, bib: nil, junk_dir: 'junk', draft_passes: true }
+        yield LatexBuilder.new('paper.tex', defaults.merge(opts))
       end
     end
   end
@@ -212,7 +213,8 @@ class TestDraftPasses < Minitest::Test
       LatexCLI.build_option_parser(options).parse!(argv)
       options[:draft_passes]
     end
-    assert parse.call({}, [])
+    refute parse.call({}, [])
+    assert parse.call({ 'draft_passes' => true }, [])
     refute parse.call({ 'draft_passes' => false }, [])
     refute parse.call({}, %w[--no-draft-passes])
     assert parse.call({ 'draft_passes' => false }, %w[--draft-passes])

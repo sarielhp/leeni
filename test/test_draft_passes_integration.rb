@@ -52,7 +52,7 @@ class TestDraftPassesIntegration < Minitest::Test
   end
 
   def test_fresh_bibliography_build_drafts_the_pass_before_biber
-    out, text, pages = build(BIB_DOC)
+    out, text, pages = build(BIB_DOC, '--draft-passes')
     assert_match(/lualatex \(1, draft\).*biber.*lualatex \(2\)/m, out)
     refute_match(/\(\d+, draft\)\s*\z/, out.lines.grep(/lualatex/).last.to_s.strip, 'the last pass must be regular')
     plain_out, plain_text, plain_pages = build(BIB_DOC, '--no-draft-passes')
@@ -63,7 +63,7 @@ class TestDraftPassesIntegration < Minitest::Test
   end
 
   def test_document_without_bibliography_has_no_draft_pass
-    out, text, pages = build(PLAIN_DOC)
+    out, text, pages = build(PLAIN_DOC, '--draft-passes')
     refute_includes out, 'draft'
     _plain_out, plain_text, plain_pages = build(PLAIN_DOC, '--no-draft-passes')
     assert_equal plain_text, text

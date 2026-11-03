@@ -60,6 +60,11 @@ module LaTeXConfig
       // Off when relatex is not on PATH; l --synctex-status shows the outcome.
       "relatex_synctex": false,
 
+      // With relatex_synctex and lualatex: leeni's passes run xelatex (its SyncTeX
+      // names the right files at once) and relatex replaces that PDF and SyncTeX with
+      // its LuaLaTeX PDF and word-level SyncTeX (--[no-]xelatex-preview).
+      "xelatex_preview": false,
+
       // Display execution timing diagnostics per pass (-T / --time)
       "time": false,
 
@@ -451,6 +456,7 @@ module LaTeXConfig
     [:explicit_passes, 'passes', ->(opts) { opts[:passes] }],
     [:explicit_update_on_diff, 'update_on_diff', ->(opts) { opts[:update_on_diff] }],
     [:explicit_relatex_synctex, 'relatex_synctex', ->(opts) { opts[:relatex_synctex] }],
+    [:explicit_xelatex_preview, 'xelatex_preview', ->(opts) { opts[:xelatex_preview] }],
     [:explicit_time, 'time', ->(opts) { opts[:time] }],
     [:explicit_raw, 'raw', ->(opts) { opts[:raw] }],
     [:explicit_trace, 'trace', ->(opts) { opts[:trace] }],

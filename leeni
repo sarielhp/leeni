@@ -295,6 +295,7 @@ module LatexCLI
       fast: is_lw || cfg['fast'] == true,
       update_on_diff: cfg['update_on_diff'] == true,
       relatex_synctex: cfg['relatex_synctex'] == true, explicit_relatex_synctex: false, synctex_status: false,
+      xelatex_preview: cfg['xelatex_preview'] == true, explicit_xelatex_preview: false,
       draft_passes: cfg['draft_passes'] == true,
       bib: cfg['bib'],
       passes: (cfg['passes'] || LaTeXUtils::DEFAULT_PASSES).to_i.clamp(1, LaTeXUtils::MAX_PASSES),
@@ -511,6 +512,10 @@ module LatexCLI
     opts.on('--[no-]relatex-synctex', 'With lualatex, let a background relatex replace the SyncTeX with a word-level one') do |v|
       options[:relatex_synctex] = v
       options[:explicit_relatex_synctex] = true
+    end
+    opts.on('--[no-]xelatex-preview', 'With --relatex-synctex, build a XeLaTeX preview that relatex replaces with its LuaLaTeX PDF') do |v|
+      options[:xelatex_preview] = v
+      options[:explicit_xelatex_preview] = true
     end
     opts.on('--synctex-status', 'Show whether the background relatex SyncTeX run is alive, with its log tail, and exit') do
       options[:synctex_status] = true

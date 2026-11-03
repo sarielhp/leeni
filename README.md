@@ -168,7 +168,7 @@ For technical guides, configuration options, and advanced features, see:
 ## Frequently Asked Questions (FAQ)
 
 ### Can I get word-level SyncTeX with lualatex?
-Yes, if `relatex` is on `PATH`: set `"relatex_synctex": true` in `.l.jsonc` (or pass `--relatex-synctex`). Each lualatex rebuild then starts `relatex synctex` in the background with the same pinned build date (`SOURCE_DATE_EPOCH`, `FORCE_SOURCE_DATE`); when its PDF is byte-identical to leeni's, it replaces `<doc>.synctex.gz` with a word-level one, so a viewer that re-reads the SyncTeX file needs no PDF reload. `l --synctex-status` shows the outcome; see [docs/cli_options.md](docs/cli_options.md).
+Yes, if `relatex` is on `PATH`: set `"relatex_synctex": true` in `.l.jsonc` (or pass `--relatex-synctex`). Each lualatex rebuild then starts `relatex synctex` in the background with the same pinned build date (`SOURCE_DATE_EPOCH`, `FORCE_SOURCE_DATE`); when its PDF is byte-identical to leeni's, it replaces `<doc>.synctex.gz` with a word-level one, so a viewer that re-reads the SyncTeX file needs no PDF reload. `l --synctex-status` shows the outcome; see [docs/cli_options.md](docs/cli_options.md). Add `--xelatex-preview` (`"xelatex_preview": true`) to build a quick XeLaTeX preview instead, which relatex then replaces with its own LuaLaTeX PDF and word-level SyncTeX.
 
 ### Does `leeni` modify my `.tex` source files?
 **No.** Standard compilation (`l`, `l paper.tex`) never touches or modifies your source documents. When generating publication packages (`-Z` or `--arxiv`), source flattening and comment stripping operate exclusively inside isolated temporary staging directories.

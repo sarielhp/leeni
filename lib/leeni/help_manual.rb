@@ -144,6 +144,14 @@ module LaTeXHelpManual
       '      Example:',
       '        l -e lualatex --relatex-synctex paper.tex',
       '',
+      '  --[no-]xelatex-preview',
+      '      With --relatex-synctex and lualatex: leeni builds with xelatex (PDF and SyncTeX at',
+      '      once, the SyncTeX naming the right files) and relatex replaces both with its LuaLaTeX',
+      '      PDF and word-level SyncTeX, only while that PDF is still the newest (config:',
+      '      xelatex_preview). The viewer shows the XeLaTeX PDF, then the LuaLaTeX one.',
+      '      Example:',
+      '        l -e lualatex --relatex-synctex --xelatex-preview paper.tex',
+      '',
       '  --synctex-status',
       '      Show whether the background relatex SyncTeX run is alive, with its log tail.'
     ].join("\n")

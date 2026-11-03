@@ -51,6 +51,10 @@ This creates `.l.jsonc` pre-populated with default settings and comments:
   // `l --synctex-status` shows the outcome.
   "relatex_synctex": false,
 
+  // With relatex_synctex and lualatex: leeni's passes run xelatex and relatex replaces
+  // that PDF and SyncTeX with its LuaLaTeX PDF and word-level SyncTeX (--[no-]xelatex-preview).
+  "xelatex_preview": false,
+
   // Help screen visual style: "plain" (default) or "lines" (subdued horizontal dividers)
   "help_style": "plain",
 

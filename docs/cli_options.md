@@ -36,6 +36,7 @@ All long options accept either `-` or `--` and allow internal dashes to be omitt
 | `--no-export` | Build | Leave the working tree untouched; outputs stay in the build directory. |
 | `--update-if-changed` | Build | Only replace target PDF if extracted text changed (`pdftotext`). |
 | `--[no-]relatex-synctex` | Build | With lualatex, a background `relatex` replaces the SyncTeX with a verified word-level one. |
+| `--[no-]xelatex-preview` | Build | With `--relatex-synctex`, build a XeLaTeX preview that relatex replaces with its LuaLaTeX PDF and word-level SyncTeX. |
 | `--synctex-status` | Build | Show whether the background relatex SyncTeX run is alive, with its log tail. |
 | `-c`, `--clean` | Cleaning | Clean the project cache and regenerable root files before compiling. |
 | `-C`, `--clean-only` | Cleaning | Clean the project cache and root auxiliary files, then exit. |
@@ -145,8 +146,14 @@ Opt-in, lualatex only, and silently off when `relatex` is not on `PATH` (config 
 l -e lualatex --relatex-synctex paper.tex
 ```
 
+### `--[no-]xelatex-preview`
+Opt-in (config key `"xelatex_preview"`), and only together with `--relatex-synctex` for a lualatex document. leeni's own passes run `xelatex` instead, so the PDF and its SyncTeX arrive quickly and the SyncTeX names the right files (LuaLaTeX's can send clicks into a package such as a TikZ library until relatex's arrives). relatex runs with `--replace-pdf`: it builds with LuaLaTeX and installs its own PDF together with its word-level `FILE.synctex.gz` in place of XeLaTeX's pair, only while `FILE.pdf` is still the file it waited for and the sources are unchanged (SyncTeX renamed first, PDF second; a newer build is never overwritten, relatex logs `superseded` and installs nothing). The viewer shows the XeLaTeX PDF first and the LuaLaTeX one a few seconds later, so use it for papers that look alike under both engines. No build date is pinned (XeTeX would date `\today` in UTC). `--synctex-status` names the mode.
+```bash
+l -e lualatex --relatex-synctex --xelatex-preview paper.tex
+```
+
 ### `--synctex-status`
-Prints whether the background relatex SyncTeX run is still alive and the last lines of its log, then exits.
+Prints whether the background relatex SyncTeX run is still alive, its mode (identity, or the XeLaTeX preview that relatex replaces) and the last lines of its log, then exits.
 ```bash
 l --synctex-status paper.tex
 ```

@@ -90,7 +90,7 @@ module LatexBuildRuntime
     junk_dir_create
     LaTeXUtils.reset_latex_environment! if @options[:no_env]
 
-    @engine_name = resolve_engine
+    @engine_name = preview_engine(resolve_engine)
     LaTeXUtils.check_program(@engine_name)
     @latex_flags = %w[-interaction=nonstopmode -synctex=1 -no-mktex=tfm -recorder] +
                    ["-output-directory=#{@junk_dir}", '-file-line-error']

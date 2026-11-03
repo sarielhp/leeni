@@ -178,4 +178,54 @@ class TestRelatexSynctex < LeeniTestBase
       assert_match(/no relatex SyncTeX run recorded/, lines.last)
     end
   end
+
+  # --xelatex-preview: the passes run xelatex, relatex gets --replace-pdf, and
+  # --synctex-status names the mode.
+  def test_xelatex_preview_runs_xelatex_and_lets_relatex_replace_the_pdf
+    in_paper do
+      b = builder(xelatex_preview: true)
+      assert_equal 'xelatex', b.send(:preview_engine, 'lualatex')
+      b.instance_variable_set(:@engine_name, 'xelatex')
+      start(b)
+      assert(wait_for { log_text.include?('args:') })
+      assert_includes log_text, 'args: synctex . --main paper.tex --for paper.pdf --replace-pdf'
+      assert_empty b.send(:relatex_date_environment), 'a preview pins no date'
+      assert_match(/XeLaTeX preview; relatex replaces it/, LeeniRelatexSynctex.status_lines('junk')[1])
+      out, = capture_io { b.send(:finish_relatex_synctex, 'ok') }
+      assert_includes strip_ansi(out), 'relatex SyncTeX running in background, replaces the XeLaTeX preview'
+    end
+  end
+
+  def test_identity_mode_is_named_and_passes_keep_lualatex
+    in_paper do
+      b = builder
+      assert_equal 'lualatex', b.send(:preview_engine, 'lualatex')
+      start(b)
+      assert(wait_for { log_text.include?('args:') })
+      refute_includes log_text, '--replace-pdf'
+      assert_match(/byte-identical/, LeeniRelatexSynctex.status_lines('junk')[1])
+    end
+  end
+
+  def test_xelatex_preview_needs_relatex_synctex_and_lualatex
+    in_paper do
+      [{ relatex_synctex: false }, { engine: 'pdflatex' }].each do |options|
+        b = builder(options.merge(xelatex_preview: true))
+        assert_equal b.engine_name, b.send(:preview_engine, b.engine_name), "no preview for #{options}"
+      end
+    end
+  end
+
+  def test_xelatex_preview_flag_and_config_key
+    parse = lambda do |cfg, argv|
+      options = LatexCLI.build_default_options(cfg, 'l', [])
+      LatexCLI.normalize_argv!(argv)
+      LatexCLI.build_option_parser(options).parse!(argv)
+      options
+    end
+    refute parse.call({}, [])[:xelatex_preview]
+    assert parse.call({ 'xelatex_preview' => true }, [])[:xelatex_preview]
+    assert parse.call({}, %w[--xelatex-preview])[:xelatex_preview]
+    refute parse.call({ 'xelatex_preview' => true }, %w[--no-xelatex-preview])[:xelatex_preview]
+  end
 end

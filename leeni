@@ -169,6 +169,7 @@ module LatexCLI
   # Every script under tools/ handles this; the binary end users actually run
   # was the only one that answered a mistyped flag with a Ruby backtrace.
   def self.parse_options!(parser, argv, prog_name)
+    reject_abbreviations!(argv, parser)
     parser.parse!(argv)
   rescue OptionParser::ParseError => e
     warn "#{prog_name}: #{e.message}"
@@ -385,6 +386,19 @@ module LatexCLI
       canonical = canonical_option_flag(flag, names)
       argv[index] = value.nil? ? canonical : "#{canonical}=#{value}"
       skip_value = value.nil? && option_requires_next_value?(argv[index], parser)
+    end
+  end
+
+  # Long options must be spelled out: OptionParser would take an unambiguous prefix, so a removed
+  # alias (--xelatex) or a typo would silently select another option (--xelatex-preview). Runs on
+  # the normalized argv; operands after -- are not options.
+  def self.reject_abbreviations!(argv, parser)
+    argv.each do |arg|
+      break if arg == '--'
+      next unless arg.start_with?('--') && arg.length > 2
+
+      flag = arg.split('=', 2).first
+      raise OptionParser::InvalidOption, flag unless parser.top.long.key?(flag.delete_prefix('--'))
     end
   end
 

@@ -35,7 +35,7 @@ class TestLeeniCLI < LeeniTestBase
 
     # Verify shortcuts and no-ops are not present in condensed help output
     refute_includes stdout, '--lua'
-    refute_includes stdout, '--xe'
+    refute_match(/(^|\s)--xe\b(?!latex-preview)/, stdout)
     refute_includes stdout, '--pdflatex'
     refute_includes stdout, '--fast'
     refute_includes stdout, '--pdf'
@@ -46,7 +46,7 @@ class TestLeeniCLI < LeeniTestBase
     refute_includes stdout, '--find-main'
     refute_includes stdout, '--file'
     refute_includes stdout, '--lualatex'
-    refute_includes stdout, '--xelatex'
+    refute_match(/--xelatex(?!-preview)/, stdout)
     refute_includes stdout, '--update-on-diff'
     refute_includes stdout, '--diff'
     refute_includes stdout, '--test'
@@ -71,7 +71,7 @@ class TestLeeniCLI < LeeniTestBase
 
     # Verify shortcuts and no-ops are not present in full help either
     refute_includes stdout, '--lua'
-    refute_includes stdout, '--xe'
+    refute_match(/(^|\s)--xe\b(?!latex-preview)/, stdout)
     refute_includes stdout, '--pdflatex'
     refute_includes stdout, '--fast'
     refute_includes stdout, '--pdf'
@@ -82,7 +82,7 @@ class TestLeeniCLI < LeeniTestBase
     refute_includes stdout, '--find-main'
     refute_includes stdout, '--file'
     refute_includes stdout, '--lualatex'
-    refute_includes stdout, '--xelatex'
+    refute_match(/--xelatex(?!-preview)/, stdout)
     refute_includes stdout, '--update-on-diff'
     refute_includes stdout, '--diff'
     refute_includes stdout, '--test'
@@ -154,6 +154,7 @@ class TestLeeniCLI < LeeniTestBase
           opts = LatexCLI.build_default_options({}, 'l', [])
           parser = LatexCLI.build_option_parser(opts)
           assert_raises(OptionParser::ParseError, "Removed alias #{alias_flag} should be rejected") do
+            LatexCLI.reject_abbreviations!(argv, parser)
             parser.order!(argv)
           end
         end

@@ -39,9 +39,6 @@ This creates `.l.jsonc` pre-populated with default settings and comments:
   // Skip PDF output on passes certain to be followed by another (--[no-]draft-passes)
   "draft_passes": false,
 
-  // Fast incremental mode: reuse aux files and avoid redundant passes
-  "fast": false,
-
   // Enable diff-based PDF replacement (requires pdftotext)
   "update_on_diff": false,
 

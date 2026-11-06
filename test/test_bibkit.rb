@@ -3,6 +3,7 @@
 # Bibkit, the .bib library: scanner, collection, comparison and fixer. No TeX
 # runs here; see test_bib_fix.rb for --bib-fix end to end.
 
+require_relative 'test_env'
 require 'minitest/autorun'
 require 'tmpdir'
 require 'fileutils'

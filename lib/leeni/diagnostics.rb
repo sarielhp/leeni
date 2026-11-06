@@ -11,6 +11,7 @@ require_relative 'error_catalog'
 require_relative 'box_context'
 require_relative 'compile_format'
 require_relative 'bib_checks'
+require_relative 'pdf_checks'
 
 module LaTeXDiagnostics
   DIAGNOSTIC_EXPLANATIONS = LaTeXErrorCatalog::WARNING_EXPLANATIONS
@@ -792,7 +793,9 @@ module LaTeXDiagnostics
       command = Regexp.last_match(1)
       return "Warning: command #{command} invalid in math mode; #{LaTeXErrorCatalog.math_mode_advice(command)}"
     end
-    return "Warning: Missing database entry: '#{Regexp.last_match(1)}'" if str =~ /Missing database entry:\s*['"]([^`'"]+)['"]/i
+    if str =~ /Missing database entry:\s*['"]([^`'"]+)['"]/i
+      return "Warning: Missing database entry: '#{Regexp.last_match(1)}'#{Regexp.last_match.post_match.rstrip}"
+    end
     return "Warning: #{str}" if str =~ /^Missing database entries/i
 
     if str =~ /^(?:\*?\s*(?:Package|Class))\s+([-\w.@*]+)\s+[Ww]arning:\s*(.+)$/m
@@ -2120,10 +2123,10 @@ module LaTeXDiagnostics
     target_pdf = resolve_target_pdf
     return [] unless target_pdf
 
-    type3 = LaTeXUtils.check_type3_fonts(target_pdf)
+    type3 = LaTeXPdfChecks.check_type3_fonts(target_pdf)
     return [] unless type3
 
-    msg = LaTeXUtils.type3_font_message(type3)
+    msg = LaTeXPdfChecks.type3_font_message(type3)
     color = type3[:glyph_kind] == :vector ? :yellow : :red
     formatted = format_diagnostic_line('', msg, color)
     [{
@@ -2697,9 +2700,9 @@ module LaTeXDiagnostics
 
     missing_keys.uniq!
     missing_keys.sort!
-    return if missing_keys.empty?
+    return add_bib_fix_note!(warn_items) if missing_keys.empty?
 
-    formatted_msg = format_missing_bib_entries(missing_keys)
+    formatted_msg = format_missing_bib_entries(missing_keys) + bib_fix_hint(missing_keys)
     warn_text = @options[:emacs] ? formatted_msg : clean_diagnostic_warning(formatted_msg)
     warn_items << {
       file: './bibliography',
@@ -2712,6 +2715,36 @@ module LaTeXDiagnostics
       formatted: format_diagnostic_line('bib', warn_text, :yellow, file: './bibliography'),
       index: 100_000
     }
+  end
+
+  # One line when --bib-fix can add some of the missing keys from the
+  # bibliography collection; nothing otherwise.
+  def bib_fix_hint(missing_keys)
+    found = LatexBibChecks.fixable_keys(missing_keys, junk_dir, bfilename, @options)
+    return '' if found.empty?
+
+    subject = if found.size < missing_keys.size then "#{found.size} of them #{found.size == 1 ? 'is' : 'are'}"
+              elsif found.size == 1 then 'It is'
+              else 'All are'
+              end
+    "\n  #{subject} in BIBINPUTS; l --bib-fix adds #{found.size == 1 ? 'it' : 'them'} to the paper's .bib file."
+  end
+
+  UNDEFINED_CITATION = /Citation\s+[`'"](.+?)[`'"](?:\s+on page \d+)?\s+undefined/i
+
+  # When the bibliography tool did not run this time (nothing it reads
+  # changed), LaTeX's undefined-citation warnings are the only sign of a
+  # missing entry; the --bib-fix hint then is a line of its own. Worded so it
+  # is not taken for one more citation warning.
+  def add_bib_fix_note!(warn_items)
+    keys = warn_items.filter_map { |w| (w[:raw_text] || w[:text]).to_s[UNDEFINED_CITATION, 1] }.uniq.sort
+    found = keys.empty? ? [] : LatexBibChecks.fixable_keys(keys, junk_dir, bfilename, @options).to_a.sort
+    return if found.empty?
+
+    text = "Warning: l --bib-fix can add #{found.size == 1 ? 'the entry' : "#{found.size} entries"} " \
+           "#{found.map { |k| "'#{k}'" }.join(', ')} from BIBINPUTS to the paper's .bib file"
+    warn_items << { file: './bibliography', line: 0, line_str: 'bib', text: text, raw_text: text, base_color: :yellow,
+                    formatted: format_diagnostic_line('bib', text, :yellow, file: './bibliography'), index: 100_001 }
   end
 
   def format_missing_bib_entries(keys)

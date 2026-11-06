@@ -96,7 +96,7 @@ l paper.tex
 Everyday commands:
 
 ```bash
-lw          # Fast incremental rebuild (reuses cached state)
+lw          # Same as l (kept for existing shortcuts)
 l -f        # Force a rebuild even if files haven't changed
 l -llm      # Token-optimized plaintext build for AI coding agents
 l -x        # Show plain-English explanations and fixes for errors

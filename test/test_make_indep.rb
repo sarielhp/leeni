@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require_relative 'test_env'
 require 'minitest/autorun'
 require 'tmpdir'
 require 'fileutils'
@@ -47,8 +48,6 @@ class TestMakeIndep < Minitest::Test
   end
 
   def test_bibtex_paper_becomes_independent
-    skip 'bibtool not available' unless LaTeXUtils.command_available?('bibtool')
-
     with_external_tree do |root, project, env|
       tex = <<~TEX
         \\documentclass{article}
@@ -133,8 +132,6 @@ class TestMakeIndep < Minitest::Test
   # The converted paper keeps styles/ and a local .bst; -z and --arxiv must
   # bundle both, and never the backup zip.
   def test_converted_paper_packages_for_zip_and_arxiv
-    skip 'bibtool not available' unless LaTeXUtils.command_available?('bibtool')
-
     with_external_tree do |_root, project, env|
       File.write(File.join(project, 'paper.tex'), <<~'TEX')
         \documentclass{article}
@@ -267,8 +264,6 @@ class TestMakeIndep < Minitest::Test
   end
 
   def test_linked_target_file_is_refused
-    skip 'bibtool not available' unless LaTeXUtils.command_available?('bibtool')
-
     with_external_tree do |root, project, env|
       shared_bib = File.join(root, 'ext', 'bib', 'refs.bib')
       before = File.read(shared_bib)

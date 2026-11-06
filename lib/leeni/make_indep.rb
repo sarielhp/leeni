@@ -16,6 +16,7 @@ require 'fileutils'
 require 'open3'
 require_relative 'tmp_space'
 require_relative 'bib_extractor'
+require_relative 'bib_checks'
 require_relative 'packager'
 
 class LatexIndependizer
@@ -316,7 +317,7 @@ class LatexIndependizer
   def plan_bibliography(plan, inputs)
     extractor = LaTeXBibExtractor.new(@builder)
     biblatex = extractor.biblatex?
-    names = biblatex ? biber_sources : bibtex_sources
+    names = LatexBibChecks.bibliography_sources(@builder.junk_dir, @bfilename)
     plan_bst(plan) unless biblatex
     return true if names.empty? || names.all? { |name| local_bib?(name) }
 
@@ -332,25 +333,9 @@ class LatexIndependizer
     @aux_text ||= LaTeXUtils.safe_read(File.join(@builder.junk_dir, "#{@bfilename}.aux"))
   end
 
-  def bibtex_sources
-    aux_text.scan(/\\bibdata\{([^}]*)\}/).flatten.flat_map { |list| list.split(',') }.map(&:strip).reject(&:empty?)
-  end
-
-  def biber_sources
-    bcf = LaTeXUtils.safe_read(File.join(@builder.junk_dir, "#{@bfilename}.bcf"))
-    bcf.scan(%r{<bcf:datasource[^>]*>([^<]+)</bcf:datasource>}).flatten.map(&:strip)
-  end
-
-  # A source counts as local when it is a relative path that leeni finds in
-  # the project without BIBINPUTS and that really lies inside it: like the
-  # .tex and style inputs, a bib reached through ../ or a symlink out of the
-  # project is external.
+  # Local for -I: a project file, named relatively so it moves with the paper.
   def local_bib?(name)
-    return false if name.start_with?('/', '~')
-
-    dirs = ['.'] + Array(@options[:bib_dirs] || LaTeXUtils::DEFAULT_BIB_DIRS)
-    stem = name.delete_suffix('.bib')
-    dirs.map { |dir| File.join(dir, "#{stem}.bib") }.any? { |path| File.file?(path) && project_relative(path) }
+    !name.start_with?('/', '~') && LatexBibChecks.local_source?(name, @options[:bib_dirs] || LaTeXUtils::DEFAULT_BIB_DIRS)
   end
 
   def extract_bibliography(extractor)

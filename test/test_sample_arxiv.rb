@@ -1,6 +1,7 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
+require_relative 'test_env'
 require 'minitest/autorun'
 require 'tmpdir'
 load File.expand_path('../tools/sample_arxiv', __dir__)

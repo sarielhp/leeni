@@ -10,6 +10,7 @@
 require 'fileutils'
 require 'open3'
 require 'rbconfig'
+require_relative 'pdf_checks'
 require_relative 'tmp_space'
 require_relative 'packaging_shared'
 
@@ -320,12 +321,12 @@ class LatexArxivPackager
   end
 
   def check_arxiv_type3_fonts(pdf_path)
-    type3 = LaTeXUtils.check_type3_fonts(pdf_path)
+    type3 = LaTeXPdfChecks.check_type3_fonts(pdf_path)
     return unless type3
 
     downgraded = type3[:glyph_kind] == :vector || Array(@options[:alert_as_warning]).map(&:to_s).include?('type3_font')
     tier = downgraded ? 'WARNING' : 'ALERT'
-    warn Rainbow("[#{tier}] arXiv package PDF: #{LaTeXUtils.type3_font_message(type3)}").yellow.bright
+    warn Rainbow("[#{tier}] arXiv package PDF: #{LaTeXPdfChecks.type3_font_message(type3)}").yellow.bright
   end
 
   def verify_arxiv_pdf_match(reference_pdf, rebuilt_pdf)

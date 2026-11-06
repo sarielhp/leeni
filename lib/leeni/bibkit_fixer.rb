@@ -123,15 +123,17 @@ module Bibkit
     # The target file's text with the plan applied: @preamble and @string
     # blocks first (BibTeX needs a macro defined before its first use),
     # entries appended.
-    def render(text, plan)
+    def render(text, plan, header: '% Added by leeni --bib-fix')
       head = plan.preambles.map { |hit| hit.item.text.b } + ordered(plan.strings).flat_map { |a| blocks_for(a) }
       tail = plan.entries.flat_map { |a| blocks_for(a) }
       out = +''.b
-      out << "% Added by leeni --bib-fix\n" << head.join("\n") << "\n\n" unless head.empty?
+      out << "#{header}\n".b << head.join("\n") << "\n\n" unless head.empty?
       out << text.b
       out << "\n" unless out.empty? || out.end_with?("\n")
-      out << "\n" << tail.join("\n\n") << "\n" unless tail.empty?
-      out
+      return out if tail.empty?
+
+      out << "\n" unless out.empty? || out.end_with?("\n\n")
+      out << tail.join("\n\n") << "\n"
     end
 
     private

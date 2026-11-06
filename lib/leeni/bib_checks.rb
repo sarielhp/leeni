@@ -19,6 +19,7 @@ require_relative 'bibkit_fixer'
 module LatexBibChecks
   CACHE_FILE = '.bib_checks.json'
   CACHE_FORMAT = 1
+  KEYS_CACHE_FILE = '.bib_keys.json'
 
   # The bibliography files the paper names: Biber's datasources from the
   # .bcf, else BibTeX's \bibdata from the .aux.
@@ -52,6 +53,13 @@ module LatexBibChecks
     nil
   end
 
+  # True when `name` resolves to a file of the project: found without the TeX
+  # search path, and really inside it (not reached through ../ or a symlink).
+  def self.local_source?(name, bib_dirs)
+    path = resolve(name, bib_dirs)
+    !path.nil? && inside_project?(path)
+  end
+
   def self.inside_project?(path)
     File.realpath(path).start_with?("#{File.realpath('.')}/")
   end
@@ -77,6 +85,43 @@ module LatexBibChecks
     found
   rescue SystemCallError
     []
+  end
+
+  # Missing keys that --bib-fix could add: the paper's bibliography is its
+  # own, and the keys are in bib_fix_sources or BIBINPUTS. Each searched
+  # file's keys are cached by size and modification time, so a large shared
+  # collection is indexed once. Run from the project directory.
+  def self.fixable_keys(missing, junk_dir, bfilename, options)
+    return [] if missing.empty?
+
+    names = bibliography_sources(junk_dir, bfilename)
+    return [] if names.empty? || !names.all? { |name| local_source?(name, options[:bib_dirs]) }
+
+    collection_keys(junk_dir, options).intersection(missing)
+  rescue SystemCallError
+    []
+  end
+
+  def self.collection_keys(junk_dir, options)
+    files = Bibkit::Collection.expand(Array(options[:bib_fix_sources])) +
+            Bibkit::Collection.expand(ENV.fetch('BIBINPUTS', '').split(File::PATH_SEPARATOR))
+    files = files.uniq.reject { |path| inside_project?(path) }
+    cache_path = File.join(junk_dir, KEYS_CACHE_FILE)
+    cache = read_cache(cache_path)
+    keys = files.flat_map { |path| cached_keys(cache, path) }
+    write_cache(cache_path, cache.slice(*files))
+    keys.to_set
+  end
+
+  def self.cached_keys(cache, path)
+    stat = File.stat(path)
+    stamp = [stat.size, stat.mtime.to_f]
+    entry = cache[path]
+    return entry['keys'] if entry && entry['stamp'] == stamp
+
+    keys = Bibkit::BibFile.load(path).entries.map { |e| e.key.dup.force_encoding('UTF-8').scrub }
+    cache[path] = { 'stamp' => stamp, 'keys' => keys }
+    keys
   end
 
   def self.cached_problems(cache, path)

@@ -37,10 +37,6 @@ module LaTeXConfig
       // Explicit main document file to compile in this directory
       // "main_file": "paper.tex",
 
-      // Accepted for compatibility and currently has no effect; incremental
-      // rebuilds are automatic via the project build cache.
-      "fast": false,
-
       // Maximum compilation passes (1-10, default: 5)
       "passes": 5,
 

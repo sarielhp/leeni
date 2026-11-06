@@ -70,6 +70,7 @@ module LatexBundler
     sandbox.rb
     make_indep.rb
     cli_targets.rb
+    cli_options.rb
   ].freeze
 
   # A module's top-level `require 'x'` moves into the bundle header; an

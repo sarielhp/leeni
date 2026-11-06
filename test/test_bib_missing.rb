@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require_relative 'test_env'
 require_relative 'leeni_test_support'
 
 # --bib-missing: the key set from build-directory files, the CLI contract, and

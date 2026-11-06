@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require_relative 'test_env'
 require_relative 'leeni_test_support'
 
 # --bib-fix end to end: real BibTeX and Biber builds against a bibliography
@@ -107,6 +108,25 @@ class TestBibFix < LeeniTestBase
       out, code = leeni(env, dir, '--bib-fix')
       assert_equal 1, code
       assert_includes out, 'Not a file of this project: strings, entries'
+    end
+  end
+
+  # A normal build names what --bib-fix could add: with the missing-entries
+  # warning when the bibliography tool ran, as a line of its own when only
+  # LaTeX's undefined citations show it; never when the bibliography is not
+  # the paper's own (--bib-fix would refuse it).
+  def test_normal_build_hints_at_bib_fix
+    skip 'bibtex not installed' unless LaTeXUtils.command_available?('bibtex')
+
+    with_paper(BIBTEX_PAPER.sub('\cite{known,fresh,clash}', '\cite{known,fresh,nowhere}')) do |dir, env|
+      out, = leeni(env, dir)
+      assert_match(/'fresh', 'nowhere'\s+1 of them is in BIBINPUTS; l --bib-fix adds it/, out)
+      out, = leeni(env, dir, '-f')
+      assert_match(/l --bib-fix can add the entry 'fresh' from BIBINPUTS/, out)
+    end
+    with_paper(BIBTEX_PAPER.sub('\bibliography{paper}', '\bibliography{strings,other}'), local: nil) do |dir, env|
+      out, = leeni(env, dir)
+      refute_match(/bib-fix/, out)
     end
   end
 

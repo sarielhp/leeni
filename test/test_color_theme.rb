@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require_relative 'test_env'
 require 'minitest/autorun'
 require 'tmpdir'
 require 'fileutils'

@@ -1,6 +1,7 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
+require_relative 'test_env'
 require 'minitest/autorun'
 require 'minitest/mock'
 require 'tmpdir'
@@ -12,12 +13,12 @@ load File.expand_path('../leeni', __dir__)
 
 class TestDeepDiagnostics < Minitest::Test
   def test_type3_glyph_classification_is_conservative
-    assert_equal :vector, LaTeXUtils.classify_type3_glyph("500 0 0 0 500 700 d1\n0 0 m 500 700 l f")
-    assert_equal :vector, LaTeXUtils.classify_type3_glyph("500 0 d0 % BI in comment\n")
-    assert_equal :bitmap, LaTeXUtils.classify_type3_glyph('500 0 d0 BI /W 1 /H 1 ID x EI')
-    assert_equal :unknown, LaTeXUtils.classify_type3_glyph('500 0 d0 /Image1 Do')
-    assert_equal :unknown, LaTeXUtils.classify_type3_glyph('500 0 d0 /Sh1 sh')
-    assert_equal :unknown, LaTeXUtils.classify_type3_glyph('')
+    assert_equal :vector, LaTeXPdfChecks.classify_type3_glyph("500 0 0 0 500 700 d1\n0 0 m 500 700 l f")
+    assert_equal :vector, LaTeXPdfChecks.classify_type3_glyph("500 0 d0 % BI in comment\n")
+    assert_equal :bitmap, LaTeXPdfChecks.classify_type3_glyph('500 0 d0 BI /W 1 /H 1 ID x EI')
+    assert_equal :unknown, LaTeXPdfChecks.classify_type3_glyph('500 0 d0 /Image1 Do')
+    assert_equal :unknown, LaTeXPdfChecks.classify_type3_glyph('500 0 d0 /Sh1 sh')
+    assert_equal :unknown, LaTeXPdfChecks.classify_type3_glyph('')
   end
 
   def test_mutool_checks_compressed_vector_and_bitmap_glyphs
@@ -26,12 +27,12 @@ class TestDeepDiagnostics < Minitest::Test
     Dir.mktmpdir('leeni_glyphs_') do |dir|
       path = File.join(dir, 'fonts.pdf')
       write_glyph_pdf(path, ['500 0 d0 0 0 m 100 100 l f', '500 0 d0'])
-      assert_equal :vector, LaTeXUtils.classify_type3_fonts(path, ['1'])
+      assert_equal :vector, LaTeXPdfChecks.classify_type3_fonts(path, ['1'])
       write_glyph_pdf(path, ['500 0 d0 0 0 m 100 100 l f', '500 0 d0 BI /W 1 /H 1 ID x EI'])
-      assert_equal :bitmap, LaTeXUtils.classify_type3_fonts(path, ['1'])
+      assert_equal :bitmap, LaTeXPdfChecks.classify_type3_fonts(path, ['1'])
       write_glyph_pdf(path, ['500 0 d0 /Image1 Do'])
-      assert_equal :unknown, LaTeXUtils.classify_type3_fonts(path, ['1'])
-      assert_equal :unknown, LaTeXUtils.classify_type3_fonts(path, ['99'])
+      assert_equal :unknown, LaTeXPdfChecks.classify_type3_fonts(path, ['1'])
+      assert_equal :unknown, LaTeXPdfChecks.classify_type3_fonts(path, ['99'])
     end
   end
 
@@ -58,14 +59,14 @@ class TestDeepDiagnostics < Minitest::Test
 
   def test_missing_and_failed_mutool_keep_font_inspection_unverified
     LaTeXUtils.stub(:command_available?, false) do
-      assert_equal :unavailable, LaTeXUtils.classify_type3_fonts('paper.pdf', ['1'])
+      assert_equal :unavailable, LaTeXPdfChecks.classify_type3_fonts('paper.pdf', ['1'])
     end
     LaTeXUtils.stub(:command_available?, true) do
       Open3.stub(:capture3, ->(*) { raise Errno::ENOENT }) do
-        assert_equal :unknown, LaTeXUtils.classify_type3_fonts('paper.pdf', ['1'])
+        assert_equal :unknown, LaTeXPdfChecks.classify_type3_fonts('paper.pdf', ['1'])
       end
     end
-    message = LaTeXUtils.type3_font_message(fonts: ['test'], pages: [1], glyph_kind: :unavailable)
+    message = LaTeXPdfChecks.type3_font_message(fonts: ['test'], pages: [1], glyph_kind: :unavailable)
     assert_includes message, 'Install MuPDF'
     assert_includes message, 'alert_as_warning'
     refute_includes message, 'will reject'
@@ -217,12 +218,12 @@ class TestDeepDiagnostics < Minitest::Test
 
       LaTeXUtils.stub(:command_available?, true) do
         Open3.stub(:capture2e, [pdffonts_clean, fake_stat]) do
-          assert_nil LaTeXUtils.check_type3_fonts(pdf_path)
+          assert_nil LaTeXPdfChecks.check_type3_fonts(pdf_path)
         end
 
         Open3.stub(:capture2e, [pdffonts_with_type3, fake_stat]) do
-          LaTeXUtils.stub(:find_type3_font_pages, [1]) do
-            res = LaTeXUtils.check_type3_fonts(pdf_path)
+          LaTeXPdfChecks.stub(:find_type3_font_pages, [1]) do
+            res = LaTeXPdfChecks.check_type3_fonts(pdf_path)
             refute_nil res
             assert_includes res[:fonts], '[none]'
             assert_equal [1], res[:pages]

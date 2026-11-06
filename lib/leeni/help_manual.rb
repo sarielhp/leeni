@@ -309,7 +309,7 @@ module LaTeXHelpManual
       '      the main file gets \input@path for styles/, references such as \input{../shared} are',
       '      rewritten to the copies in styles/, an external .bst is copied next to the',
       '      paper, and the cited entries of external .bib files are extracted to <doc>.bib',
-      '      (bibtool or biber), with \\bibliography/\\addbibresource pointed at it. The result is',
+      '      (Bibkit or biber), with \\bibliography/\\addbibresource pointed at it. The result is',
       '      first rebuilt with --no-env in a /tmp sandbox and its PDF text compared; only then',
       '      is the project changed. Originals of changed files go to old_ver_yy_mm_dd_hh_mm.zip,',
       '      which also lists the new files. Refuses to run when styles/ (or any file it',

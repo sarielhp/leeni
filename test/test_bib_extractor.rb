@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require_relative 'test_env'
 require 'minitest/autorun'
 require 'tmpdir'
 require 'open3'
@@ -84,8 +85,6 @@ class TestBibExtractor < Minitest::Test
   end
 
   def test_end_to_end_bib_extraction
-    skip 'bibtool not available' unless LaTeXUtils.command_available?('bibtool')
-
     Dir.mktmpdir('bib_extract_e2e') do |dir|
       tex_content = <<~'TEX'
         \documentclass{article}
@@ -151,9 +150,31 @@ class TestBibExtractor < Minitest::Test
     end
   end
 
-  def test_custom_bib_name_and_hint
-    skip 'bibtool not available' unless LaTeXUtils.command_available?('bibtool')
+  # \nocite{*} cites every entry; Bibkit (not bibtool) does the extraction, and
+  # the first of two entries with the same key wins, as in BibTeX.
+  def test_nocite_star_extracts_every_entry_first_copy_wins
+    Dir.mktmpdir('bib_extract_star') do |dir|
+      File.write(File.join(dir, 'paper.tex'), <<~'TEX')
+        \documentclass{article}
+        \begin{document}
+        \nocite{*}
+        \bibliographystyle{plain}
+        \bibliography{a,b}
+        \end{document}
+      TEX
+      File.write(File.join(dir, 'a.bib'), "@misc{one, title={First copy}}\n@misc{two, title={Two}}\n")
+      File.write(File.join(dir, 'b.bib'), "@misc{one, title={Second copy}}\n@misc{three, title={Three}}\n")
 
+      out, status = Open3.capture2e(@bin_path, '-B', 'paper.tex', chdir: dir)
+      assert_equal 0, status.exitstatus, out
+      extracted = File.read(File.join(dir, 'paper.bib'))
+      %w[one two three].each { |key| assert_includes extracted, "{#{key}," }
+      assert_includes extracted, 'First copy'
+      refute_includes extracted, 'Second copy'
+    end
+  end
+
+  def test_custom_bib_name_and_hint
     Dir.mktmpdir('bib_extract_custom') do |dir|
       tex_content = <<~'TEX'
         \documentclass{article}

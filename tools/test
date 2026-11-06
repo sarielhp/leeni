@@ -97,7 +97,7 @@ module LeeniTestSuite
   def self.test_cache = File.join(run_dir, 'cache')
 
   def self.run_test(file)
-    env = { 'XDG_CACHE_HOME' => test_cache, 'TMPDIR' => File.join(run_dir, 'tmp') }
+    env = { 'XDG_CACHE_HOME' => test_cache, 'TMPDIR' => File.join(run_dir, 'tmp'), 'LEENI_TEST_ENV' => '1' }
     Open3.capture2e(env, 'ruby', '-w', '-I.', file)
   end
 

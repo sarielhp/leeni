@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require_relative 'test_env'
 require_relative 'leeni_test_support'
 
 # Checks on the .bib files a paper uses: a `%` "comment" inside an entry is an

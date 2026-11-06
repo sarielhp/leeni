@@ -11,6 +11,7 @@ require 'fileutils'
 require 'open3'
 require_relative 'color'
 require_relative 'utils'
+require_relative 'bib_checks'
 
 class LaTeXBibExtractor
   attr_reader :builder, :filename, :bfilename, :bdir, :options, :custom_outfile
@@ -134,31 +135,47 @@ class LaTeXBibExtractor
     true
   end
 
+  # BibTeX papers: Bibkit copies the cited entries verbatim from the paper's
+  # .bib files, with their crossref/xdata parents and the @string and
+  # @preamble blocks they use. The first entry of a key wins, as in BibTeX.
   def extract_bibtex(stage_file)
-    unless LaTeXUtils.command_available?('bibtool')
-      warn Rainbow("==> Error: 'bibtool' is required for BibTeX bibliography extraction.").red.bright
-      warn '    Please install it via your package manager:'
-      warn '      sudo apt install bibtool      # Debian / Ubuntu'
-      warn '      brew install bibtool          # macOS'
-      return false
-    end
+    files = bibtex_sources
+    return false unless files
 
-    aux_path = File.join(junk_dir, "#{@bfilename}.aux")
-    unless File.file?(aux_path)
-      warn Rainbow("==> Error: Auxiliary file '#{aux_path}' not found.").red.bright
-      return false
-    end
+    keys = cited_keys
+    collection = Bibkit::Collection.new(files.map { |path| [Bibkit::BibFile.load(path), true] })
+    keys = collection.files.flat_map { |f| f.entries.map(&:key) }.uniq if keys.include?('*')
+    fixer = Bibkit::Fixer.new([], collection)
+    plan = fixer.plan(missing_keys: keys.reject { |k| k == '*' })
+    warn Rainbow("==> Warning: no entry found for: #{plan.not_found.join(', ')}").yellow unless plan.not_found.empty?
+    return extraction_failed('no cited entry found in the bibliography files') if plan.entries.empty?
 
-    env = build_bibinputs_env
-    cmd = ['bibtool', '-c', '-x', aux_path, '-o', stage_file]
-    out, stat = Open3.capture2e(env, *cmd)
-
-    unless stat.success? && File.file?(stage_file) && File.size(stage_file).positive?
-      warn Rainbow('==> Error: BibTool extraction failed or no citations found:').red.bright
-      warn out.strip unless out.strip.empty?
-      return false
-    end
+    header = "% Extracted by leeni -B from #{files.map { |f| File.basename(f) }.join(', ')}"
+    File.binwrite(stage_file, fixer.render('', plan, header: header))
     true
+  end
+
+  # Every \citation of the build, the .aux files of \include'd chapters too.
+  def cited_keys
+    aux = LaTeXUtils.glob_under(junk_dir, '**/*.aux').map { |path| LaTeXUtils.safe_read(path) }.join("\n")
+    LaTeXUtils.extract_citation_keys(aux)
+  end
+
+  # The paper's \bibdata files, found as BibTeX finds them (project, then BIBINPUTS).
+  def bibtex_sources
+    names = LatexBibChecks.bibliography_sources(junk_dir, @bfilename)
+    return extraction_failed('the paper names no bibliography file (\\bibliography{...})') if names.empty?
+
+    paths = names.map { |name| [name, LatexBibChecks.locate(name, @options[:bib_dirs])] }
+    missing = paths.select { |_, path| path.nil? }.map(&:first)
+    return extraction_failed("bibliography file not found: #{missing.join(', ')}") unless missing.empty?
+
+    paths.map(&:last).uniq
+  end
+
+  def extraction_failed(reason)
+    warn Rainbow("==> Error: Bibliography extraction failed: #{reason}.").red.bright
+    nil
   end
 
   def build_bibinputs_env

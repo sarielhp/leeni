@@ -116,7 +116,7 @@ Runs an end-to-end audit of a downloaded paper inside a disposable Bubblewrap sa
 tools/test_arxiv examples/arxiv/1510.00949v1
 ```
 
-Tests include clean builds, incremental caching (`--fast`), single-pass builds, PDF diffing, portable zip packaging, and arXiv visual verification.
+Tests include clean builds, incremental caching, single-pass builds, PDF diffing, portable zip packaging, and arXiv visual verification.
 
 ### Automated Test Cycle (`tools/arxiv_test_cycle`)
 Combines sampling and testing into a single command:

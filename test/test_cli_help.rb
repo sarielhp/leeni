@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require_relative 'test_env'
 require_relative 'leeni_test_support'
 
 # The condensed help has a hard size limit. It sits in the fast tier so a new

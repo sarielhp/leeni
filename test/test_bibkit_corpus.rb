@@ -4,6 +4,7 @@
 # file must scan without an exception, and every line that starts an entry
 # must yield an entry or a reported problem: nothing is silently lost.
 
+require_relative 'test_env'
 require 'minitest/autorun'
 require 'open3'
 require_relative '../lib/leeni/bibkit_collection'

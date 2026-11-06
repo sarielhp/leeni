@@ -105,11 +105,20 @@ while a bibliography file of the paper still contains a `_leeni_alt_` entry
   scanned in 0.7 s.
 - `--bib-fix` end to end for BibTeX and Biber papers.
 
+## Other users of Bibkit
+
+- `-B` for BibTeX papers (`bib_extractor.rb`): the fixer's dependency closure
+  over the paper's own `.bib` files, every source preferred so the first entry
+  of a key wins as in BibTeX; `\nocite{*}` takes every entry. No `bibtool`.
+- `bib_locator.rb` (file and line of an entry and of a field, for
+  diagnostics): a case-insensitive lookup in the parsed file, cached by size
+  and modification time; `BIBINPUTS` is expanded as TeX does (`//`).
+- The `--bib-fix` hint: when a normal build has missing citations and the
+  paper's bibliography is its own, `bib_checks.rb` looks the keys up in
+  `bib_fix_sources` and `BIBINPUTS` (key lists cached per file) and the
+  diagnostics name what `l --bib-fix` would add.
+
 ## Later
 
-- `bib_locator.rb` (file and line of an entry, for diagnostics) on top of the
-  collection.
-- `-B` for BibTeX papers through the fixer's dependency closure, removing the
-  `bibtool` requirement.
 - Near-miss keys (typos), duplicate detection by DOI or title and year,
   linting of a whole collection.

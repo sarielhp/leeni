@@ -5,10 +5,12 @@
 # than 24 hours are swept when a temporary directory is made. That no other
 # code creates temporary files is checked by the gate (tools/tooling.rb).
 
+require_relative 'test_env'
 require 'minitest/autorun'
 require 'tmpdir'
 require 'fileutils'
 require_relative '../lib/leeni/tmp_space'
+require_relative '../lib/leeni/build_workspace'
 
 class TestTmpSpace < Minitest::Test
   OLD = Time.now - (25 * 3600)
@@ -67,6 +69,19 @@ class TestTmpSpace < Minitest::Test
       Dir.mkdir(hostile)
       File.chmod(0o777, hostile)
       assert_raises(SystemExit) { capture_io { LeeniTmp.root } }
+    end
+  end
+
+  # A project inside the temporary tree builds there too (and goes with the
+  # sweep); any other project builds in $XDG_CACHE_HOME/leeni/projects/.
+  def test_temporary_projects_build_in_the_temporary_tree
+    with_tmpdir do |tmp|
+      sandbox = LeeniTmp.mktmpdir('sandbox')
+      assert_equal File.join(tmp, LeeniTmp.user_name, 'leeni', 'builds'), File.dirname(LeeniBuildWorkspace.cache_dir(sandbox))
+      elsewhere = File.join(tmp, 'paper')
+      Dir.mkdir(elsewhere)
+      assert_equal File.join(LeeniBuildWorkspace.cache_home, 'leeni', 'projects'),
+                   File.dirname(LeeniBuildWorkspace.cache_dir(elsewhere))
     end
   end
 

@@ -342,13 +342,15 @@ class LatexIndependizer
   end
 
   # A source counts as local when it is a relative path that leeni finds in
-  # the project without BIBINPUTS.
+  # the project without BIBINPUTS and that really lies inside it: like the
+  # .tex and style inputs, a bib reached through ../ or a symlink out of the
+  # project is external.
   def local_bib?(name)
     return false if name.start_with?('/', '~')
 
     dirs = ['.'] + Array(@options[:bib_dirs] || LaTeXUtils::DEFAULT_BIB_DIRS)
     stem = name.delete_suffix('.bib')
-    dirs.any? { |dir| File.file?(File.join(dir, "#{stem}.bib")) }
+    dirs.map { |dir| File.join(dir, "#{stem}.bib") }.any? { |path| File.file?(path) && project_relative(path) }
   end
 
   def extract_bibliography(extractor)

@@ -192,6 +192,31 @@ class TestMakeIndep < Minitest::Test
     end
   end
 
+  # A bib named by ../ or reached through a symlinked directory exists from the
+  # project, but lies outside it: like an outside .tex input it must be extracted.
+  def test_biblatex_resource_outside_the_project_is_extracted
+    skip 'biber not available' unless LaTeXUtils.command_available?('biber')
+
+    with_external_tree do |root, project, env|
+      FileUtils.mkdir_p(File.join(root, 'shared'))
+      FileUtils.cp(File.join(root, 'ext', 'bib', 'refs.bib'), File.join(root, 'shared', 'refs.bib'))
+      File.symlink('../shared', File.join(project, 'linked'))
+      File.write(File.join(project, 'paper.tex'), <<~TEX)
+        \\documentclass{article}
+        \\usepackage{biblatex}
+        \\addbibresource{../shared/refs.bib}
+        \\addbibresource{linked/refs.bib}
+        \\begin{document}\\cite{a,b}\\printbibliography\\end{document}
+      TEX
+      output, status = Open3.capture2e(env, BIN, '-I', 'paper.tex', chdir: project)
+      assert status.success?, output
+
+      converted = File.read(File.join(project, 'paper.tex'))
+      assert_includes converted, '\\addbibresource{paper.bib}'
+      assert File.file?(File.join(project, 'paper.bib')), output
+    end
+  end
+
   def test_paths_outside_the_project_are_copied_and_rewritten
     with_external_tree do |root, project, env|
       FileUtils.mkdir_p(%w[a b gp].map { |dir| File.join(root, dir) })

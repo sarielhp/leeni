@@ -55,6 +55,7 @@ module LatexBundler
     draft_passes.rb
     build_runtime.rb
     index_pass.rb
+    bib_missing.rb
     builder.rb
     bib_extractor.rb
     packaging_shared.rb

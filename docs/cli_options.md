@@ -59,6 +59,7 @@ All long options accept either `-` or `--` and allow internal dashes to be omitt
 | `-t`, `--verify` | Packaging | Check the zip's contents in the cache sandbox with `--no-env`, then zip that sandbox. |
 | `-I`, `--make-indep` | Packaging | Convert the paper in place to compile with `--no-env`; originals saved in `old_ver_yy_mm_dd_hh_mm.zip`. |
 | `--dry-run` | Packaging | With `-I`: check the conversion and show the changes without making them. |
+| `--bib-missing` | Diagnostics | Build as usual; print only the keys of cited entries missing from the bibliography (regular output on errors). |
 | `-B`, `--bib-extract` | Packaging | Extract cited bibliography entries into local `.bib` file. |
 | `--arxiv` | arXiv | Prepare sanitized, flattened, submission-ready arXiv zip package. |
 | `--meta` | arXiv | Extract paper metadata and write `arxiv_<file>_meta.txt`. |
@@ -317,6 +318,12 @@ Add `--dry-run` to run the sandbox check and print what would be copied, plus a 
 ```bash
 l -I paper.tex
 l -I --dry-run paper.tex
+```
+
+### `--bib-missing`
+Builds as usual (LaTeX, then BibTeX or Biber) and prints only the cited keys that have no bibliography entry, one per line, sorted; nothing when every citation resolves. A cached build is answered from the build directory without recompiling. If the build has errors, the regular output is shown instead and the exit status is 1. Cannot be combined with `-s`, `-u`, `--no-bib`, or the packaging/arXiv targets; output formats such as `-llm` or `--json` are overridden.
+```bash
+l --bib-missing paper.tex
 ```
 
 ### `-B`, `--bib-extract`

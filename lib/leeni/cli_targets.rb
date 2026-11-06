@@ -123,7 +123,8 @@ module LatexCLITargets
   def prune_cache_if_due(options)
     summary = LeeniCachePruner.auto(options)
     return unless summary && !summary[:removed].empty?
-    return if options[:compile] || options[:json] || options[:llm] || options[:agent] || options[:score] || options[:emacs]
+    return if options[:compile] || options[:json] || options[:llm] || options[:agent] || options[:score] || options[:emacs] ||
+              options[:bib_missing]
 
     puts "      #{Rainbow("Cache: #{LeeniCachePruner.describe(summary)}").cyan}"
   end

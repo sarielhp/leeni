@@ -23,7 +23,7 @@ module LeeniRelatexSynctex
   LOG_FILE = 'relatex_synctex.log'
   COMMAND = 'relatex'
   # Builds that are not a plain export of NAME.pdf into the working tree.
-  EXCLUDING_OPTIONS = %i[no_export score deps zip zip_alone verify sandbox arxiv make_indep meta_only bib_extract].freeze
+  EXCLUDING_OPTIONS = %i[no_export score bib_missing deps zip zip_alone verify sandbox arxiv make_indep meta_only bib_extract].freeze
   STATUS_TAIL_LINES = 5
   # The engine relatex builds with, and the one a preview's passes run instead.
   RELATEX_ENGINE = 'lualatex'

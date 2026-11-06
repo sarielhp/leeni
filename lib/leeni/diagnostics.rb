@@ -2695,7 +2695,9 @@ module LaTeXDiagnostics
     promoted, alert_items, reg_warns = promote_error_grade_items(alert_items, reg_warns)
     err_items.concat(promoted.map { |item| alert_as_error(item) })
     errors += promoted.size
+    return report_bib_missing if @options[:bib_missing] && errors.zero?
 
+    revert_bib_missing_output! if @options[:bib_missing]
     display_analyzed_diagnostics(err_items, alert_items, reg_warns, what_items, errors)
   end
 

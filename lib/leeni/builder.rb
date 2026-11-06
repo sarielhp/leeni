@@ -23,11 +23,13 @@ require_relative 'brace_checker'
 require_relative 'bib_manager'
 require_relative 'build_runtime'
 require_relative 'index_pass'
+require_relative 'bib_missing'
 
 class LatexBuilder
   include LaTeXDiagnostics
   include LatexBuildRuntime
   include LatexIndexPass
+  include LatexBibMissing
 
   attr_reader :options, :filename, :bfilename, :bdir, :engine_name, :biberr, :input_snapshots, :build_start_time
 
@@ -99,11 +101,13 @@ class LatexBuilder
 
   def run!
     build_dir = File.expand_path(@bdir)
-    puts "      cd #{build_dir}" if !@options[:score] && build_dir != File.expand_path('.') && (!interactive_tty? || @options[:verbose])
+    quiet = @options[:score] || @options[:bib_missing]
+    puts "      cd #{build_dir}" if !quiet && build_dir != File.expand_path('.') && (!interactive_tty? || @options[:verbose])
     Dir.chdir(build_dir) { run_in_current_directory! }
   end
 
   def run_in_current_directory!
+    return run_listing_missing_bib_keys { compile_target } if @options[:bib_missing]
     return compile_target unless @options[:score]
 
     @orig_stdout = $stdout
@@ -176,7 +180,9 @@ class LatexBuilder
   end
 
   def handle_cached_up_to_date_build
-    if @options[:vscode_lw]
+    if @options[:bib_missing]
+      report_bib_missing
+    elsif @options[:vscode_lw]
       junk_pdf = File.join(@junk_dir, "#{@bfilename}.pdf")
       puts "Output written on #{junk_pdf} (1 page)."
       analyze_output

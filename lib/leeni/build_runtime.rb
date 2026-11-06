@@ -402,6 +402,7 @@ module LatexBuildRuntime
     failure = @recovered ? nil : cache_failure(pass_log)
     raise failure if failure
 
+    revert_bib_missing_output! if @options[:bib_missing]
     announce_detected_failure if exit_status.zero?
     if @options[:score]
       output_score(pass_log, exit_status)

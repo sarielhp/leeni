@@ -58,6 +58,11 @@ module LatexBundler
     bib_missing.rb
     builder.rb
     bib_extractor.rb
+    bibkit_scanner.rb
+    bibkit_collection.rb
+    bibkit_fixer.rb
+    bib_checks.rb
+    bib_fix.rb
     packaging_shared.rb
     packager.rb
     arxiv.rb

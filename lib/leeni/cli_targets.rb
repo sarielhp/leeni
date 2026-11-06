@@ -44,6 +44,8 @@ module LatexCLITargets
       process_arxiv_target(target, options)
     elsif options[:bib_extract]
       process_bib_extract_target(target, options)
+    elsif options[:bib_fix]
+      exit 1 unless LatexBibFix.new(target, options).run!
     else
       process_standard_target(target, options)
     end

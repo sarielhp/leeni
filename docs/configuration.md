@@ -88,6 +88,10 @@ This creates `.l.jsonc` pre-populated with default settings and comments:
   // Directories searched for bibliography (.bib) files (in addition to root)
   "bib_dirs": ["refs", "bib", "bibliography"],
 
+  // Files or directories l --bib-fix searches before BIBINPUTS, highest
+  // priority first. A candidate from here wins any conflict outright.
+  "bib_fix_sources": [],
+
   // Automatically mirror project subdirectories into the build directory for nested inputs
   "auto_mirror_subdirs": false,
 

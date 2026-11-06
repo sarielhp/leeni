@@ -388,21 +388,27 @@ class TestBibIntegration < Minitest::Test
   # bypasses kpathsea, so biber resolves it against --input-directory, which must
   # be the project and not the build directory biber runs in.
   def test_biber_finds_bib_given_by_explicit_relative_path
-    Dir.mktmpdir('biber_relative_path_test') do |root|
+    assert_relative_bib_paths_resolve(
+      "\\usepackage[backend=biber]{biblatex}\n\\addbibresource{./refs.bib}\n\\addbibresource{../shared/more.bib}",
+      '\\printbibliography'
+    )
+  end
+
+  # BibTeX has no --input-directory; leeni makes such \bibdata entries absolute
+  # for the run.
+  def test_bibtex_finds_bib_given_by_explicit_relative_path
+    assert_relative_bib_paths_resolve('', "\\bibliographystyle{plain}\n\\bibliography{./refs,../shared/more}")
+  end
+
+  def assert_relative_bib_paths_resolve(preamble, bibliography)
+    Dir.mktmpdir('relative_bib_path_test') do |root|
       dir = File.join(root, 'paper')
       FileUtils.mkdir_p([dir, File.join(root, 'shared')])
-      File.write(File.join(dir, 'main.tex'), <<~'TEX')
-        \documentclass{article}
-        \usepackage[backend=biber]{biblatex}
-        \addbibresource{./refs.bib}
-        \addbibresource{../shared/more.bib}
-        \begin{document}
-        Citing \cite{itemA} and \cite{itemB}.
-        \printbibliography
-        \end{document}
-      TEX
-      File.write(File.join(dir, 'refs.bib'), "@book{itemA, author={Alpha, Ann}, title={First Book}, year={2001}}\n")
-      File.write(File.join(root, 'shared', 'more.bib'), "@book{itemB, author={Beta, Bob}, title={Second Book}, year={2002}}\n")
+      File.write(File.join(dir, 'main.tex'), "\\documentclass{article}\n#{preamble}\n\\begin{document}\n" \
+                                             "Citing \\cite{itemA} and \\cite{itemB}.\n#{bibliography}\n\\end{document}\n")
+      File.write(File.join(dir, 'refs.bib'), "@book{itemA, author={Alpha, Ann}, title={First Book}, publisher={P}, year={2001}}\n")
+      File.write(File.join(root, 'shared', 'more.bib'),
+                 "@book{itemB, author={Beta, Bob}, title={Second Book}, publisher={P}, year={2002}}\n")
 
       out, status = Open3.capture2e(File.expand_path('../leeni', __dir__), 'main.tex', chdir: dir)
       assert_equal 0, status.exitstatus, "Compilation failed:\n#{out}"

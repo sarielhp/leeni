@@ -26,6 +26,9 @@ This document provides architectural guidelines, core invariants, development wo
   - `draft_passes.rb`: Draft LaTeX passes (`-draftmode`, xelatex `-no-pdf`) only before a pass that is certain to follow (bibliography or index tool known to run); a draft that ends the loop gets a regular pass at once.
   - `index_pass.rb`: makeindex pass for `--index`: when it runs, running it, and index staleness for the build cache.
   - `bib_missing.rb`: `--bib-missing`: the build runs with stdout buffered; a clean build prints only the cited keys with no bibliography entry (from the build directory, so cached builds work), and a failed build replays the buffered output.
+  - `bibkit_scanner.rb`, `bibkit_collection.rb`, `bibkit_fixer.rb`: Bibkit, the standalone `.bib` library (standard library only, never prints): tolerant scanner keeping original bytes, file/collection indexes over BIBINPUTS-style search paths, comparison and the `--bib-fix` planner. See [bibkit.md](bibkit.md).
+  - `bib_checks.rb`: Checks on the `.bib` files a paper uses (Bibkit scan problems such as `%` inside an entry, cached by size and mtime in the build directory; unresolved `--bib-fix` alternatives), raised as alerts; also names the `%` cause in BibTeX's "expecting a `,'" failure.
+  - `bib_fix.rb`: `--bib-fix`: build, check the bibliography is local, plan with Bibkit, write with `.bak`, rebuild.
   - `packager.rb`: Portable zip archive bundler (`-z`), active figure source discovery, and styles isolation.
   - `arxiv.rb`: Sanitized, flattened arXiv submission packager and sandbox verification.
   - `sandbox.rb`: `--sandbox` check in a persistent cache sandbox (`$XDG_CACHE_HOME/leeni/sandboxes/`), rebuilt with `--no-env`; `--zip-alone` zips it.

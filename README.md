@@ -105,6 +105,7 @@ l --final       # Submission profile: undefined refs/cites are errors, draft lef
 l -C        # Clean auxiliary and temporary files
 l -B        # Extract cited references into local .bib file
 l --bib-missing  # Build; print only the keys of missing bib entries (exit 1 if any)
+l --bib-fix      # Add missing entries and @string macros to the local .bib from BIBINPUTS
 l -I        # Make the paper compile with --no-env (styles/ + local .bib; originals zipped)
 l -r        # Print raw compiler output (debug mode)
 ```

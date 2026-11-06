@@ -59,6 +59,7 @@ All long options accept either `-` or `--` and allow internal dashes to be omitt
 | `-t`, `--verify` | Packaging | Check the zip's contents in the cache sandbox with `--no-env`, then zip that sandbox. |
 | `-I`, `--make-indep` | Packaging | Convert the paper in place to compile with `--no-env`; originals saved in `old_ver_yy_mm_dd_hh_mm.zip`. |
 | `--dry-run` | Packaging | With `-I`: check the conversion and show the changes without making them. |
+| `--bib-fix` | Bibliography | Build; add missing entries, `@string` macros and `@preamble` blocks to the paper's own `.bib` from `bib_fix_sources` and `BIBINPUTS` (see [bibkit.md](bibkit.md)). |
 | `--bib-missing` | Diagnostics | Build as usual; print only the keys of cited entries missing from the bibliography (regular output on errors). |
 | `-B`, `--bib-extract` | Packaging | Extract cited bibliography entries into local `.bib` file. |
 | `--arxiv` | arXiv | Prepare sanitized, flattened, submission-ready arXiv zip package. |
@@ -324,6 +325,15 @@ l -I --dry-run paper.tex
 Builds as usual (LaTeX, then BibTeX or Biber) and prints only the cited keys that have no bibliography entry, one per line, sorted; nothing when every citation resolves. A cached build is answered from the build directory without recompiling. The exit status is 1 when any key is missing and 0 when none is, so scripts can test it. If the build has errors, the regular output is shown instead and the exit status is 1. Cannot be combined with `-s`, `-u`, `--no-bib`, or the packaging/arXiv targets; output formats such as `-llm` or `--json` are overridden.
 ```bash
 l --bib-missing paper.tex
+```
+
+### `--bib-fix`
+Builds, then adds to the paper's own `.bib` file what it lacks: cited entries that are missing (with their `crossref`/`xdata` parents), undefined `@string` macros, and the `@preamble` blocks those use. Everything is copied verbatim from the files in the `bib_fix_sources` config list, then from `BIBINPUTS`; files inside the project are not searched. Every bibliography file of the paper must lie inside the project (run `-I` first otherwise); the target is `<paper>.bib` if the paper uses it, else the first file it names. `@string` and `@preamble` blocks go at the top of the file, entries at the end; the previous file is kept as `<file>.bak` and the paper is rebuilt.
+
+When a key has differing versions (after ignoring ties, braces, whitespace and bookkeeping fields such as `file` or `abstract`, and when no version contains the others), the first is added and every other one as `<key>_leeni_alt_N` after a `% leeni-bib-fix:` marker comment. Every build raises an alert until you keep one version under the real key and delete the others. A version from `bib_fix_sources` wins outright. Keys found nowhere, or found only with different capitalisation, are reported; exit status 1 when keys remain missing. `--dry-run` shows the plan without writing. Design: [bibkit.md](bibkit.md).
+```bash
+l --bib-fix paper.tex
+l --bib-fix --dry-run paper.tex
 ```
 
 ### `-B`, `--bib-extract`

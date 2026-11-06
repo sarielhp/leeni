@@ -13,6 +13,7 @@ require 'digest'
 
 require_relative 'color'
 require_relative 'utils'
+require_relative 'bib_checks'
 
 class LaTeXBibManager
   attr_reader :builder, :bib_fatal
@@ -187,7 +188,7 @@ class LaTeXBibManager
     detail = output.to_s.each_line.find do |line|
       line.match?(/I couldn't open database file|(?:ERROR|FATAL)\s+-|---line \d+ of file/i)
     end
-    detail ? " #{detail.strip}." : ''
+    detail ? " #{detail.strip}.#{LatexBibChecks.percent_hint(detail)}" : ''
   end
 
   def invoke_bibliography_command(tool, fnbbl, previous)
@@ -257,13 +258,44 @@ class LaTeXBibManager
   end
 
   def execute_bibliography(tool)
-    cmd = if tool == :biber
-            biber_command
-          else
-            ['bibtex', bfilename]
-          end
     search_env = bibliography_search_env
-    Dir.chdir(junk_dir) { @builder.capture_pass_output(cmd, search_env) }
+    if tool == :biber
+      cmd = biber_command # resolves the project directory, so before the chdir
+      return Dir.chdir(junk_dir) { @builder.capture_pass_output(cmd, search_env) }
+    end
+
+    with_absolute_bibdata do
+      Dir.chdir(junk_dir) { @builder.capture_pass_output(['bibtex', bfilename], search_env) }
+    end
+  end
+
+  # BibTeX runs inside the build directory and has no --input-directory: a
+  # \bibdata entry with an explicit relative path (./refs, ../shared/refs)
+  # bypasses BIBINPUTS and would be resolved there. For the run, such entries
+  # become absolute project paths; the .aux is restored afterwards so the
+  # convergence hash never sees the rewrite.
+  def with_absolute_bibdata
+    aux = File.join(junk_dir, "#{bfilename}.aux")
+    original = File.file?(aux) ? File.read(aux) : nil
+    rewritten = original && absolute_bibdata(original)
+    return yield if rewritten.nil? || rewritten == original
+
+    File.write(aux, rewritten)
+    begin
+      yield
+    ensure
+      File.write(aux, original)
+    end
+  end
+
+  def absolute_bibdata(content)
+    root = File.expand_path('.')
+    content.gsub(/\\bibdata\{([^}]*)\}/) do
+      names = Regexp.last_match(1).split(',').map do |name|
+        name.strip.match?(%r{\A\.\.?/}) ? File.expand_path(name.strip, root) : name
+      end
+      "\\bibdata{#{names.join(',')}}"
+    end
   end
 
   # Biber runs inside the build directory, but a datasource with an explicit

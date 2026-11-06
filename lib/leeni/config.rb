@@ -145,6 +145,10 @@ module LaTeXConfig
       // Directories searched for bibliography (.bib) files (in addition to root)
       "bib_dirs": ["refs", "bib", "bibliography"],
 
+      // Files or directories l --bib-fix searches before BIBINPUTS, highest
+      // priority first. A candidate from here wins any conflict outright.
+      "bib_fix_sources": [],
+
       // Build artifact directory. Unset uses $XDG_CACHE_HOME/leeni/projects/.
       // Set junk_dir to junk for project-local compatibility.
 

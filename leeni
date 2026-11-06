@@ -56,6 +56,8 @@ require_relative 'lib/leeni/builder'
 require_relative 'lib/leeni/packager'
 require_relative 'lib/leeni/arxiv'
 require_relative 'lib/leeni/bib_extractor'
+require_relative 'lib/leeni/bib_checks'
+require_relative 'lib/leeni/bib_fix'
 require_relative 'lib/leeni/sandbox'
 require_relative 'lib/leeni/make_indep'
 require_relative 'lib/leeni/cli_targets'
@@ -145,6 +147,7 @@ module LatexCLI
     options[:emacs] = false if options[:compile]
     validate_make_indep!(options, prog_name)
     LatexBibMissing.validate_options!(options, prog_name)
+    LatexBibFix.validate_options!(options, prog_name)
   end
 
   def self.validate_make_indep!(options, prog_name)
@@ -152,8 +155,8 @@ module LatexCLI
       warn "#{prog_name}: error: --sandbox cannot be combined with --arxiv, --meta or --bib-extract"
       exit 2
     end
-    if options[:dry_run] && !options[:make_indep]
-      warn "#{prog_name}: error: --dry-run only applies to -I/--make-indep"
+    if options[:dry_run] && !options[:make_indep] && !options[:bib_fix]
+      warn "#{prog_name}: error: --dry-run only applies to -I/--make-indep and --bib-fix"
       exit 2
     end
     return unless options[:make_indep]
@@ -328,7 +331,8 @@ module LatexCLI
       junk_dir: nil,
       config_junk_dir: cfg['junk_dir'],
       explicit_junk_dir: false,
-      bib_extract: false, bib_extract_name: nil, bib_missing: false,
+      bib_extract: false, bib_extract_name: nil, bib_missing: false, bib_fix: false,
+      bib_fix_sources: Array(cfg['bib_fix_sources']),
       compile: cfg['compile'] == true, llm: cfg['llm'] == true, json: cfg['json'] == true,
       vscode_lw: false,
       raw: cfg['raw'] == true, link: cfg['links'],
@@ -614,11 +618,14 @@ module LatexCLI
       options[:bib_extract] = true
       options[:bib_extract_name] = v
     end
+    opts.on('--bib-fix', 'Build; add missing entries and @string macros to the local .bib from bib_fix_sources and BIBINPUTS') do
+      options[:bib_fix] = true
+    end
     opts.on('--bib-missing', 'Build; print only the keys of cited entries missing from the bibliography (regular output on errors)') { options[:bib_missing] = true }
     opts.on('-I', '--make-indep', 'Convert the paper in place to compile with --no-env: copy external styles to styles/, extract cited entries to <doc>.bib; originals saved in old_ver_yy_mm_dd_hh_mm.zip') do
       options[:make_indep] = true
     end
-    opts.on('--dry-run', 'With -I: check the conversion in the sandbox and show the changes without making them') do
+    opts.on('--dry-run', 'With -I or --bib-fix: show the changes without making them') do
       options[:dry_run] = true
     end
     opts.on('--[no-]styles-inject', 'Enable or disable isolating harvested styles into styles/ and injecting \input@path') do |v|

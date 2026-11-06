@@ -10,6 +10,7 @@
 require_relative 'error_catalog'
 require_relative 'box_context'
 require_relative 'compile_format'
+require_relative 'bib_checks'
 
 module LaTeXDiagnostics
   DIAGNOSTIC_EXPLANATIONS = LaTeXErrorCatalog::WARNING_EXPLANATIONS
@@ -2026,7 +2027,29 @@ module LaTeXDiagnostics
       ab[:formatted] = format_diagnostic_line(ab[:line_str], ab[:text], :red, file: ab[:file])
     end
     extract_label_alerts(clean_content) + alert_boxes + collect_source_label_alerts + collect_type3_font_alerts +
-      collect_page_size_alerts + collect_final_check_alerts
+      collect_page_size_alerts + collect_final_check_alerts + collect_bib_alternative_alerts +
+      collect_bib_problem_alerts
+  end
+
+  # Versions --bib-fix added as <key>_leeni_alt_N stay an alert until one
+  # version is kept under the real key.
+  def collect_bib_alternative_alerts
+    LatexBibChecks.unresolved_alternatives(junk_dir, bfilename, @options[:bib_dirs]).each_with_index.map do |(file, key, line), i|
+      msg = "Unresolved --bib-fix alternative #{key}: keep one version under the key " \
+            "#{key.sub(/#{Bibkit::ALT_TAG}\d+\z/o, '')} and delete the others"
+      { file: file, line: line, line_str: line.to_s, text: msg, formatted: format_diagnostic_line(line.to_s, msg, :red, file: file),
+        alert_type: :bib_fix_alternative, tier: 'alerts', base_color: :red, index: 60_100 + i }
+    end
+  end
+
+  # Problems in the .bib files the paper uses that the tool passes over or
+  # reports without a reason, such as a `%` "comment" inside an entry.
+  def collect_bib_problem_alerts
+    LatexBibChecks.problems(junk_dir, bfilename, @options[:bib_dirs]).each_with_index.map do |(file, line, message), i|
+      msg = "Bibliography file: #{message}"
+      { file: file, line: line, line_str: line.to_s, text: msg, formatted: format_diagnostic_line(line.to_s, msg, :red, file: file),
+        alert_type: :bib_file_problem, tier: 'alerts', base_color: :red, index: 60_200 + i }
+    end
   end
 
   # An A4 or landscape page inside a letter document, usually an included PDF.

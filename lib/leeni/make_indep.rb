@@ -14,7 +14,7 @@
 
 require 'fileutils'
 require 'open3'
-require 'tmpdir'
+require_relative 'tmp_space'
 require_relative 'bib_extractor'
 require_relative 'packager'
 
@@ -354,7 +354,7 @@ class LatexIndependizer
   end
 
   def extract_bibliography(extractor)
-    Dir.mktmpdir('leeni_indep_bib_') do |dir|
+    LeeniTmp.mktmpdir('indep-bib') do |dir|
       stage = File.join(dir, "#{@bfilename}.bib")
       unless extractor.extract_cited_to(stage)
         warn Rainbow('[FAIL] Could not extract the cited bibliography entries; nothing was changed.').red.bright
@@ -424,7 +424,7 @@ class LatexIndependizer
 
   def verify_plan(plan)
     puts Rainbow('==> Checking the converted paper in an isolated sandbox with --no-env...').cyan.bright
-    Dir.mktmpdir('leeni_indep_') do |tmpdir|
+    LeeniTmp.mktmpdir('indep') do |tmpdir|
       copy_project_to(tmpdir)
       apply_plan(plan, tmpdir)
       next true if LatexPackager.new(@builder).run_sandbox_compile(tmpdir)
@@ -467,7 +467,7 @@ class LatexIndependizer
     end
 
     name = backup_name
-    Dir.mktmpdir('leeni_indep_backup_') do |stage|
+    LeeniTmp.mktmpdir('indep-backup') do |stage|
       fill_backup_stage(plan, stage)
       out, status = Open3.capture2e('zip', '-q', '-r', File.expand_path(name), '.', chdir: stage)
       return name if status.success?
@@ -507,7 +507,7 @@ class LatexIndependizer
     end
 
     puts " -- edit #{rel}"
-    Dir.mktmpdir('leeni_indep_diff_') do |dir|
+    LeeniTmp.mktmpdir('indep-diff') do |dir|
       updated = File.join(dir, File.basename(rel))
       File.write(updated, content)
       diff, = Open3.capture2e('diff', '-u', '--label', "#{rel} (now)", '--label', "#{rel} (after -I)", rel, updated)

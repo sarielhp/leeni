@@ -12,6 +12,7 @@ require 'fileutils'
 require 'open3'
 require 'strscan'
 require 'tmpdir'
+require_relative '../lib/leeni/tmp_space'
 
 module GalleryGenerator
   REPO_ROOT = File.expand_path('..', __dir__)
@@ -398,7 +399,7 @@ module GalleryGenerator
   end
 
   def self.compile_scenario(scenario)
-    Dir.mktmpdir('gallery_case') do |dir|
+    LeeniTmp.mktmpdir('gallery') do |dir|
       tex_file = File.join(dir, 'paper.tex')
       File.write(tex_file, scenario[:tex])
       scenario[:files]&.each do |fname, content|

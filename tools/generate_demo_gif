@@ -14,6 +14,7 @@ require 'open3'
 require 'optparse'
 require 'tmpdir'
 require 'yaml'
+require_relative '../lib/leeni/tmp_space'
 
 module DemoRecorder
   DEFAULT_SCENARIO = File.expand_path('../docs/demos/l_vs_latex.yml', __dir__)
@@ -24,8 +25,13 @@ module DemoRecorder
 
     def initialize
       @ffmpeg_path = find_binary('ffmpeg', ['/usr/bin/ffmpeg', '/bin/ffmpeg'])
-      @vhs_path = find_binary('vhs', ['/tmp/gobin/vhs', File.expand_path('~/.go/bin/vhs'), File.expand_path('~/bin/vhs')])
-      @ttyd_path = find_binary('ttyd', ['/tmp/ttyd', File.expand_path('~/bin/ttyd')])
+      # Places where vhs and ttyd may be installed; nothing is created there.
+      vhs_dirs = ['/tmp/gobin/vhs', # tmp-exempt: where an installed program is looked up; creates nothing
+                  File.expand_path('~/.go/bin/vhs'), File.expand_path('~/bin/vhs')]
+      ttyd_dirs = ['/tmp/ttyd', # tmp-exempt: where an installed program is looked up; creates nothing
+                   File.expand_path('~/bin/ttyd')]
+      @vhs_path = find_binary('vhs', vhs_dirs)
+      @ttyd_path = find_binary('ttyd', ttyd_dirs)
     end
 
     def validate!
@@ -44,8 +50,8 @@ module DemoRecorder
       dirs = [
         File.dirname(@vhs_path),
         File.dirname(@ttyd_path),
-        '/tmp/gobin',
-        '/tmp/cfonts/node_modules/.bin',
+        '/tmp/gobin', # tmp-exempt: where an installed program is looked up; creates nothing
+        '/tmp/cfonts/node_modules/.bin', # tmp-exempt: where an installed program is looked up; creates nothing
         File.expand_path('~/bin'),
         File.expand_path('..', __dir__),
         ENV.fetch('PATH', '')
@@ -248,7 +254,7 @@ module DemoRecorder
     end
 
     def run
-      Dir.mktmpdir('leeni_demo_') do |tmpdir|
+      LeeniTmp.mktmpdir('demo-gif') do |tmpdir|
         setup_workspace_files(tmpdir)
         tape_content = TapeBuilder.new(@scenario, tmpdir).build
 

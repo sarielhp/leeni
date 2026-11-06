@@ -10,7 +10,7 @@
 require 'fileutils'
 require 'open3'
 require 'rbconfig'
-require 'tmpdir'
+require_relative 'tmp_space'
 require_relative 'packaging_shared'
 
 class LatexArxivPackager
@@ -44,7 +44,7 @@ class LatexArxivPackager
     zip_filename = @options[:arxiv_name] || "arxiv_#{@bfilename}.zip"
     meta_filename = "arxiv_#{@bfilename}_meta.txt"
 
-    Dir.mktmpdir('leeni_arxiv_stage_') do |stage_dir|
+    LeeniTmp.mktmpdir('arxiv-stage') do |stage_dir|
       return false unless stage_arxiv_files(stage_dir)
 
       candidate = build_arxiv_zip(stage_dir, zip_filename)
@@ -279,7 +279,7 @@ class LatexArxivPackager
       return false
     end
 
-    Dir.mktmpdir('leeni_arxiv_verify_') do |tmpdir|
+    LeeniTmp.mktmpdir('arxiv-verify') do |tmpdir|
       unzip_out, unzip_stat = Open3.capture2e('unzip', '-q', zip_abs, '-d', tmpdir)
       unless unzip_stat.success?
         warn Rainbow("[FAIL] Failed to extract #{zip_filename}: #{unzip_out}").red.bright
@@ -474,7 +474,7 @@ class LatexArxivPackager
     end
     paths.map! { |path| File.expand_path(path) }
 
-    Dir.mktmpdir('leeni_arxiv_visual_') do |tmpdir|
+    LeeniTmp.mktmpdir('arxiv-visual') do |tmpdir|
       rendered = paths.each_with_index.map { |pdf, idx| render_arxiv_pdf_pages(pdf, File.join(tmpdir, idx.to_s)) }
       return false unless rendered.all?
 

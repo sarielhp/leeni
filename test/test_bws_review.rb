@@ -153,7 +153,7 @@ class TestBwsReview < Minitest::Test
   end
 
   def test_default_temporary_output_cannot_recurse_into_source
-    ['/', '/tmp'].each do |source|
+    ['/', '/tmp'].each do |source| # tmp-exempt: refused as sources; creates nothing
       text, status = Open3.capture2e('ruby', BIN, source, '--prepare-only')
       refute status.success?, text
       assert_includes text, 'bws_run:'

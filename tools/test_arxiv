@@ -11,6 +11,7 @@ require 'rubygems/package'
 require 'stringio'
 require 'tempfile'
 require 'tmpdir'
+require_relative '../lib/leeni/tmp_space'
 require 'time'
 require 'zlib'
 
@@ -131,7 +132,7 @@ module ArxivPaperTest
   end
 
   def self.atomic_write(path, content)
-    Tempfile.create(['leeni-test-', '.tmp'], File.dirname(path)) do |tmp|
+    Tempfile.create(['leeni-test-', '.tmp'], File.dirname(path)) do |tmp| # tmp-exempt: beside the target, renamed over it
       tmp.write(content)
       tmp.close
       File.rename(tmp.path, path)
@@ -186,7 +187,7 @@ module ArxivPaperTest
       %w[PASS FAIL].each { |name| FileUtils.rm_f(File.join(@sample, name)) }
       started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
       begin
-        Dir.mktmpdir('leeni_test_stage_', '/tmp') do |stage|
+        LeeniTmp.mktmpdir('test-stage') do |stage|
           prepare(stage)
           launch(stage)
         end
@@ -244,7 +245,7 @@ module ArxivPaperTest
     end
 
     def launch(stage)
-      retained = Dir.mktmpdir('leeni_test_results_', '/tmp')
+      retained = LeeniTmp.mktmpdir('test-results') # kept for inspection; swept after 24 hours
       workspace = File.join(retained, 'sandbox')
       @report['artifacts'] = { 'sandbox' => workspace, 'log' => File.join(workspace, 'bws-run.log') }
       argv = [RbConfig.ruby, File.join(ROOT, 'tools/bws_run'), stage, '--output', workspace,

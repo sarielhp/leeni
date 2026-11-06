@@ -14,7 +14,7 @@ require 'fileutils'
 require 'json'
 require 'open3'
 require 'time'
-require 'tmpdir'
+require_relative 'tmp_space'
 require_relative 'utils'
 require_relative 'build_workspace'
 require_relative 'quarantine'
@@ -43,7 +43,7 @@ module LeeniReport
       return 2
     end
 
-    zip = Dir.mktmpdir('leeni_report') do |stage|
+    zip = LeeniTmp.mktmpdir('report') do |stage|
       files = stage_bundle(stage, target, options, level)
       archive(stage, target, files)
     end

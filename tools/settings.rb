@@ -1,6 +1,9 @@
 # frozen_string_literal: true
 
 module ToolSettings
+  # Name of the project's temporary-file tree, <tmpdir>/<user>/<name>/; nil uses the
+  # repository directory's name.
+  PROJECT_NAME = 'leeni'
   TOOLS = { 'ruby-audit' => File.expand_path('ruby_audit', __dir__) }.freeze
   PROFILE = :project # :script is for standalone programs <=150 lines without Gemfile.lock.
   SOURCE_GLOBS = ['leeni', 'lib/**/*.rb', 'tools/**/*', 'test/**/*.rb'].freeze

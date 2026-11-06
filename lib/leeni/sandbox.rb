@@ -12,7 +12,7 @@
 # ==============================================================================
 
 require 'fileutils'
-require 'tmpdir'
+require_relative 'tmp_space'
 require_relative 'build_workspace'
 require_relative 'packager'
 
@@ -63,7 +63,7 @@ class LatexSandbox
   end
 
   def refresh!
-    Dir.mktmpdir('leeni_sandbox_stage_') do |stage|
+    LeeniTmp.mktmpdir('sandbox') do |stage|
       next false unless packager.stage_into(stage)
 
       FileUtils.rm_f(File.join(stage, "#{@bfilename}.pdf"))

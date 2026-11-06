@@ -5,6 +5,7 @@ require 'fileutils'
 require 'json'
 require 'optparse'
 require 'tmpdir'
+require_relative '../lib/leeni/tmp_space'
 require 'find'
 require 'open3'
 
@@ -114,7 +115,10 @@ def validate_options(source, options)
   end
 
   raise ArgumentError, 'source must be a paper directory, not /' if source == '/'
-  raise ArgumentError, '--output must be outside the source directory' if !options[:output] && source == '/tmp'
+
+  # A source of /tmp itself would contain the workspace.
+  in_tmp = source == '/tmp' # tmp-exempt: a comparison; creates nothing
+  raise ArgumentError, '--output must be outside the source directory' if !options[:output] && in_tmp
 
   options[:leeni] = File.realpath(options[:leeni])
   options[:bws] = File.expand_path(options[:bws]) if options[:bws].include?(File::SEPARATOR)
@@ -130,7 +134,7 @@ def validate_options(source, options)
 end
 
 def stage_workspace(source, options, real_home)
-  workspace = options[:output] || Dir.mktmpdir('leeni_bws_', '/tmp')
+  workspace = options[:output] || LeeniTmp.mktmpdir('bws')
   if options[:output]
     FileUtils.mkdir_p(File.dirname(workspace))
     Dir.mkdir(workspace)

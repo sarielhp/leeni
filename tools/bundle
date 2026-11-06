@@ -23,6 +23,7 @@ module LatexBundler
 
   MODULE_ORDER = %w[
     version.rb
+    tmp_space.rb
     color.rb
     compatibility.rb
     config.rb

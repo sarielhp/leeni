@@ -408,9 +408,7 @@ class TestLeeniDiagnostics < LeeniTestBase
         lock2 = b2.send(:project_tmp_file, 'build.lock')
 
         refute_equal lock1, lock2
-        user = ENV['USER'] || 'user'
-        refute_includes lock1, "/tmp/#{user}"
-        assert_equal File.join(Dir.tmpdir, "leeni_#{Process.uid}"), File.dirname(lock1)
+        assert_equal File.join(Dir.tmpdir, LeeniTmp.user_name, 'leeni', 'locks'), File.dirname(lock1)
         assert_includes lock1, 'main_build.lock'
       end
     end
@@ -678,7 +676,7 @@ class TestLeeniDiagnostics < LeeniTestBase
     builder = legacy_builder('main.tex', trace: true)
     env = ENV.to_h.merge('TEXINPUTS' => '.:custom_styles:', 'max_print_line' => '2048')
     cmd = ['xelatex', '-output-directory=junk', 'main.tex']
-    formatted = builder.send(:format_trace_command, env, cmd, '/tmp/doc')
+    formatted = builder.send(:format_trace_command, env, cmd, '/tmp/doc') # tmp-exempt: a string
 
     assert_includes formatted, 'cd /tmp/doc'
     assert_includes formatted, 'TEXINPUTS=.:custom_styles:'

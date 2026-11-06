@@ -11,6 +11,7 @@ This document provides architectural guidelines, core invariants, development wo
   - Supports symlink personalities (`l`, `lw`, `ll`, `llua`, `latex_clean`, `latex_file_in_dir`, `latex_env_free`).
 - **Modular Core Library (`lib/leeni/`)**:
   - `version.rb`: Canonical version string, executable path, and constants.
+  - `tmp_space.rb`: `LeeniTmp`, the standards `ProjectTmp` helper (identical to `tools/tmp_space.rb`) with project `leeni`: the only way to create temporary files, under `<tmpdir>/<user>/leeni/<purpose>/`, private, swept of entries older than 24 hours; build locks live in its `locks/`.
   - `color.rb`: ANSI color rendering via `Rainbow` with graceful plain-text `NullString` fallback.
   - `compatibility.rb`: Environment adjustments for vendor styles (e.g. `revtex4`).
   - `config.rb`: Unified JSONC configuration loader (`.l.jsonc`, `~/.config/leeni/config.jsonc`) and quote-aware parser.
@@ -68,6 +69,8 @@ This document provides architectural guidelines, core invariants, development wo
   All scripts, tooling, and test runners must be written in idiomatic **Ruby** (`#!/usr/bin/env ruby`). Do not introduce Python, Bash, Sed, or Awk scripts.
 - **Canonical Interface & Anti-Alias Policy (Strict No Redundant Aliases)**:
   Maintain a strictly minimal, clean CLI hierarchy without redundant aliases. Aliases blow up the command-line interface of a program. Every command-line option must have at most one canonical long name and optionally at most one single-letter shortcut (e.g. `-f, --force`, `-u, --single-pass`). Never add multiple single-letter shortcuts (e.g. `-u` and `-1` to the same command) or multiple long option names (e.g. `--single-pass` and `--one-pass`) to the same command. A single-letter shortcut is fine, but two single-letter shortcuts to the same command are strictly prohibited.
+- **Temporary Files (one private tree, swept daily)**:
+  Every temporary file or directory goes through `LeeniTmp` (`lib/leeni/tmp_space.rb`, the standards `ProjectTmp` helper with project `leeni`) and lives under `<tmpdir>/<user>/leeni/<purpose>/`, so the system temporary directory holds one entry per user. `LeeniTmp.mktmpdir(purpose)` first removes entries older than 24 hours (never a held lock file), including old-style `<tmpdir>/leeni_*` leftovers. `tools/test` runs every test file with `TMPDIR` inside the tree. Never call `Dir.mktmpdir`, `Dir.tmpdir` or `Tempfile` directly or name a literal `/tmp` path (tests may use `Dir.mktmpdir`); the gate rejects it (`check_temporary_files` in `tools/tooling.rb`). A line may opt out only with `# tmp-exempt: <reason>`, e.g. a temporary file beside its target that is renamed over it. Caches are not temporary files: the per-project build directories stay in `$XDG_CACHE_HOME/leeni/` (see Isolated Build Output) under the `cache_days` policy. See the standards README, "Temporary and cached files".
 - **Isolated Build Output (XDG cache by default)**:
   All intermediate build artifacts must remain confined to the per-project build directory under `$XDG_CACHE_HOME/leeni/projects/` (falling back to `~/.cache`). Explicit `--junk-dir junk` preserves the project-local compatibility layout. Only final targets (`<file>.pdf`, `<file>.bbl`, `<file>.synctex.gz`) are exported to the project root. Cache state lives in the build directory's `.build_state.json`.
 - **Engine Support**:

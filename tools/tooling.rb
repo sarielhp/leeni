@@ -6,6 +6,7 @@ require 'fileutils'
 require 'json'
 require 'open3'
 require_relative 'settings'
+require_relative 'tmp_space'
 require_relative 'language'
 
 # Copy beside the entry points. This helper never loads the live standards checkout.
@@ -19,7 +20,37 @@ module Tooling
   def setup
     Dir.chdir(File.realpath(File.expand_path('..', __dir__)))
     ENV['PATH'] = search_paths.join(File::PATH_SEPARATOR)
+    ProjectTmp.project = project_name
     Language.setup
+  end
+
+  # ToolSettings::PROJECT_NAME, or the repository directory's name.
+  def project_name
+    name = ToolSettings.const_defined?(:PROJECT_NAME) ? ToolSettings::PROJECT_NAME : nil
+    name || File.basename(Dir.pwd)
+  end
+
+  # Ruby programs in tools/; settings.rb is configuration (install
+  # destinations, tool paths) and creates nothing.
+  def tool_scripts
+    Dir.glob('tools/*').select do |path|
+      next false if path == 'tools/settings.rb'
+
+      File.file?(path) && (path.end_with?('.rb') || File.open(path, &:gets).to_s.match?(/\A#!.*ruby/))
+    end
+  end
+
+  # Temporary files go under <tmpdir>/<user>/<project>/ through ProjectTmp;
+  # tests may use the language's own calls, since tools/test points TMPDIR
+  # into that tree, but no literal /tmp path.
+  def check_temporary_files
+    found = ProjectTmp.offenders(tool_scripts, ProjectTmp::RUBY_CALLS, comment: /#.*/) +
+            ProjectTmp.offenders(Language.temp_policy_files, Language::TEMP_CALLS, comment: Language::COMMENT,
+                                                                                   test_file: Language.method(:test_file?))
+    return if found.empty?
+
+    raise "temporary files outside <tmpdir>/<user>/#{ProjectTmp.project}/ (use ProjectTmp, " \
+          "or mark the line `tmp-exempt: <reason>`):\n#{found.uniq.join("\n")}"
   end
 
   def search_paths
@@ -145,6 +176,7 @@ module Tooling
     checked = input_digest
     Language.gate_start
     script('lint')
+    check_temporary_files
     ToolSettings::FAST_CHECKS.each { |args| run(*args) }
     script('test', "--#{tier}")
     if full

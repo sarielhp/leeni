@@ -11,7 +11,7 @@ require 'fileutils'
 require 'json'
 require 'open3'
 require 'rbconfig'
-require 'tmpdir'
+require_relative 'tmp_space'
 require_relative 'flattener'
 require_relative 'packaging_shared'
 
@@ -283,7 +283,7 @@ class LatexPackager
 
   def stage_and_create_zip(zip_filename)
     candidate = archive_candidate_path(zip_filename)
-    succeeded = Dir.mktmpdir('leeni_stage_') do |stage_dir|
+    succeeded = LeeniTmp.mktmpdir('zip-stage') do |stage_dir|
       stage_into(stage_dir) && zip_directory(stage_dir, candidate, zip_filename)
     end
     succeeded ? candidate : false
@@ -433,7 +433,7 @@ class LatexPackager
       return false
     end
 
-    Dir.mktmpdir('leeni_zip_visual_') do |directory|
+    LeeniTmp.mktmpdir('zip-visual') do |directory|
       pages = [original, rebuilt].each_with_index.map do |pdf, index|
         prefix = File.join(directory, "pdf#{index}")
         output, status = Open3.capture2e('pdftoppm', '-r', '150', pdf, prefix)

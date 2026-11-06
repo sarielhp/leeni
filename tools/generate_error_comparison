@@ -10,6 +10,7 @@
 
 require 'fileutils'
 require 'tmpdir'
+require_relative '../lib/leeni/tmp_space'
 
 OUTPUT_DIR = File.expand_path('../docs/images', __dir__)
 FileUtils.mkdir_p(OUTPUT_DIR)
@@ -150,7 +151,7 @@ if system('which', 'convert', out: File::NULL, err: File::NULL)
   puts "Wrote #{PNG_FILE}" if File.exist?(PNG_FILE)
 
   # 3. Generate animated GIF of simulated build session
-  Dir.mktmpdir('gif_frames') do |tmpdir|
+  LeeniTmp.mktmpdir('error-comparison') do |tmpdir|
     # Frame 1: Command launched
     f1_svg = File.join(tmpdir, 'f1.svg')
     f1_png = File.join(tmpdir, 'f1.png')

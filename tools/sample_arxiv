@@ -281,7 +281,7 @@ module ArxivSampler
       FileUtils.mkdir_p(output)
       slug = entry[:id].to_s.gsub(/[^A-Za-z0-9._-]/, '_')
       destination = File.join(output, slug)
-      stage = Dir.mktmpdir('arxiv-', output)
+      stage = Dir.mktmpdir('arxiv-', output) # tmp-exempt: inside the output directory
       begin
         filename = "source.#{kind}"
         filename += '.gz' if bytes.getbyte(0) == 31 && bytes.getbyte(1) == 139

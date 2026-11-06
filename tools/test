@@ -7,6 +7,10 @@ require 'open3'
 require 'tmpdir'
 require 'optparse'
 require 'etc'
+require_relative 'settings'
+require_relative 'tmp_space'
+
+ProjectTmp.project = ToolSettings::PROJECT_NAME
 
 module LeeniTestSuite
   COLORS = { green: "\e[32m", red: "\e[31m", cyan: "\e[36m", bold: "\e[1m", reset: "\e[0m" }.freeze
@@ -19,7 +23,7 @@ module LeeniTestSuite
     test_repair_failures.rb test_config.rb test_color_theme.rb test_cli_spellings.rb
     test_author_verification.rb test_visual_verification.rb test_compatibility.rb
     test_arxiv_worker.rb test_arxiv_fixups.rb test_sample_arxiv.rb test_bump.rb
-    test_cli_help.rb test_bundle.rb test_bibkit.rb
+    test_cli_help.rb test_bundle.rb test_bibkit.rb test_tmp_space.rb
   ].freeze
   MEDIUM_TESTS = %w[
     test_compile_mode.rb test_pathological_latex.rb test_llm_mode.rb test_json_mode.rb
@@ -79,14 +83,22 @@ module LeeniTestSuite
     exit 1
   end
 
-  # Every run gets its own build cache, so test projects never pile up in
-  # the real ~/.cache/leeni.
-  def self.test_cache
-    @test_cache ||= Dir.mktmpdir('leeni_test_cache_').tap { |dir| at_exit { FileUtils.rm_rf(dir) } }
+  # Every run gets its own directory, <tmpdir>/<user>/leeni/test-run/<stamp>/,
+  # removed when the run ends. It holds the build cache, so test projects never
+  # pile up in ~/.cache, and, through TMPDIR, every temporary file the tests and
+  # the programs they start create.
+  def self.run_dir
+    @run_dir ||= ProjectTmp.mktmpdir('test-run').tap do |dir|
+      FileUtils.mkdir_p([File.join(dir, 'cache'), File.join(dir, 'tmp')])
+      at_exit { FileUtils.rm_rf(dir) }
+    end
   end
 
+  def self.test_cache = File.join(run_dir, 'cache')
+
   def self.run_test(file)
-    Open3.capture2e({ 'XDG_CACHE_HOME' => test_cache }, 'ruby', '-w', '-I.', file)
+    env = { 'XDG_CACHE_HOME' => test_cache, 'TMPDIR' => File.join(run_dir, 'tmp') }
+    Open3.capture2e(env, 'ruby', '-w', '-I.', file)
   end
 
   def self.abort_failure(label, output)

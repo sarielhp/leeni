@@ -47,8 +47,7 @@ class TestCachePruner < LeeniTestBase
   end
 
   def hold_lock(dir)
-    lock_dir = File.join(Dir.tmpdir, "leeni_#{Process.uid}")
-    FileUtils.mkdir_p(lock_dir, mode: 0o700)
+    lock_dir = LeeniTmp.dir('locks')
     file = File.new(File.join(lock_dir, "#{File.basename(dir)[-16..]}_main_build.lock"), 'w')
     file.flock(File::LOCK_EX)
     file

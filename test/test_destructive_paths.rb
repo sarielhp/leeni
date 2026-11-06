@@ -243,7 +243,7 @@ class TestDestructivePaths < Minitest::Test
 
   def test_lock_directory_must_be_private_and_owned
     Dir.mktmpdir('leeni_tmpdir_test') do |dir|
-      hostile = File.join(dir, "leeni_#{Process.uid}")
+      hostile = File.join(dir, LeeniTmp.user_name)
       Dir.mkdir(hostile, 0o777)
       File.chmod(0o777, hostile)
 

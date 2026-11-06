@@ -13,7 +13,7 @@
 # ==============================================================================
 
 require 'fileutils'
-require 'tmpdir'
+require_relative 'tmp_space'
 require_relative 'build_workspace'
 require_relative 'project_record'
 
@@ -112,22 +112,11 @@ module LeeniCachePruner
   end
 
   # Project hashes whose build lock is held right now. The lock lives in
-  # Dir.tmpdir/leeni_<uid>/<hash>_<main>_build.lock, and <hash> is the suffix
+  # LeeniTmp.dir('locks')/<hash>_<main>_build.lock, and <hash> is the suffix
   # of the cache entry's name.
   def held_locks
-    Dir.glob(File.join(Dir.tmpdir, "leeni_#{Process.uid}", '*_build.lock'))
-       .select { |f| lock_held?(f) }.to_set { |f| File.basename(f)[0, 16] }
-  end
-
-  def lock_held?(file)
-    File.open(file, File::RDONLY) do |fh|
-      return true unless fh.flock(File::LOCK_EX | File::LOCK_NB)
-
-      fh.flock(File::LOCK_UN)
-      false
-    end
-  rescue SystemCallError
-    false
+    Dir.glob(File.join(LeeniTmp.dir('locks'), '*_build.lock'))
+       .select { |f| LeeniTmp.locked?(f) }.to_set { |f| File.basename(f)[0, 16] }
   end
 
   # Removes orphans first, then the longest-idle projects, at most `limit`.

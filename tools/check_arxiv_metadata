@@ -39,7 +39,7 @@ module ArxivMetadataReport
     report = build_report(dir, source_name, metadata, main_name, reference: reference, extracted: extracted,
                                                                  comparisons: comparisons, pdf: pdf_result, bytes: bytes)
     report_path = File.join(dir, 'metadata-report.json')
-    Tempfile.create(['metadata-report-', '.json'], dir) do |temporary|
+    Tempfile.create(['metadata-report-', '.json'], dir) do |temporary| # tmp-exempt: beside its target, renamed over it
       temporary.write(JSON.pretty_generate(report) + "\n")
       temporary.close
       File.rename(temporary.path, report_path)

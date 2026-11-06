@@ -7,6 +7,7 @@
 # process execution, timeouts, and individual LaTeX passes.
 # ==============================================================================
 
+require_relative 'tmp_space'
 require_relative 'relatex_synctex'
 require_relative 'draft_passes'
 
@@ -34,23 +35,11 @@ module LatexBuildRuntime
     @path_hash ||= Digest::SHA256.hexdigest(canonical_build_dir)[0..15]
   end
 
+  # The lock directory name is predictable; LeeniTmp refuses a directory
+  # another user could control, otherwise a malicious lock-file symlink could
+  # redirect the truncating open performed by with_lock.
   def project_tmp_dir
-    @project_tmp_dir ||= begin
-      dir = File.join(Dir.tmpdir, "leeni_#{Process.uid}")
-      Dir.mkdir(dir, 0o700) unless File.directory?(dir)
-      verify_private_dir!(dir)
-      dir
-    end
-  end
-
-  # The lock directory name is predictable. Refuse a directory that another
-  # user could control, otherwise a malicious lock-file symlink could redirect
-  # the truncating open performed by with_lock.
-  def verify_private_dir!(dir)
-    stat = File.lstat(dir)
-    return if stat.directory? && !stat.symlink? && stat.uid == Process.uid && stat.mode.nobits?(0o077)
-
-    abort "leeni: refusing to use #{dir}: not a private directory owned by uid #{Process.uid}"
+    @project_tmp_dir ||= LeeniTmp.dir('locks')
   end
 
   def project_tmp_file(suffix)

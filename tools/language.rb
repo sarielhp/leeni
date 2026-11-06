@@ -6,6 +6,9 @@ module Language
   VERSION_ASSIGNMENT = /^\s*(?:[A-Z]\w*::)*VERSION\s*=\s*(?<quote>['"])(?<value>[^'"\n]+)\k<quote>/
   TEST_LOADER = 'ARGV.each { |path| require File.expand_path(path) }'
   FLAY_SCORE = /^Total score \(lower is better\) = (\d+)$/
+  # Direct uses of the system temporary directory (see Tooling.check_temporary_files).
+  TEMP_CALLS = ProjectTmp::RUBY_CALLS
+  COMMENT = /#.*/
 
   module_function
 
@@ -47,6 +50,15 @@ module Language
     paths = ToolSettings::SOURCE_GLOBS.flat_map { |pattern| Dir.glob(pattern) }
     paths << File.basename(Dir.pwd)
     paths.uniq.sort.select { |path| ruby_source?(path) }
+  end
+
+  # tools/ is checked by Tooling for every language.
+  def temp_policy_files
+    source_files.reject { |path| path.start_with?('tools/') }
+  end
+
+  def test_file?(path)
+    ToolSettings::TEST_GLOBS.any? { |glob| File.fnmatch?(glob, path, File::FNM_PATHNAME | File::FNM_EXTGLOB) }
   end
 
   def project_profile?

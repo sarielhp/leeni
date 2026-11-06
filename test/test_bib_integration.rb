@@ -384,6 +384,34 @@ class TestBibIntegration < Minitest::Test
     end
   end
 
+  # \addbibresource{./refs.bib} or {../shared/refs.bib}: an explicit relative path
+  # bypasses kpathsea, so biber resolves it against --input-directory, which must
+  # be the project and not the build directory biber runs in.
+  def test_biber_finds_bib_given_by_explicit_relative_path
+    Dir.mktmpdir('biber_relative_path_test') do |root|
+      dir = File.join(root, 'paper')
+      FileUtils.mkdir_p([dir, File.join(root, 'shared')])
+      File.write(File.join(dir, 'main.tex'), <<~'TEX')
+        \documentclass{article}
+        \usepackage[backend=biber]{biblatex}
+        \addbibresource{./refs.bib}
+        \addbibresource{../shared/more.bib}
+        \begin{document}
+        Citing \cite{itemA} and \cite{itemB}.
+        \printbibliography
+        \end{document}
+      TEX
+      File.write(File.join(dir, 'refs.bib'), "@book{itemA, author={Alpha, Ann}, title={First Book}, year={2001}}\n")
+      File.write(File.join(root, 'shared', 'more.bib'), "@book{itemB, author={Beta, Bob}, title={Second Book}, year={2002}}\n")
+
+      out, status = Open3.capture2e(File.expand_path('../leeni', __dir__), 'main.tex', chdir: dir)
+      assert_equal 0, status.exitstatus, "Compilation failed:\n#{out}"
+      txt, = Open3.capture2('pdftotext', File.join(dir, 'main.pdf'), '-')
+      assert_includes txt, 'First Book'
+      assert_includes txt, 'Second Book'
+    end
+  end
+
   def test_biber_single_pass_when_citations_and_bib_unchanged
     Dir.mktmpdir('biber_single_pass_test') do |dir|
       tex1 = <<~'TEX'

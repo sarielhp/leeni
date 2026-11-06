@@ -28,13 +28,13 @@ class TestCachePruner < LeeniTestBase
   end
 
   # A cache entry whose newest activity lies `age_days` back. The project
-  # directory exists unless `missing`.
-  def entry(root, name, age_days:, missing: false, record: true)
+  # directory exists unless `missing`. `now` is the clock the code under test reads.
+  def entry(root, name, age_days:, missing: false, record: true, now: NOW)
     project = File.join(root, 'projects', name)
     FileUtils.mkdir_p(project) unless missing
     dir = File.join(LeeniCachePruner.projects_dir, "#{name}-#{format('%016x', name.sum * 7919)}")
     FileUtils.mkdir_p(dir)
-    stamp = NOW - (age_days * DAY)
+    stamp = now - (age_days * DAY)
     File.write(File.join(dir, '.leeni_workspace'), project)
     File.write(File.join(dir, 'main.aux'), '\relax')
     if record
@@ -116,9 +116,9 @@ class TestCachePruner < LeeniTestBase
 
   def test_doctor_reports_stale_entries_and_prunes_on_request
     with_cache do |root|
-      entry(root, 'gone', age_days: 2, missing: true)
-      entry(root, 'old', age_days: 20)
-      entry(root, 'recent', age_days: 1)
+      entry(root, 'gone', age_days: 2, missing: true, now: Time.now)
+      entry(root, 'old', age_days: 20, now: Time.now)
+      entry(root, 'recent', age_days: 1, now: Time.now)
       io = StringIO.new
       LeeniDoctor.run(true, { color: false, cache_days: 10 }, io: io)
       assert_includes io.string, 'stale: 1 of deleted projects, 1 idle for more than 10 days'

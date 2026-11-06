@@ -258,12 +258,22 @@ class LaTeXBibManager
 
   def execute_bibliography(tool)
     cmd = if tool == :biber
-            ['biber', *biber_encoding_options, '--input-directory', '.', '--output-directory', '.', bfilename]
+            biber_command
           else
             ['bibtex', bfilename]
           end
     search_env = bibliography_search_env
     Dir.chdir(junk_dir) { @builder.capture_pass_output(cmd, search_env) }
+  end
+
+  # Biber runs inside the build directory, but a datasource with an explicit
+  # relative path (\addbibresource{./book.bib}, {../shared/x.bib}) bypasses the
+  # kpathsea search and is resolved against --input-directory, so that must be
+  # the project. The .bcf is named by absolute path so a stale one left in the
+  # project by a direct lualatex run is never read instead.
+  def biber_command
+    bcf = File.expand_path("#{bfilename}.bcf", junk_dir)
+    ['biber', *biber_encoding_options, '--input-directory', File.expand_path('.'), '--output-directory', '.', bcf]
   end
 
   # pdfLaTeX reads the .bbl best as TeX accent macros. LuaLaTeX and XeLaTeX read UTF-8, and

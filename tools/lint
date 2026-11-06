@@ -3,7 +3,17 @@
 
 require_relative 'tooling'
 
-Tooling.entry do
+HELP = <<~TEXT
+  Usage: tools/lint
+
+  Static feedback only: ruby-audit --strict on every Ruby file, and RuboCop
+  for a project. No tests.
+
+  Options:
+    -h, --help  Show this help; nothing is run.
+TEXT
+
+Tooling.entry(HELP) do
   abort 'Usage: tools/lint' unless ARGV.empty?
   Language.lint
 end

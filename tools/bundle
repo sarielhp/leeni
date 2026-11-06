@@ -66,21 +66,11 @@ module LatexBundler
     cli_targets.rb
   ].freeze
 
-  STD_REQUIRES = %w[
-    digest
-    fileutils
-    io/console
-    json
-    open3
-    optparse
-    pathname
-    rbconfig
-    shellwords
-    stringio
-    tmpdir
-    time
-    uri
-  ].freeze
+  # A module's top-level `require 'x'` moves into the bundle header; an
+  # indented one (an optional gem inside begin/rescue) stays where it is. The
+  # header used to come from a hand-kept list, so a new stdlib require passed
+  # every test from the source tree and raised NameError in the installed binary.
+  TOP_LEVEL_REQUIRE = /\Arequire\s+['"]([^'"]+)['"]/
 
   def self.current_version
     return '0.21.0' unless File.file?(VERSION_FILE)
@@ -94,7 +84,7 @@ module LatexBundler
       line.start_with?('# frozen_string_literal:') ||
         line.start_with?('#!/usr/bin/env') ||
         line.match?(/\A\s*require_relative\s+['"]/) ||
-        (name != 'color.rb' && line.match?(/\A\s*require\s+['"]/))
+        line.match?(TOP_LEVEL_REQUIRE)
     end
     result = lines.join.strip
     result = specialize_version_module(result, version) if name == 'version.rb'
@@ -110,9 +100,15 @@ module LatexBundler
     lines = entry_content.lines.reject do |line|
       line.start_with?('# frozen_string_literal:') ||
         line.start_with?('#!/usr/bin/env') ||
-        line.match?(/\A\s*require(?:_relative)?\s+['"]/)
+        line.match?(/\A\s*require_relative\s+['"]/) ||
+        line.match?(TOP_LEVEL_REQUIRE)
     end
     lines.join.strip
+  end
+
+  def self.top_level_requires
+    sources = MODULE_ORDER.map { |name| File.join(LIB_DIR, name) } + [ENTRY_FILE]
+    sources.flat_map { |file| File.read(file).scan(/^require\s+['"]([^'"]+)['"]/).flatten }.uniq.sort
   end
 
   def self.verify_all_modules_present!
@@ -139,7 +135,7 @@ module LatexBundler
   end
 
   def self.generate_header(version)
-    reqs = STD_REQUIRES.map { |r| "require '#{r}'" }.join("\n")
+    reqs = top_level_requires.map { |r| "require '#{r}'" }.join("\n")
     <<~HEADER.strip
       #!/usr/bin/env ruby
       # frozen_string_literal: true

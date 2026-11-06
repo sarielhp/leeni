@@ -3,7 +3,20 @@
 
 require_relative 'tooling'
 
-Tooling.entry do
+HELP = <<~TEXT
+  Usage: tools/gate [--fast|--medium|--full]
+
+  Check the tree without changing it: tools/lint, FAST_CHECKS and the test
+  tier (tools/test).
+
+  Options:
+    --fast      Default: syntax, metrics, lint and the fast tests.
+    --medium    Adds the real-LaTeX integration tests.
+    --full      The release gate: every test, the deep review and FULL_CHECKS.
+    -h, --help  Show this help; nothing is run.
+TEXT
+
+Tooling.entry(HELP) do
   abort 'Usage: tools/gate [--fast|--medium|--full]' unless ARGV.empty? || [%w[--fast], %w[--medium], %w[--full]].include?(ARGV)
   Tooling.gate((ARGV.first || '--fast').delete_prefix('--').to_sym)
 end

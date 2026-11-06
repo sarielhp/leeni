@@ -21,6 +21,15 @@ class TestBump < Minitest::Test
   def test_unknown_argument_rejected_before_release
     out, status = Open3.capture2e(BUMP_BIN, 'other')
     refute status.success?
-    assert_includes out, 'Usage: tools/bump [major|minor|patch|--resume]'
+    assert_includes out, 'Usage: tools/bump [major|minor|patch|--resume|--abandon]'
+  end
+
+  # tools/commit --help once committed the pending version bump as "--help".
+  def test_help_runs_nothing
+    %w[bump commit release snapshot gate install].each do |name|
+      out, status = Open3.capture2e(File.expand_path("../tools/#{name}", __dir__), '--help')
+      assert status.success?, out
+      assert_match(%r{\AUsage: tools/#{name}}, out)
+    end
   end
 end

@@ -65,9 +65,10 @@ checkpoint, while `tools/commit MESSAGE` commits checked changes locally.
 `tools/release MESSAGE` commits the current changes, increments the patch version,
 runs the full gate against that version, and atomically pushes the branch and tag
 to the configured upstream. The tag push triggers GitHub Actions to attach the
-standalone executable to a GitHub Release. Pass `--install` to install after the
-remote tag is verified. For a version-only release, use `tools/bump` (`--minor`, `--major`, or
-`--resume` after an interruption). Installation can also be run independently
+standalone executable to a GitHub Release. It then installs (`tools/install`);
+steps already done are skipped, so a rerun only confirms. For a version-only release, use
+`tools/bump` (`minor`, `major`, `--resume` after an interruption, or `--abandon` to drop an
+interrupted bump that published nothing). Installation can also be run independently
 with `tools/install`.
 
 ### Requirements

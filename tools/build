@@ -3,7 +3,17 @@
 
 require_relative 'tooling'
 
-Tooling.entry do
+HELP = <<~TEXT
+  Usage: tools/build
+
+  Check that each artifact is executable Ruby, and syntax-check every source
+  (ruby -cw). Nothing is installed.
+
+  Options:
+    -h, --help  Show this help; nothing is run.
+TEXT
+
+Tooling.entry(HELP) do
   abort 'Usage: tools/build' unless ARGV.empty?
   Language.build
 end

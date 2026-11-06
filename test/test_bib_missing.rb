@@ -77,16 +77,16 @@ class TestBibMissing < LeeniTestBase
     refute(options.values_at(:llm, :json, :compile, :emacs, :trace).any?)
   end
 
-  def run_paper(dir, *)
-    Open3.capture3(BIN, *, 'paper.tex', chdir: dir)
+  def run_paper(dir, *, bin: BIN)
+    Open3.capture3(bin, *, 'paper.tex', chdir: dir)
   end
 
-  def assert_lists_missing_keys(paper)
+  def assert_lists_missing_keys(paper, bin: BIN)
     Dir.mktmpdir('bib_missing_build') do |dir|
       File.write(File.join(dir, 'refs.bib'), BIB)
       File.write(File.join(dir, 'paper.tex'), paper)
       2.times do |run|
-        out, err, status = run_paper(dir, '--bib-missing')
+        out, err, status = run_paper(dir, '--bib-missing', bin: bin)
         assert_equal 0, status.exitstatus, "run #{run}: #{out}#{err}"
         assert_equal "alpha\nzeta\n", out, "run #{run} (second run is cached)"
       end
@@ -103,6 +103,18 @@ class TestBibMissing < LeeniTestBase
     skip 'biber not installed' unless LaTeXUtils.command_available?('biber')
 
     assert_lists_missing_keys(BIBLATEX_PAPER)
+  end
+
+  # The installed leeni is the bundle; 1.0.76 raised NameError on StringIO there.
+  def test_bundled_program_prints_missing_keys
+    skip 'bibtex not installed' unless LaTeXUtils.command_available?('bibtex')
+
+    Dir.mktmpdir('bib_missing_bundle') do |dir|
+      bin = File.join(dir, 'leeni')
+      _out, status = Open3.capture2e(File.expand_path('../tools/bundle', __dir__), '-o', bin)
+      assert status.success?
+      assert_lists_missing_keys(BIBTEX_PAPER, bin: bin)
+    end
   end
 
   def test_latex_error_restores_regular_output

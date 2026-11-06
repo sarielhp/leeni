@@ -2,7 +2,6 @@
 # frozen_string_literal: true
 
 require 'fileutils'
-require 'optparse'
 require_relative 'tooling'
 
 module LeeniInstaller
@@ -56,18 +55,22 @@ module LeeniInstaller
 end
 
 if __FILE__ == $PROGRAM_NAME
-  Tooling.entry do
-    options = { verbose: false }
-    OptionParser.new do |parser|
-      parser.banner = 'Usage: tools/install [-v]'
-      parser.on('-v', '--verbose', 'Show installed shortcuts') { options[:verbose] = true }
-      parser.on('-h', '--help', 'Show this help') do
-        puts parser
-        exit 0
-      end
-    end.parse!
+  HELP = <<~TEXT.freeze
+    Usage: tools/install [-v]
+
+    Build, install build/leeni to ~/bin/leeni with its shortcut links
+    (#{LeeniInstaller::SHORTCUTS.join(', ')}) and the revtex4 compatibility
+    files, and verify each copy.
+
+    Options:
+      -v, --verbose  Show installed shortcuts.
+      -h, --help     Show this help; nothing is run.
+  TEXT
+
+  Tooling.entry(HELP) do
+    verbose = ARGV.delete('-v') || ARGV.delete('--verbose')
     abort 'Usage: tools/install [-v]' unless ARGV.empty?
 
-    LeeniInstaller.run(**options)
+    LeeniInstaller.run(verbose: !verbose.nil?)
   end
 end

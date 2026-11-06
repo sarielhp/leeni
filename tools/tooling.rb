@@ -12,6 +12,8 @@ require_relative 'language'
 module Tooling
   SEMVER = /\A(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)\z/
 
+  HELP_FLAGS = %w[-h --help].freeze
+
   module_function
 
   def setup
@@ -207,7 +209,9 @@ module Tooling
   end
 
   def bump(level = 'patch')
-    raise 'unfinished release; inspect local state and use tools/bump --resume' if File.exist?(state_path('release'))
+    if File.exist?(state_path('release'))
+      raise 'unfinished release; inspect local state and use tools/bump --resume, or --abandon if nothing was published'
+    end
 
     destination, ref = upstream
     _, current = version
@@ -226,7 +230,8 @@ module Tooling
     finish_pending_commit(data)
     publish(data)
   rescue StandardError => e
-    raise "#{e.message}\nLocal state retained. Inspect and use tools/bump --resume; it never bumps again."
+    raise "#{e.message}\nLocal state retained. Inspect and use tools/bump --resume; it never bumps again. " \
+          'If nothing was published, tools/bump --abandon drops it.'
   end
 
   def finish_pending_commit(data)
@@ -255,7 +260,9 @@ module Tooling
 
     data = JSON.parse(File.read(path), symbolize_names: true)
     unless data[:commit]
-      raise 'HEAD or version changed; inspect pending release' unless head == data.fetch(:base) && version.last == data.fetch(:version)
+      unless head == data.fetch(:base) && version.last == data.fetch(:version)
+        raise 'HEAD or version changed; inspect, then drop the pending release with tools/bump --abandon'
+      end
 
       ToolSettings::VERSION_UPDATE.each { |args| run(*args) }
       Language.synchronize_version
@@ -266,6 +273,51 @@ module Tooling
     raise 'HEAD, working tree, or checked inputs changed since release commit' unless unchanged
 
     publish(data)
+  end
+
+  # Drops a pending release that never reached the remote, so a bump that can
+  # no longer resume (HEAD moved, the fix needed a commit) does not need its
+  # state file deleted by hand. The bump commit and its local tag go only while
+  # HEAD is still that commit; an uncommitted pending version is restored.
+  # Other files the bump touched are listed, not reverted.
+  def abandon
+    path = state_path('release')
+    raise 'no interrupted release to abandon' unless File.file?(path)
+
+    data = JSON.parse(File.read(path), symbolize_names: true)
+    refuse_published_release(data)
+    data[:commit] ? drop_release_commit(data) : restore_pending_version(data)
+    FileUtils.rm_f(path)
+    puts "Abandoned release #{data.fetch(:version)}; nothing was published"
+    left = git('status', '--porcelain')
+    puts "Left for inspection:\n#{left}" unless left.empty?
+  end
+
+  def refuse_published_release(data)
+    destination = data.fetch(:destination)
+    published = data[:commit] && git('ls-remote', destination, data.fetch(:ref)).split.first == data[:commit]
+    published ||= data[:tag] && !git('ls-remote', destination, "refs/tags/#{data[:tag]}").empty?
+    raise 'the release already reached the remote; finish it with tools/bump --resume' if published
+  end
+
+  def drop_release_commit(data)
+    commit = data.fetch(:commit)
+    raise 'HEAD is no longer the release commit; inspect and remove it by hand' unless head == commit
+    raise 'abandon requires a clean working tree' unless git('status', '--porcelain').empty?
+
+    delete_release_tag(data[:tag], commit) if data[:tag]
+    git('reset', '--keep', "#{commit}^")
+  end
+
+  def delete_release_tag(tag, commit)
+    ref = "refs/tags/#{tag}"
+    _, _, status = capture(executable('git'), 'show-ref', '--verify', '--quiet', ref)
+    git('tag', '-d', tag) if status.success? && git('rev-parse', "#{ref}^{}").strip == commit
+  end
+
+  def restore_pending_version(data)
+    file, value = version
+    git('checkout', 'HEAD', '--', file) if value == data.fetch(:version)
   end
 
   def ensure_release_tag(data)
@@ -325,6 +377,24 @@ module Tooling
     puts 'Installation verified'
   end
 
+  # True when destination already holds built's bytes and permissions.
+  def installed?(built, destination)
+    File.file?(destination) && !File.symlink?(destination) &&
+      Digest::SHA256.file(built) == Digest::SHA256.file(destination) &&
+      File.stat(built).mode == File.stat(destination).mode
+  end
+
+  # Copies built beside destination and renames it into place, so a running
+  # program is replaced rather than overwritten ("Text file busy") and no
+  # reader ever sees a partial file.
+  def replace_file(built, destination)
+    temporary = File.join(File.dirname(destination), ".#{File.basename(destination)}.#{Process.pid}.tmp")
+    FileUtils.cp(built, temporary, preserve: true)
+    File.rename(temporary, destination)
+  ensure
+    FileUtils.rm_f(temporary) if temporary
+  end
+
   def install_artifact(source, destination, link)
     built = contained_path(source)
     raise "installation source is not executable: #{source}" unless File.file?(built) && File.executable?(built)
@@ -336,23 +406,49 @@ module Tooling
       FileUtils.ln_s(built, destination)
       raise "installed link mismatch: #{destination}" unless File.realpath(destination) == built
     end
-    FileUtils.cp(built, destination, preserve: true) unless link
+    unless link
+      return puts("#{destination} is already up to date") if installed?(built, destination)
+
+      replace_file(built, destination)
+    end
     raise "installed artifact mismatch: #{destination}" unless expected == Digest::SHA256.file(destination).hexdigest
     raise "installed permissions mismatch: #{destination}" unless File.stat(built).mode == File.stat(destination).mode
   end
 
-  def release(message, install_requested: true)
+  # True when HEAD is the bump commit of the current version and the upstream
+  # branch already points at it: there is nothing new to bump or push. A bump
+  # commit the upstream lacks is an interrupted or diverged release, which
+  # needs inspection rather than a second bump.
+  def released?
+    current = version.last
+    return false unless git('log', '-1', '--format=%s').strip == "chore: bump version to #{current}"
+
+    destination, ref = upstream
+    actual = git('ls-remote', destination, ref).split.first
+    return true if actual == head
+
+    raise "HEAD is the #{current} release commit, but #{ref} at #{destination} is #{actual.inspect}; " \
+          'inspect, then use tools/bump --resume or push it'
+  end
+
+  def release(message)
     published = false
     upstream
     version
     if git('status', '--porcelain').empty?
-      puts 'Working tree clean; nothing to commit, moving on to the bump.'
+      puts 'Nothing to commit; continuing with the bump.'
     else
       script('commit', message)
     end
-    script('bump')
+    if released?
+      puts "Nothing new since release #{version.last}; skipping the bump."
+    else
+      script('bump')
+    end
     published = true
-    script('install') if install_requested
+    return puts('No INSTALL_TARGETS declared; installation skipped.') if ToolSettings::INSTALL_TARGETS.empty?
+
+    script('install')
   rescue StandardError => e
     state = if published
               'Release published and verified; installation failed. Retry tools/install separately.'
@@ -362,10 +458,28 @@ module Tooling
     raise "#{e.message}\n#{state}"
   end
 
-  def entry
+  # A script's help is printed, and nothing else happens, whenever -h or
+  # --help is among its arguments. The scripts took any lone argument as their
+  # commit message, so `tools/release --help` committed pending work as
+  # "--help", bumped the version and published the release.
+  def entry(help = nil)
+    if ARGV.intersect?(HELP_FLAGS)
+      puts help || "#{File.basename($PROGRAM_NAME)}: no help written for this script"
+      exit
+    end
     setup
     yield
   rescue StandardError => e
     abort e.message
+  end
+
+  # A commit message is what the commit is called for good once it is pushed,
+  # so one that looks like an option -- a mistyped --ful, a --dry-run the
+  # script does not have -- is refused rather than committed.
+  def commit_message(text)
+    raise 'the commit message is empty' if text.strip.empty?
+    raise "refusing a commit message that looks like an option: #{text}" if text.start_with?('-')
+
+    text
   end
 end

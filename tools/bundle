@@ -76,6 +76,7 @@ module LatexBundler
     pathname
     rbconfig
     shellwords
+    stringio
     tmpdir
     time
     uri

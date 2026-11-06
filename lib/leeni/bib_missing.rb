@@ -42,19 +42,24 @@ module LatexBibMissing
 
   private
 
+  # False (exit 1) when keys are missing, as with grep, so scripts can test it;
+  # a failed build replays its output instead.
   def run_listing_missing_bib_keys
     @orig_stdout = $stdout
     @bib_missing_buffer = StringIO.new
     $stdout = @bib_missing_buffer
     ok = false
     ok = yield
+    ok && !@bib_missing_found
   ensure
     $stdout = @orig_stdout
     revert_bib_missing_output! unless ok
   end
 
   def report_bib_missing
-    missing_bib_keys.each { |key| @orig_stdout.puts key }
+    keys = missing_bib_keys
+    keys.each { |key| @orig_stdout.puts key }
+    @bib_missing_found = keys.any?
   end
 
   # Restores stdout and replays what the build printed so far, so a failure

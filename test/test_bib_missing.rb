@@ -87,7 +87,7 @@ class TestBibMissing < LeeniTestBase
       File.write(File.join(dir, 'paper.tex'), paper)
       2.times do |run|
         out, err, status = run_paper(dir, '--bib-missing', bin: bin)
-        assert_equal 0, status.exitstatus, "run #{run}: #{out}#{err}"
+        assert_equal 1, status.exitstatus, "run #{run}: #{out}#{err}"
         assert_equal "alpha\nzeta\n", out, "run #{run} (second run is cached)"
       end
     end
@@ -114,6 +114,18 @@ class TestBibMissing < LeeniTestBase
       _out, status = Open3.capture2e(File.expand_path('../tools/bundle', __dir__), '-o', bin)
       assert status.success?
       assert_lists_missing_keys(BIBTEX_PAPER, bin: bin)
+    end
+  end
+
+  def test_clean_bibliography_prints_nothing_and_exits_zero
+    skip 'bibtex not installed' unless LaTeXUtils.command_available?('bibtex')
+
+    Dir.mktmpdir('bib_missing_clean') do |dir|
+      File.write(File.join(dir, 'refs.bib'), BIB)
+      File.write(File.join(dir, 'paper.tex'), BIBTEX_PAPER.sub(',zeta', '').sub(' and \cite{alpha}', ''))
+      out, err, status = run_paper(dir, '--bib-missing')
+      assert_equal 0, status.exitstatus, "#{out}#{err}"
+      assert_empty out
     end
   end
 

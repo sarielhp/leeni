@@ -321,7 +321,7 @@ l -I --dry-run paper.tex
 ```
 
 ### `--bib-missing`
-Builds as usual (LaTeX, then BibTeX or Biber) and prints only the cited keys that have no bibliography entry, one per line, sorted; nothing when every citation resolves. A cached build is answered from the build directory without recompiling. If the build has errors, the regular output is shown instead and the exit status is 1. Cannot be combined with `-s`, `-u`, `--no-bib`, or the packaging/arXiv targets; output formats such as `-llm` or `--json` are overridden.
+Builds as usual (LaTeX, then BibTeX or Biber) and prints only the cited keys that have no bibliography entry, one per line, sorted; nothing when every citation resolves. A cached build is answered from the build directory without recompiling. The exit status is 1 when any key is missing and 0 when none is, so scripts can test it. If the build has errors, the regular output is shown instead and the exit status is 1. Cannot be combined with `-s`, `-u`, `--no-bib`, or the packaging/arXiv targets; output formats such as `-llm` or `--json` are overridden.
 ```bash
 l --bib-missing paper.tex
 ```

@@ -72,7 +72,7 @@ l --json paper.tex
 | `-I` | `--make-indep` | flag | `false` | Convert the paper in place to compile with `--no-env` (styles to `styles/`, cited entries to `<doc>.bib`); verified in a sandbox first; originals saved in `old_ver_yy_mm_dd_hh_mm.zip`. |
 | *(none)* | `--sandbox` | flag | `false` | After the build, rebuild an isolated copy (kept in the cache) with `--no-env` and compare PDFs; exit 1 on mismatch. |
 | *(none)* | `--dry-run` | flag | `false` | With `-I`: run the sandbox check and print copies and diffs; change nothing. |
-| *(none)* | `--bib-missing` | flag | `false` | Build; print only cited keys missing from the bibliography, one per line (regular output and exit 1 on errors). |
+| *(none)* | `--bib-missing` | flag | `false` | Build; print only cited keys missing from the bibliography, one per line; exit 1 if any is missing, 0 if none (regular output and exit 1 on build errors). |
 | `-B` | `--bib-extract`| flag | `false` | Extract cited references into local standalone `.bib` file. |
 | `--arxiv`| *(none)* | flag | `false` | Produce submission-ready, comment-stripped arXiv archive. |
 | `--meta` | *(none)* | flag | `false` | Extract sanitized metadata and write `arxiv_<file>_meta.txt`. |

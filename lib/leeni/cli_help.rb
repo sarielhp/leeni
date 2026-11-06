@@ -12,7 +12,6 @@ module LatexCLI
       '  -c, --clean          Clean temporary build files (preserves .bbl and metadata)',
       '  -x, --explain        Display plain-English explanations for diagnostics',
       '  -B, --bib-extract    Extract cited bib entries into local .bib file',
-      '  --bib-missing        Build and print only the keys of missing bib entries',
       '  -e, --engine ENGINE  Compiler engine: x (xelatex), l (lualatex), p (pdflatex)',
       '',
       'Help & Discovery:',

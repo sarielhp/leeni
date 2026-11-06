@@ -2590,13 +2590,21 @@ module LaTeXDiagnostics
   ).freeze
 
   BIB_WARNING_PATTERN = /^Warning--|^Repeated entry---|^WARN\s+-\s/i
+  BIBTEX_ERROR_SUMMARY = /\(There (?:was|were) \d+ error message/i
+
+  # BibTeX's "(There was 1 error message)" is no error when every error it
+  # counted is a repeated entry, which leeni reports as an alert.
+  def bib_error_lines(content)
+    lines = content.each_line.grep(BIB_ERROR_PATTERN)
+    LatexBibChecks.only_repeated_entries?(content) ? lines.grep_v(BIBTEX_ERROR_SUMMARY) : lines
+  end
 
   def count_bib_messages
     return { warns: 0, errors: 0 } unless @biberr && File.exist?(@biberr)
 
     bib_content = LaTeXUtils.safe_read(@biberr)
     warns = bib_content.each_line.count { |l| l =~ BIB_WARNING_PATTERN }
-    errors = bib_content.each_line.count { |l| l =~ BIB_ERROR_PATTERN }
+    errors = bib_error_lines(bib_content).size
     { warns: warns, errors: errors }
   end
 
@@ -2615,18 +2623,48 @@ module LaTeXDiagnostics
   def append_bib_diagnostics!(warn_items, err_items)
     return unless @biberr && File.exist?(@biberr)
 
-    LaTeXUtils.safe_read(@biberr).each_line.with_index do |bl, bidx|
-      if bl =~ BIB_WARNING_PATTERN
+    content = LaTeXUtils.safe_read(@biberr)
+    errors = bib_error_lines(content)
+    content.each_line.with_index do |bl, bidx|
+      if (dup = biber_duplicate_item(bl, 100_000 + bidx))
+        warn_items << dup
+      elsif bl =~ BIB_WARNING_PATTERN
         line_str = bl =~ /line\s+(\d+)/i ? Regexp.last_match(1) : ''
         bib_file = bl[/of file (\S+?)\.?\s*$/i, 1] || './bibliography'
         formatted = format_diagnostic_line(line_str, bl.strip, :yellow, file: bib_file)
         warn_items << { file: bib_file, line: line_str.to_i, line_str: line_str, text: bl.strip, formatted: formatted,
                         index: 100_000 + bidx }
-      elsif bl =~ BIB_ERROR_PATTERN
+      elsif errors.include?(bl)
         formatted = @options[:emacs] ? bl.strip : highlight_line_numbers(bl.strip, :red, bright: true)
         err_items << { file: './bibliography', line: 0, text: bl.strip, formatted: formatted, index: 100_000 + bidx }
       end
     end
+  end
+
+  BIBER_DUPLICATE = /Duplicate entry key: '([^']+)' in file '([^']+)'/
+
+  # Biber names the file by absolute path and neither line. Bibkit finds the
+  # copy it kept and the one it skipped; the file is shown relative to the
+  # project when inside it, and the line links to the real location.
+  def biber_duplicate_item(text, index)
+    m = text.match(BIBER_DUPLICATE)
+    return nil unless m
+
+    key, path = m.captures
+    lines = File.file?(path) ? Bibkit::BibFile.load(path).entries_for(key).map(&:line) : []
+    line_str = lines[1].to_s
+    msg = "Duplicate entry key '#{key}'#{": Biber skips this copy and uses the one on line #{lines[0]}" if lines.size > 1}"
+    file = display_bib_path(path)
+    { file: file, line: lines[1].to_i, line_str: line_str, text: msg,
+      formatted: format_diagnostic_line(line_str, msg, :yellow, file: file), index: index }
+  rescue SystemCallError
+    nil
+  end
+
+  def display_bib_path(path)
+    root = "#{File.realpath('.')}/"
+    real = File.realpath(path)
+    real.start_with?(root) ? real.delete_prefix(root) : path
   end
 
   MISSING_DB_ENTRY_PATTERNS = [

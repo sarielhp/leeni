@@ -103,6 +103,13 @@ module LatexBibChecks
     nil
   end
 
+  # BibTeX counts a repeated key as an error (exit status 2) but writes the
+  # .bbl with the first copy; leeni reports it as an alert instead of failing.
+  def self.only_repeated_entries?(bibtex_out)
+    errors = bibtex_out.scan(/---line \d+ of file/).size
+    errors.positive? && errors == bibtex_out.scan(/^Repeated entry---line \d+ of file/).size
+  end
+
   # BibTeX's "I was expecting a `,' or a `}'---line N of file F" when that
   # line has a `%`: the usual cause, which BibTeX does not name.
   def self.percent_hint(detail)

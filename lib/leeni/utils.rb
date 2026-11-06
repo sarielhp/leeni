@@ -329,7 +329,7 @@ module LaTeXUtils
   def self.bib_fatal_error?(tool, bib_out, status_ok)
     out = bib_out.to_s
     if tool == :bibtex
-      return false if status_ok
+      return false if status_ok || LatexBibChecks.only_repeated_entries?(out)
       return false if out =~ /I found no \\citation commands/i && out !~ /Illegal end of database|syntax error|I couldn't open/i
 
       true

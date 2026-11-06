@@ -4,7 +4,7 @@
 require_relative 'tooling'
 
 HELP = <<~TEXT
-  Usage: tools/release <message>
+  Usage: tools/release [--no-install] <message>
 
   Publish a release: commit, bump the patch version, push, and install.
 
@@ -15,7 +15,7 @@ HELP = <<~TEXT
        together, verified (tools/bump);
        skipped when HEAD is already the pushed release commit.
     3. Install the built artifacts to INSTALL_TARGETS (tools/install);
-       skipped, with a notice, when no targets are declared;
+       skipped, with a notice, with --no-install or when no targets are declared;
        a target that already matches the build is left alone.
 
   Rerunning after a success does nothing but confirm it. Steps 1 and 2 change
@@ -25,12 +25,14 @@ HELP = <<~TEXT
   nothing was published.
 
   Options:
-    --install   Accepted for compatibility; installation always runs.
-    -h, --help  Show this help; nothing is run.
+    --no-install  Skip step 3; the release is still published.
+    --install     Accepted for compatibility; installation is the default.
+    -h, --help    Show this help; nothing is run.
 TEXT
 
 Tooling.entry(HELP) do
-  ARGV.shift if ARGV.first == '--install'
-  abort 'Usage: tools/release <message>' unless ARGV.length == 1
-  Tooling.release(Tooling.commit_message(ARGV.first))
+  install = ARGV.first != '--no-install'
+  ARGV.shift if %w[--install --no-install].include?(ARGV.first)
+  abort 'Usage: tools/release [--no-install] <message>' unless ARGV.length == 1
+  Tooling.release(Tooling.commit_message(ARGV.first), install: install)
 end

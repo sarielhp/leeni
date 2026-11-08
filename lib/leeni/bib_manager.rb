@@ -14,6 +14,7 @@ require 'digest'
 require_relative 'color'
 require_relative 'utils'
 require_relative 'bib_checks'
+require_relative 'bbl_provenance'
 
 class LaTeXBibManager
   attr_reader :builder, :bib_fatal
@@ -45,6 +46,9 @@ class LaTeXBibManager
     fnbbl = File.join(junk_dir, "#{bfilename}.bbl")
     return false unless File.exist?(fnbbl) && File.size(fnbbl).positive?
     return false unless File.exist?(File.join(junk_dir, "#{bfilename}.aux")) || File.exist?(File.join(junk_dir, "#{bfilename}.bcf"))
+
+    verdict = LeeniBblProvenance.stale_verdict(junk_dir, fnbbl)
+    return verdict unless verdict.nil?
 
     bbl_mtime = File.mtime(fnbbl)
     discover_bib_files.any? do |b|
@@ -179,8 +183,15 @@ class LaTeXBibManager
       return false
     end
 
+    record_bbl_inputs(tool, fnbbl)
     @builder.update_target_file(fnbbl, root_bbl) if options[:trace] || File.exist?(root_bbl)
     true
+  end
+
+  def record_bbl_inputs(tool, fnbbl)
+    blg = File.join(junk_dir, "#{bfilename}.blg")
+    inputs = LeeniBblProvenance.logged_inputs(tool, blg, File.expand_path(junk_dir), bibliography_search_env)
+    LeeniBblProvenance.record(junk_dir, fnbbl, inputs)
   end
 
   def bibliography_failure_detail(output)
@@ -459,12 +470,16 @@ class LaTeXBibManager
     @last_bib_citations && current_citation_keys(aux_contents) != @last_bib_citations
   end
 
-  # True when a bibliography database the document names is newer than the .bbl
-  # or differs from what the last bib run read. It depends on inputs only, so it
+  # True when a file the last bib run read (per its log) has changed since; without
+  # that record, when a database the document names is newer than the .bbl or
+  # differs from what the last bib run read. It depends on inputs only, so it
   # is known before a LaTeX pass runs (draft passes rely on that).
   def bib_database_changed?(aux_contents = nil)
     fnbbl = File.join(junk_dir, "#{bfilename}.bbl")
     return false unless File.file?(fnbbl)
+
+    verdict = LeeniBblProvenance.stale_verdict(junk_dir, fnbbl)
+    return verdict unless verdict.nil?
 
     bbl_mtime = File.mtime(fnbbl)
     discover_bib_files(aux_contents).any? { |b| bib_file_changed?(b, bbl_mtime) }

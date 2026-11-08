@@ -51,6 +51,7 @@ module LatexBundler
     compile_format.rb
     presenters.rb
     diagnostics.rb
+    bbl_provenance.rb
     bib_manager.rb
     relatex_synctex.rb
     draft_passes.rb

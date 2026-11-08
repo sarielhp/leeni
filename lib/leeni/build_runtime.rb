@@ -17,6 +17,11 @@ module LatexBuildRuntime
   include LeeniRelatexSynctex::Hooks
   include LatexDraftPasses
 
+  # A pass failed inside a .bbl older than the .bib files: the bibliography
+  # predates the edit (often the fix for this very error), so it is dropped
+  # and the build reruns once to let the bibliography tool regenerate it.
+  class StaleBibliography < StandardError; end
+
   STYLE_COPY_EXTS = %w[.sty .cls .clo .def .fd .cfg .bst .bbx .cbx .lbx .dbx .ldf .bib].freeze
 
   EXTERNAL_TRACKED_EXTS = %w[.tex .sty .cls .clo .def .fd .cfg .bbx .cbx .lbx .dbx .ldf .rtx .lua
@@ -388,6 +393,8 @@ module LatexBuildRuntime
     error_count = count_errors_in_log(exit_status, pass_log)
     return unless error_count.positive?
 
+    raise StaleBibliography if stale_bbl_failure?(pass_log)
+
     failure = @recovered ? nil : cache_failure(pass_log)
     raise failure if failure
 
@@ -398,6 +405,20 @@ module LatexBuildRuntime
       exit 1
     end
     report_errors(pass_log)
+  end
+
+  # An empty .bbl, not a missing one: the engine would fall back to the
+  # working-tree copy, which is just as stale. A successful build replaces both.
+  def drop_stale_bbl
+    @stale_bbl_dropped = true
+    File.write(File.join(@junk_dir, "#{@bfilename}.bbl"), '')
+  end
+
+  def stale_bbl_failure?(pass_log)
+    return false if @stale_bbl_dropped || !bib_files_newer_than_bbl?
+
+    first = extract_errors(LaTeXUtils.filter_subcommand_noise(LaTeXUtils.safe_read(pass_log))).first
+    !!first && (first[:bib_entry] || File.extname(first[:file].to_s) == '.bbl')
   end
 
   # The first error of the pass sits in a generated file (.aux, .toc, .bbl,
@@ -419,6 +440,9 @@ module LatexBuildRuntime
   # failure in the same run is reported as usual.
   def run_convergence_loop_with_recovery
     run_convergence_loop
+  rescue StaleBibliography
+    drop_stale_bbl
+    run_convergence_loop_with_recovery
   rescue LeeniQuarantine::CacheFailure => e
     @recovered = true
     repeat = LeeniQuarantine.recent_case_for?('.')

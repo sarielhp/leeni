@@ -33,6 +33,7 @@ module LeeniTestSuite
     test_arxiv.rb test_config_save.rb test_code_metrics.rb test_convergence_loop.rb
     test_sample_arxiv_review.rb test_arxiv_cycle.rb test_emacs_auctex.rb test_cache_recovery.rb test_report.rb
     test_make_indep.rb test_sandbox.rb test_draft_passes_integration.rb test_bib_missing.rb test_bib_fix.rb test_bib_checks.rb
+    test_stale_bbl.rb
   ].freeze
   FULL_TESTS = Dir.glob(File.expand_path('../test/test_*.rb', __dir__)).map { |path| File.basename(path) }.freeze
   TIERS = { fast: FAST_TESTS, medium: MEDIUM_TESTS + FAST_TESTS,

@@ -188,7 +188,19 @@ class LaTeXBibManager
     detail = output.to_s.each_line.find do |line|
       line.match?(/I couldn't open database file|(?:ERROR|FATAL)\s+-|---line \d+ of file/i)
     end
-    detail ? " #{detail.strip}.#{LatexBibChecks.percent_hint(detail)}" : ''
+    return '' unless detail
+
+    detail = biber_source_path(output, detail)
+    " #{detail.strip}.#{LatexBibChecks.percent_hint(detail)}"
+  end
+
+  # Biber parses a line-for-line UTF-8 copy of each data source under a temporary
+  # name; the error names the .bib it last reported finding instead.
+  def biber_source_path(output, detail)
+    source = output.to_s.partition(detail).first.scan(/Found BibTeX data source '([^']+)'/).last&.first
+    return detail unless source
+
+    detail.sub(%r{\S*/biber_tmp_\w+/\S+?\.utf8}, File.basename(source))
   end
 
   def invoke_bibliography_command(tool, fnbbl, previous)
@@ -209,16 +221,18 @@ class LaTeXBibManager
     return unless previous
 
     backup = "#{root_bbl}.bak"
-    FileUtils.cp(previous, backup)
-    FileUtils.cp(previous, File.join(junk_dir, File.basename(backup)))
+    FileUtils.cp(previous, backup, preserve: true)
+    FileUtils.cp(previous, File.join(junk_dir, File.basename(backup)), preserve: true)
   end
 
+  # The old timestamp stays: a restored .bbl must still look older than the .bib
+  # files, or the next build trusts it.
   def restore_bibliography(junk_bbl, previous)
     return FileUtils.rm_f(junk_bbl) unless previous
 
     backup = "#{bfilename}.bbl.bak"
     source = File.file?(backup) ? backup : previous
-    FileUtils.cp(source, junk_bbl) unless source == junk_bbl
+    FileUtils.cp(source, junk_bbl, preserve: true) unless source == junk_bbl
   end
 
   def discover_bib_files(aux_contents = nil)

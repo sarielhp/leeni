@@ -96,6 +96,17 @@ class TestBblProvenance < LeeniTestBase
     end
   end
 
+  # The record covers only the databases it lists: switching \bibliography to
+  # another file reruns BibTeX even though every recorded input is unchanged.
+  def test_a_newly_named_database_is_not_covered_by_the_record
+    skip 'bibtex not installed' unless system('kpsewhich plain.bst', out: File::NULL)
+    with_bibtex_project do |_junk_dir|
+      File.write('other.bib', File.read('refs.bib'))
+      File.write('main.tex', File.read('main.tex').sub('\bibliography{refs}', '\bibliography{other}'))
+      assert_includes build_output, 'bibtex'
+    end
+  end
+
   private
 
   def options = { engine: 'pdflatex', passes: 4, lock: false, force: true }

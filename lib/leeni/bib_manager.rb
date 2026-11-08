@@ -47,7 +47,7 @@ class LaTeXBibManager
     return false unless File.exist?(fnbbl) && File.size(fnbbl).positive?
     return false unless File.exist?(File.join(junk_dir, "#{bfilename}.aux")) || File.exist?(File.join(junk_dir, "#{bfilename}.bcf"))
 
-    verdict = LeeniBblProvenance.stale_verdict(junk_dir, fnbbl)
+    verdict = recorded_bbl_verdict(fnbbl)
     return verdict unless verdict.nil?
 
     bbl_mtime = File.mtime(fnbbl)
@@ -186,6 +186,17 @@ class LaTeXBibManager
     record_bbl_inputs(tool, fnbbl)
     @builder.update_target_file(fnbbl, root_bbl) if options[:trace] || File.exist?(root_bbl)
     true
+  end
+
+  # The record speaks only for the databases it lists: when the document now
+  # names one the last run did not read (a renamed \bibliography), nil sends
+  # the caller back to modification times.
+  def recorded_bbl_verdict(fnbbl, aux_contents = nil)
+    verdict = LeeniBblProvenance.stale_verdict(junk_dir, fnbbl)
+    return verdict unless verdict == false
+
+    declared = extract_aux_bib_files(aux_contents) + extract_bcf_bib_files
+    LeeniBblProvenance.covers?(junk_dir, declared) ? false : nil
   end
 
   def record_bbl_inputs(tool, fnbbl)
@@ -478,7 +489,7 @@ class LaTeXBibManager
     fnbbl = File.join(junk_dir, "#{bfilename}.bbl")
     return false unless File.file?(fnbbl)
 
-    verdict = LeeniBblProvenance.stale_verdict(junk_dir, fnbbl)
+    verdict = recorded_bbl_verdict(fnbbl, aux_contents)
     return verdict unless verdict.nil?
 
     bbl_mtime = File.mtime(fnbbl)

@@ -69,6 +69,20 @@ module LeeniBblProvenance
     nil
   end
 
+  # True when every given file is one the recorded run read.
+  def covers?(dir, paths)
+    recorded = JSON.parse(File.read(File.join(dir, RECORD))).fetch('inputs').keys.filter_map { |p| real(p) }
+    paths.all? { |p| recorded.include?(real(p)) }
+  rescue StandardError
+    false
+  end
+
+  def real(path)
+    File.realpath(path)
+  rescue SystemCallError
+    nil
+  end
+
   def sha(path)
     File.file?(path) ? Digest::SHA256.file(path).hexdigest : nil
   end

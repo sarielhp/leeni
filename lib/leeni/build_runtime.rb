@@ -22,6 +22,8 @@ module LatexBuildRuntime
   # and the build reruns once to let the bibliography tool regenerate it.
   class StaleBibliography < StandardError; end
 
+  TRUNCATED_AUX_ERROR = /File ended while scanning use of \\(?:@newl@bel|@writefile|@@BOOKMARK|newlabel|bibcite|contentsline|abx@aux@\w+)\b.*/
+
   STYLE_COPY_EXTS = %w[.sty .cls .clo .def .fd .cfg .bst .bbx .cbx .lbx .dbx .ldf .bib].freeze
 
   EXTERNAL_TRACKED_EXTS = %w[.tex .sty .cls .clo .def .fd .cfg .bbx .cbx .lbx .dbx .ldf .rtx .lua
@@ -333,7 +335,9 @@ module LatexBuildRuntime
 
     command = build_latex_pass_cmd
     write_pass_header(pass_log, command)
+    pass_started_at = Time.now
     output, status = capture_pass_output(command)
+    discard_truncated_outputs(pass_started_at) if killed_pass?(status)
     output = strip_draft_notice(output)
     exit_status = process_exit_status(status)
     File.open(pass_log, 'a') { |file| file.write(output) }
@@ -342,6 +346,21 @@ module LatexBuildRuntime
     File.open(@log, 'a') { |file| file.write(output) }
     print_pass_time(started) if @options[:time]
     status.success?
+  end
+
+  # A killed engine (a signal, typically SIGPIPE once xdvipdfmx died, or the
+  # timeout) leaves its .aux, .out, .toc, ... cut off mid-buffer; the next run
+  # would read them and fail with runaway arguments at \begin{document}.
+  def killed_pass?(status)
+    (status.respond_to?(:signaled?) && status.signaled?) || status.exitstatus == 124
+  end
+
+  def discard_truncated_outputs(since)
+    Dir.glob(File.join(@junk_dir, '**', '*')).each do |path|
+      next unless File.file?(path) && LeeniQuarantine.generated_file?(path)
+
+      FileUtils.rm_f(path) if File.mtime(path) >= since
+    end
   end
 
   def process_exit_status(status)
@@ -426,13 +445,25 @@ module LatexBuildRuntime
   # a .bib entry is the user's and is excluded.
   def cache_failure(pass_log)
     content = LaTeXUtils.filter_subcommand_noise(LaTeXUtils.safe_read(pass_log))
-    first = extract_errors(content).first
-    return nil unless first && LeeniQuarantine.generated_file?(first[:file]) && !first[:bib_entry]
+    errors = extract_errors(content)
+    first = errors.first
+    return nil unless first && !first[:bib_entry]
+    return truncated_aux_failure(errors, pass_log) unless LeeniQuarantine.generated_file?(first[:file])
 
     LeeniQuarantine::CacheFailure.new(
       "error inside generated file #{File.basename(first[:file].to_s)}",
       first[:text].to_s.lines.first.to_s.strip, pass_log
     )
+  end
+
+  # A cut-off .aux or .out (from a killed run) ends inside one of the internal
+  # commands those files consist of; TeX blames the line of \begin{document}.
+  def truncated_aux_failure(errors, pass_log)
+    first = errors.find { |err| !err[:text].to_s.start_with?('Runaway argument?') }
+    line = first && first[:text].to_s[TRUNCATED_AUX_ERROR]
+    return nil unless line
+
+    LeeniQuarantine::CacheFailure.new('auxiliary file cut off by an earlier run', line, pass_log)
   end
 
   # A failure inside generated files is the cache's fault, not the source's:

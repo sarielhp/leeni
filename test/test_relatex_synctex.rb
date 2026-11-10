@@ -54,6 +54,10 @@ class TestRelatexSynctex < LeeniTestBase
     pid
   end
 
+  # The stub runs under `nice -n 19` and exits from its TERM handler, so it
+  # needs CPU time to die; under a loaded gate that can take well over 10s.
+  STOP_TIMEOUT = 30
+
   def wait_for(timeout = 10)
     deadline = Time.now + timeout
     sleep 0.05 until yield || Time.now > deadline
@@ -85,7 +89,7 @@ class TestRelatexSynctex < LeeniTestBase
       pid = start(b)
       assert(wait_for { log_text.include?('args:') })
       b.send(:finish_relatex_synctex, 'failed')
-      assert wait_for { !alive?(pid) }, 'relatex must be stopped after a failed build'
+      assert wait_for(STOP_TIMEOUT) { !alive?(pid) }, 'relatex must be stopped after a failed build'
       refute File.exist?('junk/relatex_synctex.pid')
       assert(wait_for { log_text.include?('got TERM') })
     end
@@ -97,7 +101,7 @@ class TestRelatexSynctex < LeeniTestBase
       assert(wait_for { log_text.include?('args:') })
       second = start(builder)
       refute_equal first, second
-      assert wait_for { !alive?(first) }, 'the previous relatex must be stopped'
+      assert wait_for(STOP_TIMEOUT) { !alive?(first) }, 'the previous relatex must be stopped'
       assert alive?(second)
       assert_equal second, File.read('junk/relatex_synctex.pid').to_i
     end

@@ -89,6 +89,8 @@ Errors during compilation originate in one of three layers:
 | **58** | `Missing character: There is no X in font Y` | TeX Primitive | The font lacks a glyph, so the character is silently dropped from the PDF; `leeni` promotes it to an error and locates the character. | **Catalog Hint** | [`58_missing_character`](58_missing_character/) |
 | **59** | `No pages of output.` | TeX Primitive | The body typeset nothing and no PDF was written, yet TeX exits 0; `leeni` promotes it to an error. | **Catalog Hint** | [`59_no_pages_of_output`](59_no_pages_of_output/) |
 | **60** | `Command \foo invalid in math mode` | LaTeX Kernel | Text font declaration or size switch inside math; declarations error, `\em` and size switches are silently ignored (promoted to an alert). Hint names the `\math...` equivalent. | **Catalog Hint** | [`60_invalid_in_math_mode`](60_invalid_in_math_mode/) |
+| **61** | `xdvipdfmx:fatal: Image inclusion failed for "x.pdf" (page=N).` | Driver (XeTeX) | `\includegraphics[page=N]` past the last page; printed only to the terminal, and a long document is killed by SIGPIPE with cut-off `.aux` files. `leeni` promotes it to an error at the `\includegraphics` and discards the cut-off files. | **Catalog Hint** | [`61_pdf_driver_image_failed`](61_pdf_driver_image_failed/) |
+| **62** | `xdvipdfmx:fatal: ...` | Driver (XeTeX) | Any other fatal driver error; terminal-only, no PDF written. `leeni` promotes it to an error. | **Catalog Hint** | [`62_pdf_driver_fatal`](62_pdf_driver_fatal/) |
 
 ---
 

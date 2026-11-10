@@ -23,7 +23,7 @@ module LeeniTestSuite
     test_repair_failures.rb test_config.rb test_color_theme.rb test_cli_spellings.rb
     test_author_verification.rb test_visual_verification.rb test_compatibility.rb
     test_arxiv_worker.rb test_arxiv_fixups.rb test_sample_arxiv.rb test_bump.rb
-    test_cli_help.rb test_bundle.rb test_bibkit.rb test_tmp_space.rb
+    test_cli_help.rb test_bundle.rb test_bibkit.rb test_tmp_space.rb test_pdf_driver_failure.rb
   ].freeze
   MEDIUM_TESTS = %w[
     test_compile_mode.rb test_pathological_latex.rb test_llm_mode.rb test_json_mode.rb
@@ -33,7 +33,7 @@ module LeeniTestSuite
     test_arxiv.rb test_config_save.rb test_code_metrics.rb test_convergence_loop.rb
     test_sample_arxiv_review.rb test_arxiv_cycle.rb test_emacs_auctex.rb test_cache_recovery.rb test_report.rb
     test_make_indep.rb test_sandbox.rb test_draft_passes_integration.rb test_bib_missing.rb test_bib_fix.rb test_bib_checks.rb
-    test_stale_bbl.rb test_bbl_provenance.rb
+    test_stale_bbl.rb test_bbl_provenance.rb test_pdf_driver_integration.rb
   ].freeze
   FULL_TESTS = Dir.glob(File.expand_path('../test/test_*.rb', __dir__)).map { |path| File.basename(path) }.freeze
   TIERS = { fast: FAST_TESTS, medium: MEDIUM_TESTS + FAST_TESTS,

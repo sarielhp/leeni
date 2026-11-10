@@ -13,11 +13,12 @@
 # into the same message so the hint and repeat count stay the same. The level
 # is set after the preamble, since packages may reset it. TeX resets its
 # 100-error limit every paragraph, so only 100+ lost glyphs in one paragraph
-# can stop a run.
+# can stop a run. A fatal xdvipdfmx message, printed to the terminal only, is
+# promoted the same way.
 # ==============================================================================
 
 module LaTeXLogPromoter
-  TRIGGER = /\\end occurred|^No file \S+\.tex\.|^(?:! |.+?:\d+: )?Missing character: |^No pages of output\.|^pdfTeX warning \(ext4\): destination/
+  TRIGGER = /\\end occurred|^No file \S+\.tex\.|^(?:! |.+?:\d+: )?Missing character: |^No pages of output\.|^pdfTeX warning \(ext4\): destination|^xdvipdfmx:fatal: /
   DUPLICATE_DESTINATION = /^pdfTeX warning \(ext4\): destination with the same identifier \(name\{(.+?)\}\) has been already used, duplicate ignored/
   UNCLOSED_GROUP_NOTICE = /^\(\\end occurred inside a group at level \d+\)\s*$/
   UNCLOSED_GROUP_DETAIL = /^### (.+? group) \(level \d+\) entered at line (\d+) \((.+)\)\s*$/
@@ -25,6 +26,8 @@ module LaTeXLogPromoter
   MISSING_INCLUDE = /^No file (\S+\.tex)\.\s*$/
   MISSING_CHARACTER = /^(?:! |(?<at>.+?:\d+: ))?Missing character: There is no (?<glyph>.+?) in font (?<font>.+?)[.!]?\s*$/
   NO_PAGES = /^No pages of output\.\s*$/
+  DRIVER_IMAGE_FAILED = /^xdvipdfmx:fatal: Image inclusion failed for "(?<path>.+?)" \(page=(?<page>\d+)\)\.?\s*$/
+  DRIVER_FATAL = /^xdvipdfmx:fatal: (?<what>.+?)\.?\s*$/
 
   COMPILER_ERROR = /^(?:!\s+\S|Runaway argument\?|Error:\s|.+?:\d+:\s+(?!warning\b)(?!\(see\b)\S)/i
   PENDING_BIBLIOGRAPHY = /^No file \S+\.bbl\.|\(re\)run Biber|Please run BibTeX/i
@@ -64,11 +67,26 @@ module LaTeXLogPromoter
       rewrite_missing_character(m, state)
     elsif (m = line.match(DUPLICATE_DESTINATION))
       rewrite_duplicate_destination(m[1], state)
+    elsif (m = line.match(DRIVER_IMAGE_FAILED) || line.match(DRIVER_FATAL))
+      rewrite_driver_fatal(m)
     elsif line.match?(NO_PAGES) && !state[:skip_no_pages]
       error('No pages of output: the document body typeset nothing, so no PDF was written')
     else
       line
     end
+  end
+
+  # XeTeX hands its pages to xdvipdfmx through a pipe. When the driver dies
+  # (most often on an image page that does not exist), its message goes to the
+  # terminal only, and XeTeX is killed by SIGPIPE mid-document or reports a
+  # bare "Error 256 (driver return code)" at the end.
+  def self.rewrite_driver_fatal(match)
+    generic = "PDF driver xdvipdfmx failed: #{match[:what] if match.names.include?('what')}, so no PDF was written"
+    return error(generic, note: false) unless match.names.include?('path')
+
+    path = match[:path].delete_prefix('./')
+    error("PDF driver could not include page #{match[:page]} of image '#{path}' " \
+          '(the file has fewer pages, or is damaged), so no PDF was written', note: false)
   end
 
   # One error per distinct glyph and font; TeX repeats the note per occurrence.

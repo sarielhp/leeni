@@ -1141,7 +1141,7 @@ module LaTeXDiagnostics
     classification = LaTeXErrorCatalog.classify(
       err_text, err_block, file: file_name, line: line_no, junk_dir: diagnostics_junk_dir
     )
-    source_location = locate_error_source(classification)
+    source_location = locate_error_source(classification, err_text)
     if source_location
       file_name, line_no = source_location
       classification = LaTeXErrorCatalog.classify(
@@ -1172,13 +1172,32 @@ module LaTeXDiagnostics
 
   # TeX attributes some errors to no source position (a missing file, a glyph
   # the font lacks); the position is recovered from the source tree instead.
-  def locate_error_source(classification)
+  def locate_error_source(classification, err_text = '')
     case classification&.[](:id)
     when :file_not_found, :include_target_missing
       locate_missing_resource_request(classification[:token])
     when :missing_character
       locate_missing_character(classification[:token])
+    when :pdf_driver_image_failed
+      locate_image_request(classification[:token], err_text[/include page (\d+) of image/, 1])
     end
+  end
+
+  # The \includegraphics of the image, preferring the one that asks for the
+  # failing page; the driver names the file as found, extension and all.
+  def locate_image_request(path, page)
+    stem = File.basename(path.to_s).sub(/\.[A-Za-z0-9]+\z/, '')
+    return nil if stem.empty?
+
+    pattern = /\\includegraphics\s*\*?\s*(?:\[(?<opts>[^\]]*)\])?\s*\{[^}]*#{Regexp.escape(stem)}(?:\.[A-Za-z0-9]+)?\s*\}/
+    hits = collect_source_candidates.flat_map do |file|
+      LaTeXUtils.safe_read(file).each_line.with_index(1).filter_map do |line, line_no|
+        m = LaTeXUtils.strip_latex_comments(line).match(pattern)
+        [file, line_no, m[:opts].to_s] if m
+      end
+    end
+    best = hits.find { |_f, _l, opts| page && opts.match?(/\bpage\s*=\s*\{?#{page}\b/) } || hits.first
+    best&.first(2)
   end
 
   def locate_missing_character(glyph)

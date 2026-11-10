@@ -1088,6 +1088,29 @@ module LaTeXErrorCatalog
       doc_slug: '59_no_pages_of_output'
     },
     {
+      id: :pdf_driver_image_failed,
+      pattern: /PDF driver could not include page (\d+) of image '(.+?)'/,
+      title: 'PDF driver could not include an image page',
+      token_extractor: ->(match, _block) { match[2] },
+      hint: lambda { |tok|
+        img = tok ? "'#{File.basename(tok)}'" : 'the image'
+        "Image #{img} lacks that page or is unreadable; check the page= option against its page count"
+      },
+      why: 'XeTeX passes each image to its PDF driver, xdvipdfmx, which failed on it: usually \includegraphics[page=N] asks for a page the PDF does not have, or the file is damaged. The driver message goes only to the terminal; XeTeX itself either reports a bare driver return code or is killed mid-document, leaving truncated auxiliary files.',
+      fix: 'Correct the page= option (pdfinfo shows the page count), or regenerate the image file.',
+      doc_slug: '61_pdf_driver_image_failed'
+    },
+    {
+      id: :pdf_driver_fatal,
+      pattern: /PDF driver xdvipdfmx failed: (.+?), so no PDF was written/,
+      title: 'PDF driver xdvipdfmx failed',
+      token_extractor: ->(match, _block) { match[1] },
+      hint: 'xdvipdfmx, the PDF driver of XeTeX, stopped; the cause is in its message',
+      why: 'XeTeX writes its pages to xdvipdfmx, which turns them into the PDF. A fatal driver error ends the run without a PDF, and is printed only to the terminal, never to the .log file.',
+      fix: 'Fix the image, font or special the message names; if unclear, try -e lualatex to see whether the input is at fault.',
+      doc_slug: '62_pdf_driver_fatal'
+    },
+    {
       id: :invalid_in_math_mode,
       pattern: /Command (\\[A-Za-z@]+) invalid in math mode/,
       title: 'Command invalid in math mode',

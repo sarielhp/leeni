@@ -52,6 +52,8 @@ module Bibkit
     IDENT = /[^\s"#%'(),={}]+/
     KINDS = { 'comment' => :comment, 'string' => :string, 'preamble' => :preamble }.freeze
     RUNAWAY = /\n[ \t]*@[A-Za-z]+[ \t]*[{(]/
+    COMMENTED_AT = "'@' in a % comment: % is not a comment in BibTeX, which reads the '@' " \
+                   'as the start of an entry (Biber skips the line); remove the @'
 
     # Returns [items, problems].
     def self.scan(text, file = nil)
@@ -67,7 +69,9 @@ module Bibkit
 
     def run
       items = []
-      while @scanner.skip_until(/@/)
+      while @scanner.skip_until(/[@%]/)
+        next skip_line_comment if @scanner.matched == '%'
+
         start = @scanner.pos - 1
         item = scan_block(start)
         items << item if item
@@ -76,6 +80,18 @@ module Bibkit
     end
 
     private
+
+    # Between blocks Biber reads % to the end of the line as a comment, so a
+    # commented-out @preamble or entry is not a block. BibTeX has no comment
+    # character: it ignores text between blocks but starts a block at any
+    # '@', so an '@' on such a line is recorded as a problem.
+    def skip_line_comment
+      start = @scanner.pos
+      line = @scanner.scan_until(/\n/) || @scanner.rest.tap { @scanner.terminate }
+      return unless line.include?('@')
+
+      @problems << Problem.new(@file, line_at(start), COMMENTED_AT)
+    end
 
     def scan_block(start)
       type = @scanner.scan(TYPE)

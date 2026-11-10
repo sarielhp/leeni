@@ -18,7 +18,7 @@ require_relative 'bibkit_fixer'
 
 module LatexBibChecks
   CACHE_FILE = '.bib_checks.json'
-  CACHE_FORMAT = 1
+  CACHE_FORMAT = 3
   KEYS_CACHE_FILE = '.bib_keys.json'
 
   # The bibliography files the paper names: Biber's datasources from the

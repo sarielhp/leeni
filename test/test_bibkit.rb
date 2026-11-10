@@ -31,6 +31,26 @@ class TestBibkitScanner < Minitest::Test
     assert_equal '"Quoted {with "inner" quotes}"', items[4].field('title').value
   end
 
+  # Biber skips a %-commented @preamble whose quote never closes.
+  def test_percent_comments_out_a_block_between_entries
+    items, problems = scan(<<~'BIB')
+      %@preamble{"\providecommand{\CNFW}{{\em{(W)}}}}%
+      @string{J = {J. Assoc.}}
+      % email: a@b.org, @book{fake, year = 1}
+      @book{k, journal = J}
+    BIB
+    assert_equal %i[string entry], items.map(&:kind)
+    assert_equal 4, items[1].line
+    assert_equal [1, 3], problems.map(&:line)
+    assert_equal [Bibkit::Scanner::COMMENTED_AT] * 2, problems.map(&:message)
+  end
+
+  def test_comment_without_at_is_not_a_problem
+    items, problems = scan("% just a note\n@book{k, year = 1}\n")
+    assert_empty problems
+    assert_equal 1, items.size
+  end
+
   def test_text_is_kept_byte_for_byte
     text = "@misc{k,\n  note   = {Latin-1 \xE9},\n  year = 1 }\n".b
     items, = scan(text)

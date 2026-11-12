@@ -313,6 +313,7 @@ module LaTeXDiagnostics
     else
       append_error_hint(lines, cat, indent)
     end
+    append_error_hint(lines, { hint: cat[:note] }, indent) if cat&.[](:note)
 
     append_repeat_note(lines, repeat_count, line_no, indent) if repeat_count > 1
 
@@ -1329,6 +1330,7 @@ module LaTeXDiagnostics
     bib_companions = generate_bib_companions(raw_items)
     items = decluster_errors(raw_items) + bib_companions
     items.each { |i| i[:tier] = 'errors' }
+    flag_unregenerable_bbl(items.first) if respond_to?(:flag_unregenerable_bbl, true)
     items
   end
 

@@ -24,6 +24,10 @@ module LatexBuildRuntime
 
   TRUNCATED_AUX_ERROR = /File ended while scanning use of \\(?:@newl@bel|@writefile|@@BOOKMARK|newlabel|bibcite|contentsline|abx@aux@\w+)\b.*/
 
+  UNREGENERABLE_BBL_HINT = 'No .bib file for this bibliography was found, so leeni cannot regenerate this .bbl: ' \
+                           'it is probably stale (left by another configuration or an older .bib) and the cause of ' \
+                           'this error. Restore the .bib file, or replace the .bbl with one matching the document.'
+
   STYLE_COPY_EXTS = %w[.sty .cls .clo .def .fd .cfg .bst .bbx .cbx .lbx .dbx .ldf .bib].freeze
 
   EXTERNAL_TRACKED_EXTS = %w[.tex .sty .cls .clo .def .fd .cfg .bbx .cbx .lbx .dbx .ldf .rtx .lua
@@ -196,12 +200,29 @@ module LatexBuildRuntime
   def sync_bbl_before_compile
     root_bbl = "#{@bfilename}.bbl"
     junk_bbl = File.join(@junk_dir, root_bbl)
+    return regenerate_bbl_from_scratch(junk_bbl) if clean_build_regenerates_bbl?(root_bbl)
+
     if File.exist?(root_bbl) && LaTeXUtils.bbl_has_entries?(root_bbl)
       FileUtils.mkdir_p(@junk_dir)
       FileUtils.cp(root_bbl, junk_bbl, preserve: true) if newer_root_bbl?(root_bbl, junk_bbl)
     elsif restore_root_bbl?(root_bbl, junk_bbl)
       FileUtils.cp(junk_bbl, root_bbl, preserve: true)
     end
+  end
+
+  # With -c a working-tree .bbl the .bib files can regenerate does not seed the
+  # wiped build directory: it may be left by another configuration (biblatex vs
+  # BibTeX) or predate the .bib. It stays in the tree (a fallback if the
+  # bibliography run fails) until a successful run replaces it. A .bbl with no
+  # database on disk (arXiv-style) still seeds the build.
+  def clean_build_regenerates_bbl?(root_bbl)
+    @options[:clean] && File.file?(root_bbl) && !bib_files_on_disk.empty?
+  end
+
+  # An empty .bbl, not a missing one: the engine would read the working-tree copy.
+  def regenerate_bbl_from_scratch(junk_bbl)
+    FileUtils.mkdir_p(@junk_dir)
+    File.write(junk_bbl, '')
   end
 
   def restore_root_bbl?(root_bbl, junk_bbl)
@@ -434,10 +455,32 @@ module LatexBuildRuntime
   end
 
   def stale_bbl_failure?(pass_log)
-    return false if @stale_bbl_dropped || !bib_files_newer_than_bbl?
+    return false if @stale_bbl_dropped
 
     first = extract_errors(LaTeXUtils.filter_subcommand_noise(LaTeXUtils.safe_read(pass_log))).first
-    !!first && (first[:bib_entry] || File.extname(first[:file].to_s) == '.bbl')
+    return false unless first && (first[:bib_entry] || File.extname(first[:file].to_s) == '.bbl')
+
+    bib_files_newer_than_bbl? || foreign_format_bbl?(first)
+  end
+
+  # A biblatex .bbl read by a document that does not load biblatex (a switch to
+  # BibTeX, often behind a conditional the source scan cannot evaluate, such as
+  # a submission-version flag): the bibliography tool regenerates it as BibTeX output.
+  def foreign_format_bbl?(first)
+    first[:text].to_s.include?("Missing 'biblatex' package") && !bib_files_on_disk.empty?
+  end
+
+  # The first error sits inside a .bbl that no bibliography run can replace:
+  # rebuilding will not help, and the source line TeX names is not at fault.
+  def flag_unregenerable_bbl(item)
+    return unless item && !item[:bib_entry] && File.extname(item[:file].to_s) == '.bbl'
+    return unless bib_files_on_disk.empty?
+
+    # The build directory holds a copy of the working-tree .bbl: name the one to fix.
+    tree_bbl = File.basename(item[:file].to_s)
+    item[:file] = tree_bbl if File.file?(tree_bbl) && FileUtils.identical?(tree_bbl, item[:file].to_s)
+    item[:catalog] = (item[:catalog] || {}).merge(note: UNREGENERABLE_BBL_HINT)
+    item[:formatted] = format_error_block(item[:err_block], item[:line] || 0, catalog: item[:catalog], item: item)
   end
 
   # The first error of the pass sits in a generated file (.aux, .toc, .bbl,
@@ -449,6 +492,8 @@ module LatexBuildRuntime
     first = errors.first
     return nil unless first && !first[:bib_entry]
     return truncated_aux_failure(errors, pass_log) unless LeeniQuarantine.generated_file?(first[:file])
+    # A .bbl no .bib can regenerate is input, not cache: a rebuild reads it again.
+    return nil if File.extname(first[:file].to_s) == '.bbl' && bib_files_on_disk.empty?
 
     LeeniQuarantine::CacheFailure.new(
       "error inside generated file #{File.basename(first[:file].to_s)}",

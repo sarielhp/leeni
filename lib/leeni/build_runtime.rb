@@ -326,12 +326,25 @@ module LatexBuildRuntime
       reader = Thread.new { read_process_output(stdout_err, output) }
       return timeout_result(wait_thread, reader, timeout) unless wait_thread.join(timeout)
 
-      reader.join(2.0) || reader.kill
+      drain_reader(reader, output)
       [output, wait_thread.value]
     ensure
       kill_process_group(wait_thread.pid) if wait_thread&.alive?
       reader&.kill
     end
+  end
+
+  # The engine has exited; its output may still sit in the pipe, behind a
+  # reader slowed by a loaded machine (the driver's fatal message comes last).
+  # Reading goes on while it makes progress and stops after a quiet interval,
+  # so a grandchild that keeps the pipe open cannot hang the build.
+  def drain_reader(reader, output, quiet: 2.0)
+    loop do
+      size = output.bytesize
+      return if reader.join(quiet)
+      break if output.bytesize == size
+    end
+    reader.kill
   end
 
   def read_process_output(stream, output)

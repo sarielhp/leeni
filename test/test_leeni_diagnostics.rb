@@ -958,7 +958,7 @@ class TestLeeniDiagnostics < LeeniTestBase
       File.write(tex, "\\documentclass{article}\n\\begin{document}\n\\loop\\iftrue\\repeat\n\\end{document}\n")
       cmd = [BIN, '-f', 'slow.tex']
       Open3.popen2e(*cmd, chdir: dir) do |_stdin, stdout_err, wait_thr|
-        sleep 0.6
+        wait_for_child_process(wait_thr.pid)
         begin
           Process.kill('INT', wait_thr.pid)
         rescue StandardError
@@ -973,6 +973,19 @@ class TestLeeniDiagnostics < LeeniTestBase
         refute_includes output, 'from /'
       end
     end
+  end
+
+  # The interrupt must reach leeni once it runs the engine, not while Ruby
+  # still loads it (a fixed sleep lost that race on a loaded machine).
+  def wait_for_child_process(pid, limit: 60)
+    deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + limit
+    until Process.clock_gettime(Process::CLOCK_MONOTONIC) > deadline
+      children, = Open3.capture2('pgrep', '-P', pid.to_s)
+      return sleep(0.2) unless children.strip.empty?
+
+      sleep 0.05
+    end
+    flunk "leeni (pid #{pid}) started no engine within #{limit}s"
   end
 
   def test_group_diagnostics_by_file_with_ordered_tiers

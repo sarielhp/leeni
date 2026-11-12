@@ -12,6 +12,7 @@ AllCops:
     - '.bundle/**/*'
     - 'tmp/**/*'
     - 'reviews/**/*'     # review-cycle artifacts
+    - 'build/**/*'       # generated standalone bundle
 
 # Metric thresholds: Defer to `ruby-audit` for cognitive complexity & tiered sizing
 Metrics/MethodLength:
@@ -23,7 +24,7 @@ Metrics/BlockLength:
     - 'spec/**/*'
     - 'Rakefile'
     - '*.gemspec'
-    - 'lib/leeni/error_catalog.rb' # Static diagnostic definitions.
+    - 'lib/leeni/error_catalog_data.rb' # Static diagnostic definitions.
 
 Metrics/CyclomaticComplexity:
   Enabled: false
@@ -36,14 +37,9 @@ Metrics/AbcSize:
 
 Metrics/ClassLength:
   Max: 800
-  Exclude:
-    - 'test/test_leeni_diagnostics.rb' # Integration fixtures dominate this test class.
 
 Metrics/ModuleLength:
   Max: 800
-  Exclude:
-    - 'lib/leeni/diagnostics.rb' # Existing diagnostic engine is split into cohesive modules over time.
-    - 'lib/leeni/error_catalog.rb' # Diagnostic catalog is mostly static data.
 
 Metrics/ParameterLists:
   Max: 8
@@ -51,7 +47,8 @@ Metrics/ParameterLists:
 
 Metrics/CollectionLiteralLength:
   Exclude:
-    - 'lib/leeni/error_catalog.rb'
+    - 'lib/leeni/error_catalog_data.rb'
+    - 'lib/leeni/error_catalog_lookup.rb'
 
 # String allocation hygiene
 Style/FrozenStringLiteralComment:
@@ -110,7 +107,8 @@ Layout/LineLength:
     - '^\s*opts\.on'
     - '^\s*[A-Z_]+\s*=\s*/' # Dense static regular-expression declarations.
   Exclude:
-    - 'lib/leeni/error_catalog.rb' # Static diagnostic prose and lookup data.
+    - 'lib/leeni/error_catalog_data.rb' # Static diagnostic prose and lookup data.
+    - 'lib/leeni/error_catalog_lookup.rb' # Static diagnostic prose and lookup data.
     - 'tools/generate_gallery' # Published example copy.
 
 # Safety & Exception Handling

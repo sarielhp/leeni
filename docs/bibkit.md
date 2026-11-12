@@ -12,7 +12,7 @@ standalone `leeni` like every other module.
 - Its tests (`test/test_bibkit*.rb`) never run TeX.
 - Running BibTeX or Biber, reading their logs, CLI options and alerts stay in
   leeni (`lib/leeni/bib_fix.rb`, `bib_checks.rb`, `bib_manager.rb`,
-  `diagnostics.rb`).
+  `diagnostic_bib_messages.rb`).
 
 ## Checks on every build
 

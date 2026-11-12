@@ -210,11 +210,6 @@ module LaTeXFlattener
     output
   end
 
-  def self.strip_inline_comment(line)
-    idx = inline_comment_index(line)
-    idx ? line[0...idx] : line
-  end
-
   def self.preceding_backslash_count(line, idx)
     count = 0
     k = idx - 1

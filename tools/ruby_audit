@@ -150,9 +150,8 @@ module RubyCodeAuditor
       # 2. Check for bare 'rescue Exception'
       if clean_line =~ /\brescue\s+(?:::)?Exception\b/ && !line.include?('ruby-audit: allow-rescue-exception')
         # ruby-audit: allow-rescue-exception
-        message = "unsafe 'rescue " \
-                  "Exception' traps system interrupts and signals; rescue StandardError instead"
-        trap_violations << TrapViolation.new(file, idx + 1, 'rescue_exception', message)
+        risk = "unsafe 'rescue Exception' traps system interrupts and signals" # ruby-audit: allow-rescue-exception
+        trap_violations << TrapViolation.new(file, idx + 1, 'rescue_exception', "#{risk}; rescue StandardError instead")
       end
 
       # 3. Check for Hash.new([]) or Hash.new({}) mutable default trap
@@ -184,8 +183,9 @@ module RubyCodeAuditor
     file_lines = content.lines
     line_count = file_lines.size
 
-    # Check File Sizing
-    exempt = content.include?('ruby-audit: allow-long-file') || file =~ /(?:catalog|data|dict|fixtures|diagnostics)/i
+    # Check File Sizing. Only an explicit marker comment exempts a file (static
+    # data); a name is no evidence that a file holds no logic.
+    exempt = content.match?(/^\s*#\s*ruby-audit: allow-long-file\b/)
     unless exempt
       if line_count > options[:max_file_lines]
         file_violations << FileViolation.new(file, line_count, options[:max_file_lines], :hard)
@@ -317,7 +317,8 @@ module RubyCodeAuditor
     if options[:verbose]
       puts "Audited #{all_methods.length} methods across files."
       all_methods.sort_by { |m| -m[:cc] }.first(20).each do |m|
-        puts format('  %<file>-25s %<name>-30s (L%<line>4d): lines=%<lines>3d, depth=%<depth>d, cc=%<cc>2d', **m)
+        puts format('  %<file>-25s %<name>-30s (L%<line>4d): lines=%<lines>3d, depth=%<depth>d, cc=%<cc>2d',
+                    **m.slice(:file, :name, :line, :lines, :depth, :cc))
       end
       puts ''
     end
@@ -350,8 +351,8 @@ module RubyCodeAuditor
           puts "  \e[31m#{f.file}\e[0m: File length #{f.lines} exceeds hard limit of #{f.limit} lines"
         end
         violations.each do |v|
-          puts "  \e[31m#{v.file}:#{v.line}\e[0m - \e[1m#{v.name}\e[0m: #{v.reasons.join(', ')} " \
-               "[lines=#{v.lines}, depth=#{v.depth}, cc=#{v.complexity}]"
+          metrics = "[lines=#{v.lines}, depth=#{v.depth}, cc=#{v.complexity}]"
+          puts "  \e[31m#{v.file}:#{v.line}\e[0m - \e[1m#{v.name}\e[0m: #{v.reasons.join(', ')} #{metrics}"
         end
       end
       return 1

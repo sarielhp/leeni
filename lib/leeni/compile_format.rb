@@ -12,13 +12,6 @@ require 'uri'
 module LaTeXCompileFormat
   module_function
 
-  SEVERITY = {
-    'errors' => { label: 'error',            style: :error },
-    'alerts' => { label: 'warning: [alert]', style: :alert },
-    'warnings' => { label: 'warning', style: :warning },
-    'whatevers' => { label: 'note', style: :note }
-  }.freeze
-
   WARNING_HEADER_PATTERN = /^(?:LaTeX|Class|Package|\*)(?:\s+[-\w.@*]+)*\s+[Ww]arning:\s*/
 
   def render(record, color: true, link: false)

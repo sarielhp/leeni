@@ -47,9 +47,17 @@ module LatexBundler
     macro_harvester.rb
     diagnostic_record.rb
     error_catalog.rb
+    error_catalog_data.rb
+    error_catalog_lookup.rb
     box_context.rb
     compile_format.rb
     presenters.rb
+    diagnostic_formatting.rb
+    diagnostic_log_parsing.rb
+    diagnostic_output.rb
+    diagnostic_alerts.rb
+    diagnostic_summary.rb
+    diagnostic_bib_messages.rb
     diagnostics.rb
     bbl_provenance.rb
     bib_manager.rb

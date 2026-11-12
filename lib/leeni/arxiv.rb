@@ -132,11 +132,12 @@ class LatexArxivPackager
   end
 
   def stage_bbl(stage_dir)
-    bbl_source = File.file?("#{@bfilename}.bbl") ? "#{@bfilename}.bbl" : build_artifact('bbl')
-    if File.file?(bbl_source) && LaTeXUtils.bbl_has_entries?(bbl_source)
+    bbl_source, bbl_warnings = LaTeXPackagingShared.shipped_bbl(@bfilename, junk_dir)
+    bbl_warnings.each { |w| warn Rainbow("[WARN] #{w}").yellow }
+    if bbl_source
       FileUtils.cp(bbl_source, File.join(stage_dir, "#{@bfilename}.bbl"))
     else
-      warn Rainbow("[WARN] No bibliography entries found in #{bbl_source}!").yellow
+      warn Rainbow("[WARN] No bibliography entries found in #{@bfilename}.bbl!").yellow
     end
   end
 

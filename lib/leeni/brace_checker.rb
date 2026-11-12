@@ -89,6 +89,33 @@ class LaTeXBraceChecker
     cap_invisible_reports(path, found)
   end
 
+  # A citation command with an empty key: \cite{}[note] puts the note after the
+  # command, where it is plain text, and the citation itself prints as [?].
+  # LaTeX only says "Citation `' undefined", with no line; this names the line.
+  EMPTY_CITATION_PATTERN = /\\([a-zA-Z]*cite[a-zA-Z]*)\*?(?:\[[^\]]*\]){0,2}\{\s*\}(\[)?/
+
+  def self.check_empty_citations(path)
+    return [] unless File.file?(path)
+
+    LaTeXUtils.safe_read(path).each_line.with_index(1).flat_map do |raw, line_no|
+      line = LaTeXUtils.strip_latex_comments(raw)
+      next [] if line.match?(MACRO_DEFINITION_PATTERN)
+
+      line.enum_for(:scan, EMPTY_CITATION_PATTERN).map do
+        empty_citation_alert(path, line_no, Regexp.last_match(1), Regexp.last_match(2))
+      end
+    end
+  end
+
+  def self.empty_citation_alert(path, line_no, cmd, trailing_bracket)
+    hint = if trailing_bracket
+             "the [...] after it is plain text; write \\#{cmd}[note]{key}"
+           else
+             "give a key; a note goes in the optional argument, \\#{cmd}[note]{key}"
+           end
+    build_label_alert(path, line_no, "Empty \\#{cmd}{}: #{hint}", :empty_citation)
+  end
+
   def self.invisible_item(path, line_no, col, name)
     {
       type: :warn, file: path, line: line_no, line_str: line_no.to_s, col: col,

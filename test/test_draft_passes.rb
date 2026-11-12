@@ -98,7 +98,7 @@ class TestDraftPasses < Minitest::Test
 
   def test_biblatex_without_an_earlier_aux_always_asks_for_biber
     in_project(BIBLATEX_DOC) do |b|
-      File.write('junk/paper.bbl', "\\entry{knuth}{book}{}\n")
+      File.write('junk/paper.bbl', "% $ biblatex bbl format version 3.3 $\n\\entry{knuth}{book}{}\n")
       File.utime(Time.now - 100, Time.now - 100, 'refs.bib')
       assert_equal :bib, reason(b)
     end

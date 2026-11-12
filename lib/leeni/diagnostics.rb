@@ -109,6 +109,7 @@ module LaTeXDiagnostics
     consolidate_missing_bib_entries!(raw_warns)
 
     alert_items, reg_warns, what_items = partition_diagnostics(clean_content, raw_warns)
+    reg_warns = drop_empty_key_citation_warnings(alert_items, reg_warns)
     errors = count_latex_errors(new_content, 0) + counts[:biberr]
     promoted, alert_items, reg_warns = promote_error_grade_items(alert_items, reg_warns)
     err_items.concat(promoted.map { |item| alert_as_error(item) })
@@ -124,7 +125,8 @@ module LaTeXDiagnostics
   # partition_diagnostics applies it first. With --final the document is about
   # to leave the author's hands, so the ordinary drafting warnings join them.
   ERROR_GRADE_ALERTS = %i[multiply_defined_label].freeze
-  FINAL_ERROR_CATEGORIES = %i[undefined_reference undefined_citation missing_bib_entry unconverged_build float_too_large].freeze
+  FINAL_ERROR_CATEGORIES = %i[undefined_reference undefined_citation empty_citation missing_bib_entry
+                              unconverged_build float_too_large].freeze
 
   def error_grade_alert?(item)
     category = diagnostic_category(item)

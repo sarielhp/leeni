@@ -69,6 +69,35 @@ module LaTeXPackagingShared
     end
   end
 
+  # A package ships the .bbl the PDF was built with, from the build directory.
+  # A successful build exports it to the working tree, but that copy can change
+  # afterwards (a checkout, a copy from another version, a failed build, or
+  # --no-export), possibly to the other bibliography system's format; it ships
+  # only when the build directory has none. Returns the path (nil for none)
+  # and any warnings.
+  def shipped_bbl(bfilename, junk_dir)
+    root = "#{bfilename}.bbl"
+    built = File.join(junk_dir, root)
+    source = [built, root].find { |f| LaTeXUtils.bbl_has_entries?(f) }
+    return [nil, []] unless source
+
+    warnings = []
+    if source == built && File.file?(root) && !FileUtils.identical?(root, built)
+      warnings << "#{root} in the working tree differs from the bibliography the PDF was built with; " \
+                  'shipping the build\'s copy'
+    end
+    [source, warnings + bbl_format_warnings(source, root, File.join(junk_dir, "#{bfilename}.fls"))]
+  end
+
+  def bbl_format_warnings(source, root, fls)
+    loaded = LaTeXUtils.recorded_biblatex_load(fls)
+    written_by_biber = LaTeXUtils.biblatex_bbl?(source)
+    return [] if loaded.nil? || written_by_biber == loaded
+
+    ["the shipped #{root} was written for #{written_by_biber ? 'biblatex' : 'BibTeX'}, but the document " \
+     "#{loaded ? 'loads' : 'does not load'} biblatex; rebuild with l -c before submitting"]
+  end
+
   def realpath_or(path, fallback)
     File.realpath(path)
   rescue StandardError

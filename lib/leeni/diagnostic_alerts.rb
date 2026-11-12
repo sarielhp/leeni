@@ -211,12 +211,22 @@ module LaTeXDiagnostics
     def collect_source_label_alerts
       candidates = collect_source_candidates
       candidates.flat_map do |f|
-        raw_alerts = LaTeXBraceChecker.check_inverted_labels(f)
+        raw_alerts = LaTeXBraceChecker.check_inverted_labels(f) + LaTeXBraceChecker.check_empty_citations(f)
         raw_alerts.map do |a|
           a[:formatted] = format_diagnostic_line(a[:line_str], a[:text], :red)
           a
         end
       end
+    end
+
+    # LaTeX's "Citation `' undefined" and BibTeX's missing entry "" only repeat
+    # an empty-citation alert, without its line.
+    EMPTY_KEY_CITATION = /Citation\s+`'|database entry for (?:""|'')/
+
+    def drop_empty_key_citation_warnings(alert_items, reg_warns)
+      return reg_warns unless alert_items.any? { |a| a[:alert_type] == :empty_citation }
+
+      reg_warns.reject { |w| (w[:raw_text] || w[:text]).to_s.match?(EMPTY_KEY_CITATION) }
     end
 
     def diagnostics_junk_dir

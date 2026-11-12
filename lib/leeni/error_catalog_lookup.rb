@@ -132,6 +132,11 @@ module LaTeXErrorCatalog
       why: 'A zero-width, non-breaking, or bidirectional control character is in the source, usually pasted from a browser or PDF. It compiles but produces odd spacing, forbids line breaks, or corrupts copy and search in the PDF.',
       fix: 'Delete the character at the reported column; an editor that shows invisible characters, or a search for the code point, will find it.'
     },
+    empty_citation: {
+      title: 'Alert: Empty Citation Key',
+      why: 'A citation command has an empty key, so it prints [?] and LaTeX reports only an undefined citation with an empty name and no line. Usually a note was written after the command, as in \\cite{}[Theorem 3], where it is typeset as plain text.',
+      fix: 'Put the key in the braces and the note in the optional argument before them: \\cite[Theorem 3]{key}.'
+    },
     draft_leftover: {
       title: 'Alert: Draft Leftover (--final)',
       why: 'A drafting aid is still active in the source: \\includeonly drops chapters, the draft option boxes out figures, and showkeys, todonotes, lineno, draftwatermark or refcheck print marks that do not belong in a submitted document.',

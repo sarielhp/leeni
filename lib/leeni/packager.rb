@@ -301,9 +301,9 @@ class LatexPackager
     pdf_source = pdf_candidates.find { |f| File.file?(f) }
     FileUtils.cp(pdf_source, File.join(stage_dir, "#{@bfilename}.pdf")) if pdf_source
 
-    bbl_candidates = ["#{@bfilename}.bbl", File.join(junk_dir, "#{@bfilename}.bbl")]
-    bbl_source = bbl_candidates.find { |f| File.file?(f) }
-    return unless bbl_source && LaTeXUtils.bbl_has_entries?(bbl_source)
+    bbl_source, bbl_warnings = LaTeXPackagingShared.shipped_bbl(@bfilename, junk_dir)
+    bbl_warnings.each { |w| warn Rainbow("[WARN] #{w}").yellow }
+    return unless bbl_source
 
     FileUtils.cp(bbl_source, File.join(stage_dir, "#{@bfilename}.bbl"))
   end

@@ -65,7 +65,7 @@ module LatexDraftPasses
     # without entries can still cover the citations (all of them missing).
     return true unless File.size?(File.join(@junk_dir, "#{@bfilename}.bbl"))
 
-    !File.file?(File.join(@junk_dir, "#{@bfilename}.aux")) && sources_use_biblatex?
+    !File.file?(File.join(@junk_dir, "#{@bfilename}.aux")) && biblatex_bbl?(File.join(@junk_dir, "#{@bfilename}.bbl"))
   end
 
   def previous_aux_names_bibliography?(aux) = aux.match?(BIBLIOGRAPHY_AUX) && aux.match?(CITATION_AUX)

@@ -47,8 +47,6 @@ class LatexBuilder
     /Package rerunfilecheck Warning: File .* has changed/i, /Package ocgx2 Warning: Rerun/i
   ].freeze
 
-  BIBLATEX_USE = /\\(?:usepackage|RequirePackage)\s*(?:\[[^\]]*\])?\s*\{[^}]*\bbiblatex\b/
-  BIBLATEX_BBL_HEADER = 'biblatex bbl format'
   MAX_BIB_RUNS = 2
   # TeX error context ("l.12 ...") and the trace header echo document text, which
   # can contain rerun phrases without TeX asking for a rerun.
@@ -165,7 +163,6 @@ class LatexBuilder
     FileUtils.rm_f(File.join(@junk_dir, '.build_state.json'))
     clean_pass_logs
     junk_dir_create
-    discard_stale_bib_format_files
     total_t0 = Process.clock_gettime(Process::CLOCK_MONOTONIC) if @options[:time]
 
     unless run_convergence_loop_with_recovery
@@ -343,46 +340,9 @@ class LatexBuilder
     LaTeXUtils.safe_read("#{@pdferr}_#{pass}").match?(/Please \(re\)run Biber/i)
   end
 
-  # The build directory persists, so a .bbl from an earlier build in the other bibliography
-  # system kills pass 1 ("Missing 'biblatex' package" / "not created by
-  # biblatex"), and report_errors exits before any retry is possible. A .bbl
-  # whose format contradicts what the sources load is useless; if a preamble
-  # elsewhere disagrees with the scan, the only cost of removing it is one extra
-  # bib run.
-  def discard_stale_bib_format_files
-    return if @options[:bib] == false
-
-    uses_biblatex = sources_use_biblatex?
-    stale = stale_bbl_files(uses_biblatex)
-    stale += biblatex_leftovers unless uses_biblatex
-    FileUtils.rm_f(stale)
-  end
-
-  # A .bbl that cannot be regenerated (no bibliography database on disk) is never
-  # discarded: the scan for biblatex cannot see a class or .sty loading it, and a
-  # supplied .bbl (arXiv-style) would be lost for good.
-  def stale_bbl_files(uses_biblatex)
-    return [] if bib_files_on_disk.empty?
-
-    [File.join(@junk_dir, "#{@bfilename}.bbl"), "#{@bfilename}.bbl"].select do |f|
-      File.file?(f) && File.size(f).positive? && LaTeXUtils.safe_read(f).include?(BIBLATEX_BBL_HEADER) != uses_biblatex
-    end
-  end
-
-  # Biblatex aux files hold \abx@aux@ commands that are undefined without the
-  # package ("Missing \begin{document}"), so they go with the control files. This
-  # only runs when no source loads biblatex, and only touches this document's aux
-  # tree: other documents sharing a build directory (or \includeonly'd chapters) keep theirs.
-  def biblatex_leftovers
-    auxes = bib_manager.current_aux_files.select { |f| LaTeXUtils.safe_read(f).include?(LaTeXBibManager::BIBLATEX_AUX_MARKER) }
-    return [] if auxes.empty? && !File.file?(File.join(@junk_dir, "#{@bfilename}.bcf"))
-
-    auxes + %w[bcf run.xml].map { |ext| File.join(@junk_dir, "#{@bfilename}.#{ext}") }
-  end
-
-  def sources_use_biblatex?
-    files = [@filename] + Dir['*.{tex,cls,sty}', '*/*.{tex,cls,sty}']
-    files.uniq.any? { |f| File.file?(f) && LaTeXUtils.safe_read(f).gsub(/(?<!\\)%.*$/, '').match?(BIBLATEX_USE) }
+  # A .bbl written by biber for biblatex (as opposed to BibTeX output).
+  def biblatex_bbl?(path)
+    LaTeXUtils.biblatex_bbl?(path)
   end
 
   # Digest of the pagination-dependent side files; true when it differs from the

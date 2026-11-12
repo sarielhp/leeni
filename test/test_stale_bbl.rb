@@ -117,8 +117,30 @@ class TestStaleBbl < LeeniTestBase
 
         File.write('main.tex', switchable_main('false'))
         out, err = capture_io { assert LatexBuilder.new('main.tex', options).run!, 'the biblatex .bbl blocked the build' }
-        refute_includes strip_ansi(out + err), 'Missing'
+        text = strip_ansi(out + err)
+        refute_includes text, 'Missing'
+        refute_includes text, 'cleaned the build directory', 'a bibliography switch is not a cache failure'
         assert_includes File.read('main.bbl'), '\begin{thebibliography}'
+      end
+    end
+  end
+
+  # The other direction: a BibTeX .bbl when the document now loads biblatex.
+  def test_switch_from_bibtex_to_biblatex_regenerates_the_bbl
+    %w[bibtex biber].each do |tool|
+      skip "#{tool} not installed" unless system("#{tool} --version", out: File::NULL, err: File::NULL)
+    end
+    Dir.mktmpdir('leeni_switch_back_bbl') do |dir|
+      with_cache(dir) do
+        File.write('main.tex', switchable_main('false'))
+        File.write('refs.bib', BIB)
+        capture_io { assert LatexBuilder.new('main.tex', options(trace: true)).run!, 'BibTeX build failed' }
+        assert_includes File.read('main.bbl'), '\begin{thebibliography}', 'the BibTeX build left no .bbl in the tree'
+
+        File.write('main.tex', switchable_main('true'))
+        out, err = capture_io { assert LatexBuilder.new('main.tex', options).run!, 'the BibTeX .bbl blocked the build' }
+        refute_includes strip_ansi(out + err), 'cleaned the build directory'
+        assert_includes File.read('main.bbl'), 'biblatex bbl format'
       end
     end
   end

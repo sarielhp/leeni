@@ -28,6 +28,9 @@ module LatexBuildRuntime
                            'it is probably stale (left by another configuration or an older .bib) and the cause of ' \
                            'this error. Restore the .bib file, or replace the .bbl with one matching the document.'
 
+  # biblatex refusing a BibTeX .bbl.
+  BBL_NOT_FROM_BIBLATEX = /File '[^']+\.bbl' not created by biblatex/
+
   STYLE_COPY_EXTS = %w[.sty .cls .clo .def .fd .cfg .bst .bbx .cbx .lbx .dbx .ldf .bib].freeze
 
   EXTERNAL_TRACKED_EXTS = %w[.tex .sty .cls .clo .def .fd .cfg .bbx .cbx .lbx .dbx .ldf .rtx .lua
@@ -478,27 +481,52 @@ module LatexBuildRuntime
     report_errors(pass_log)
   end
 
-  # An empty .bbl, not a missing one: the engine would fall back to the
-  # working-tree copy, which is just as stale. A successful build replaces both.
+  # A stale .bbl is replaced by an empty one, not removed: the engine would fall
+  # back to the working-tree copy, which is just as stale. A successful build
+  # replaces both. A stale .aux needs nothing: the failed pass has already
+  # rewritten it, and the rerun reads the new one. Each kind is dropped once.
   def drop_stale_bbl
-    @stale_bbl_dropped = true
-    File.write(File.join(@junk_dir, "#{@bfilename}.bbl"), '')
+    (@stale_dropped ||= []) << @stale_bibliography
+    File.write(File.join(@junk_dir, "#{@bfilename}.bbl"), '') if @stale_bibliography == :bbl
   end
 
   def stale_bbl_failure?(pass_log)
-    return false if @stale_bbl_dropped
+    content = LaTeXUtils.filter_subcommand_noise(LaTeXUtils.safe_read(pass_log))
+    first = extract_errors(content).first
+    kind = first && stale_bibliography_kind(first, content)
+    return false if kind.nil? || (@stale_dropped || []).include?(kind)
 
-    first = extract_errors(LaTeXUtils.filter_subcommand_noise(LaTeXUtils.safe_read(pass_log))).first
-    return false unless first && (first[:bib_entry] || File.extname(first[:file].to_s) == '.bbl')
-
-    bib_files_newer_than_bbl? || foreign_format_bbl?(first)
+    @stale_bibliography = kind
+    true
   end
 
-  # A biblatex .bbl read by a document that does not load biblatex (a switch to
-  # BibTeX, often behind a conditional the source scan cannot evaluate, such as
-  # a submission-version flag): the bibliography tool regenerates it as BibTeX output.
+  # :bbl when the first error comes from a .bbl that predates the .bib files or
+  # was written for the other bibliography system; :aux when it sits in an .aux
+  # a biblatex build left for a document that no longer loads biblatex.
+  def stale_bibliography_kind(first, content)
+    ext = File.extname(first[:file].to_s)
+    return :aux if ext == '.aux' && recorded_biblatex_load == false && content.include?(LaTeXBibManager::BIBLATEX_AUX_MARKER)
+    return :bbl if first[:text].to_s.match?(BBL_NOT_FROM_BIBLATEX) && recorded_biblatex_load && !bib_files_on_disk.empty?
+    return nil unless first[:bib_entry] || ext == '.bbl'
+
+    :bbl if bib_files_newer_than_bbl? || foreign_format_bbl?(first)
+  end
+
+  # Whether this pass loaded biblatex, from the engine's recorder (.fls): it
+  # sees a class, a package, or a \usepackage behind a flag such as a
+  # submission-version switch, which no reading of the sources can evaluate.
+  # nil when the pass left no recorder file.
+  def recorded_biblatex_load
+    LaTeXUtils.recorded_biblatex_load(File.join(@junk_dir, "#{@bfilename}.fls"))
+  end
+
+  # The failing .bbl was written for the other bibliography system. One with
+  # no .bib on disk (supplied, arXiv-style) cannot be regenerated and stays.
   def foreign_format_bbl?(first)
-    first[:text].to_s.include?("Missing 'biblatex' package") && !bib_files_on_disk.empty?
+    loaded = recorded_biblatex_load
+    return false if loaded.nil? || bib_files_on_disk.empty?
+
+    biblatex_bbl?(File.expand_path(first[:file].to_s)) != loaded
   end
 
   # The first error sits inside a .bbl that no bibliography run can replace:
@@ -559,7 +587,6 @@ module LatexBuildRuntime
     announce_recovery(e, repeat)
     LaTeXUtils.clean_directory('.', false, workspace_dir: @junk_dir)
     junk_dir_create
-    discard_stale_bib_format_files
     run_convergence_loop_with_recovery
   end
 

@@ -313,6 +313,20 @@ module LaTeXUtils
     false
   end
 
+  BIBLATEX_BBL_HEADER = 'biblatex bbl format'
+  BIBLATEX_STY_INPUT = %r{^INPUT\s+(?:\S*/)?biblatex\.sty\s*$}
+
+  # A .bbl written by biber for biblatex (as opposed to BibTeX output).
+  def self.biblatex_bbl?(path)
+    File.file?(path) && safe_read(path).include?(BIBLATEX_BBL_HEADER)
+  end
+
+  # Whether the build loaded biblatex, from the engine's recorder file; nil
+  # without one.
+  def self.recorded_biblatex_load(fls)
+    File.file?(fls) ? safe_read(fls).match?(BIBLATEX_STY_INPUT) : nil
+  end
+
   def self.bbl_has_entries?(path)
     return false unless path && File.file?(path) && File.size(path).positive?
 

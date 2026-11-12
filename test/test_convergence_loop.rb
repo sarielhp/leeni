@@ -98,55 +98,6 @@ class TestConvergenceLoop < Minitest::Test
     end
   end
 
-  def test_biblatex_bbl_is_discarded_when_no_source_uses_biblatex
-    in_project do |builder|
-      File.write('refs.bib', "@book{a, title={T}}\n")
-      File.write('junk/paper.bbl', "% $ biblatex bbl format version 3.3 $\n")
-      FileUtils.cp('junk/paper.bbl', 'paper.bbl')
-      File.write('junk/paper.bcf', '<bcf:citekey>a</bcf:citekey>')
-      builder.send(:discard_stale_bib_format_files)
-      assert_empty Dir['paper.bbl', 'junk/paper.bbl', 'junk/paper.bcf']
-    end
-  end
-
-  def test_biblatex_bbl_is_kept_when_a_source_uses_biblatex
-    in_project do |builder|
-      File.write('paper.tex', "\\usepackage{biblatex}\n")
-      File.write('junk/paper.bbl', "% $ biblatex bbl format version 3.3 $\n")
-      builder.send(:discard_stale_bib_format_files)
-      assert File.file?('junk/paper.bbl')
-    end
-  end
-
-  def test_bibtex_bbl_is_discarded_when_the_document_now_uses_biblatex
-    in_project do |builder|
-      File.write('paper.tex', "\\usepackage[backend=biber]{biblatex}\n")
-      File.write('refs.bib', "@book{a, title={T}}\n")
-      File.write('junk/paper.bbl', "\\begin{thebibliography}{1}\n\\end{thebibliography}\n")
-      builder.send(:discard_stale_bib_format_files)
-      refute File.exist?('junk/paper.bbl')
-    end
-  end
-
-  def test_commented_out_biblatex_does_not_count_as_use
-    in_project do |builder|
-      File.write('paper.tex', "% \\usepackage{biblatex}\n")
-      File.write('refs.bib', "@book{a, title={T}}\n")
-      File.write('junk/paper.bbl', "\\begin{thebibliography}{1}\n\\end{thebibliography}\n")
-      builder.send(:discard_stale_bib_format_files)
-      assert File.exist?('junk/paper.bbl')
-    end
-  end
-
-  def test_biblatex_aux_is_discarded_when_no_source_uses_biblatex
-    in_project do |builder|
-      File.write('junk/paper.aux', "\\relax\n\\abx@aux@cite{0}{a}\n")
-      builder.instance_variable_set(:@build_start_time, Time.now)
-      builder.send(:discard_stale_bib_format_files)
-      refute File.exist?('junk/paper.aux')
-    end
-  end
-
   def last_pass_log(builder, pass)
     File.read("#{builder.instance_variable_get(:@pdferr)}_#{pass}")
   end
@@ -297,59 +248,16 @@ class TestConvergenceLoop < Minitest::Test
     end
   end
 
-  def test_junk_dir_name_with_glob_characters_does_not_touch_a_lookalike_directory
+  def test_glob_under_treats_glob_characters_in_the_directory_name_literally
     Dir.mktmpdir('leeni_glob_test') do |dir|
       Dir.chdir(dir) do
         FileUtils.mkdir_p(%w[build1 build[1]])
         File.write('paper.tex', "\\begin{document}x\\end{document}\n")
-        File.write('build1/other.aux', "\\abx@aux@cite{0}{a}\n")
         File.write('build1/x.toc', 'toc')
-        builder = LatexBuilder.new('paper.tex', { engine: 'xelatex', passes: 3, lock: false, junk_dir: 'build[1]' })
-        builder.instance_variable_set(:@build_start_time, Time.now)
-        builder.send(:discard_stale_bib_format_files)
-        assert File.exist?('build1/other.aux'), 'a lookalike directory was cleaned'
         assert_empty LaTeXUtils.glob_under('build[1]', '**/*.toc')
         File.write('build[1]/a.toc', 'x')
         assert_equal ['build[1]/a.toc'], LaTeXUtils.glob_under('build[1]', '**/*.toc')
       end
-    end
-  end
-
-  def test_other_documents_biblatex_aux_in_shared_junk_is_kept
-    in_project do |builder|
-      File.write('junk/paper.aux', "\\relax\n")
-      File.write('junk/thesis.aux', "\\abx@aux@cite{0}{a}\n")
-      File.utime(Time.now - 3600, Time.now - 3600, 'junk/thesis.aux')
-      builder.instance_variable_set(:@build_start_time, Time.now)
-      builder.send(:discard_stale_bib_format_files)
-      assert File.exist?('junk/thesis.aux')
-    end
-  end
-
-  def test_supplied_bbl_without_a_bib_database_is_never_discarded
-    in_project do |builder|
-      File.write('paper.bbl', "% $ biblatex bbl format version 3.3 $\n")
-      builder.send(:discard_stale_bib_format_files)
-      assert File.exist?('paper.bbl')
-    end
-  end
-
-  def test_bbl_kept_when_biblatex_is_loaded_by_a_class_file
-    in_project do |builder|
-      File.write('refs.bib', "@book{a, title={T}}\n")
-      File.write('mythesis.cls', "\\RequirePackage[backend=biber]{biblatex}\n")
-      File.write('paper.bbl', "% $ biblatex bbl format version 3.3 $\n")
-      builder.send(:discard_stale_bib_format_files)
-      assert File.exist?('paper.bbl')
-    end
-  end
-
-  def test_no_bib_option_disables_bbl_discard
-    in_project(bib: false) do |builder|
-      File.write('refs.bib', "@book{a, title={T}}\n")
-      File.write('paper.bbl', "% $ biblatex bbl format version 3.3 $\n")
-      builder.send(:discard_stale_bib_format_files)
-      assert File.exist?('paper.bbl')
     end
   end
 

@@ -9,6 +9,7 @@
 
 require_relative 'utils'
 require_relative 'macro_harvester'
+require_relative 'key_suggester'
 
 module LaTeXErrorCatalog
   def self.suggest_command(raw_tok, file: nil, macro: nil, junk_dir: nil)
@@ -529,6 +530,17 @@ module LaTeXErrorCatalog
     else
       match.captures.first
     end
+  end
+
+  # Names the project file a missing one was probably meant to be (the
+  # diagnostics run in the document directory, where TeX resolves the name).
+  def self.file_not_found_hint(tok)
+    return 'File not found; check file path or spelling' unless tok
+
+    found = LeeniKeySuggester.suggest_file(tok)
+    return "File '#{tok}' not found; check file path or spelling" if found.empty?
+
+    "Did you mean #{found.map { |path| "'#{path}'" }.join(' or ')}? File '#{tok}' not found"
   end
 
   def self.resolve_hint(hint, token, file: nil, macro: nil, junk_dir: nil)

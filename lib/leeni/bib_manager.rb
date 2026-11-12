@@ -15,6 +15,7 @@ require_relative 'color'
 require_relative 'utils'
 require_relative 'bib_checks'
 require_relative 'bbl_provenance'
+require_relative 'key_suggester'
 
 class LaTeXBibManager
   attr_reader :builder, :bib_fatal
@@ -213,7 +214,17 @@ class LaTeXBibManager
     return '' unless detail
 
     detail = biber_source_path(output, detail)
-    " #{detail.strip}.#{LatexBibChecks.percent_hint(detail)}"
+    " #{detail.strip}.#{missing_database_hint(detail)}#{LatexBibChecks.percent_hint(detail)}"
+  end
+
+  MISSING_DATABASE = /I couldn't open database file (\S+)|Cannot find (?:file )?'([^']+)'/i
+
+  # \bibliography{ref} for refs.bib: names the .bib it probably meant.
+  def missing_database_hint(detail)
+    match = detail.match(MISSING_DATABASE)
+    name = match && (match[1] || match[2])
+    found = name ? LeeniKeySuggester.suggest_file(name).select { |f| f.end_with?('.bib') } : []
+    found.empty? ? '' : " Did you mean #{found.map { |f| "'#{f}'" }.join(' or ')}?"
   end
 
   # Biber parses a line-for-line UTF-8 copy of each data source under a temporary

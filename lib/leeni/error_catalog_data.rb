@@ -97,7 +97,7 @@ module LaTeXErrorCatalog
       id: :file_not_found,
       pattern: /File `?([^']+)'? not found/i,
       title: 'File not found',
-      hint: ->(tok) { tok ? "File '#{tok}' not found; check file path or spelling" : 'File not found; check file path or spelling' },
+      hint: ->(tok) { LaTeXErrorCatalog.file_not_found_hint(tok) },
       why: 'An \\input{...}, \\include{...}, or \\usepackage{...} targeted a file that does not exist in TeX search path.',
       fix: 'Verify that the file exists and that the relative path is correct.',
       doc_slug: '09_file_not_found'

@@ -3,8 +3,10 @@
 # ==============================================================================
 # lib/leeni/key_suggester.rb
 #
-# "Did you mean" for undefined \ref and \cite keys.
+# "Did you mean" for undefined \ref and \cite keys and missing files.
 # ==============================================================================
+
+require 'find'
 
 # Finds the defined key an undefined one was most likely meant to be. A key
 # such as lem:main_result has a category prefix and a name. Confusing the
@@ -24,14 +26,44 @@ module LeeniKeySuggester
   COSMETIC_SLACK = 0.6
   MAX_SUGGESTIONS = 3
 
+  # Files a missing-file error may have meant: sources, figures, styles.
+  FILE_EXTENSIONS = %w[.tex .ltx .pdf .png .jpg .jpeg .eps .ps .svg .mps .pgf .tikz .bib .sty .cls .bst .clo .def].freeze
+  SKIPPED_DIRS = %w[.git .svn .hg node_modules].freeze
+  FILE_SCAN_LIMIT = 5000
+
   module_function
 
+  # Project files a name in a "File `x' not found" error was probably meant
+  # to be. A directory is read like a key prefix (figs/a for fig/a costs
+  # little), a file that exists under another extension is named outright,
+  # and even a short name may take one edit (ref.bib for refs.bib).
+  def suggest_file(name, root = '.')
+    ext = File.extname(name)
+    stem = name.delete_suffix(ext).delete_prefix('./')
+    by_stem = project_files(root).group_by { |path| path.delete_suffix(File.extname(path)) }
+    stems = by_stem.key?(stem) ? [stem] : suggest(stem, by_stem.keys, min_edits: 1)
+    stems.flat_map { |s| by_stem[s] }.reject { |path| path == name.delete_prefix('./') }.sort.first(MAX_SUGGESTIONS)
+  end
+
+  def project_files(root)
+    found = []
+    Find.find(root) do |path|
+      Find.prune if found.size >= FILE_SCAN_LIMIT || (File.directory?(path) && skipped_dir?(path, root))
+      found << path.delete_prefix("#{root}/") if File.file?(path) && FILE_EXTENSIONS.include?(File.extname(path).downcase)
+    end
+    found
+  end
+
+  def skipped_dir?(path, root)
+    path != root && (File.basename(path).start_with?('.') || SKIPPED_DIRS.include?(File.basename(path)))
+  end
+
   # The best candidates for key (ties all count, up to MAX_SUGGESTIONS), or [].
-  def suggest(key, candidates)
+  def suggest(key, candidates, min_edits: 0)
     scored = candidates.uniq.filter_map do |candidate|
       next if candidate == key
 
-      cost = cost(key, candidate)
+      cost = cost(key, candidate, min_edits)
       [cost, candidate] if cost
     end
     best = scored.map(&:first).min
@@ -44,9 +76,9 @@ module LeeniKeySuggester
   # A separator need not end a prefix (main_result), so each key is also read
   # whole, and the cheaper reading counts. The edit budget follows the name
   # without its prefix, so reading a key whole does not widen it.
-  def cost(key, candidate)
+  def cost(key, candidate, min_edits = 0)
     own = readings(key)
-    allowed = allowed_edits(normalize(own.last.last))
+    allowed = [allowed_edits(normalize(own.last.last)), min_edits].max
     own.product(readings(candidate)).filter_map { |a, b| reading_cost(*a, *b, allowed) }.min
   end
 

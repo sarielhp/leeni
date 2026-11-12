@@ -45,6 +45,29 @@ class TestKeySuggester < LeeniTestBase
     assert_equal ['knuth84'], S.suggest('knuht84', %w[HarPeled11 knuth84])
   end
 
+  def test_missing_files_suggest_project_files
+    Dir.mktmpdir('leeni_file_suggest') do |dir|
+      Dir.chdir(dir) do
+        FileUtils.mkdir_p(%w[figs sections .git/objects])
+        %w[figs/Packing.pdf figs/packing_old.png sections/intro.tex refs.bib notes.txt .git/objects/refs.bib].each do |f|
+          File.write(f, '')
+        end
+        assert_equal ['figs/Packing.pdf'], S.suggest_file('fig/packing'), 'directory and case'
+        assert_equal ['sections/intro.tex'], S.suggest_file('section/intro.tex')
+        assert_equal ['refs.bib'], S.suggest_file('ref.bib'), 'a short name may take one edit'
+        assert_equal ['figs/Packing.pdf'], S.suggest_file('figs/Packing.eps'), 'another extension'
+        assert_empty S.suggest_file('figs/graph'), 'nothing near'
+        assert_empty S.suggest_file('note'), 'only TeX-relevant files are candidates'
+        hint = LaTeXErrorCatalog.file_not_found_hint('section/intro.tex')
+        assert_equal "Did you mean 'sections/intro.tex'? File 'section/intro.tex' not found", hint
+        assert_includes LaTeXErrorCatalog.file_not_found_hint('myheader.sty'), "File 'myheader.sty' not found"
+        bib = LaTeXBibManager.allocate
+        assert_equal " Did you mean 'refs.bib'?", bib.send(:missing_database_hint, "I couldn't open database file ref.bib")
+        assert_equal " Did you mean 'refs.bib'?", bib.send(:missing_database_hint, "ERROR - Cannot find 'ref.bib'!")
+      end
+    end
+  end
+
   MAIN = <<~'TEX'
     \documentclass{article}
     \newtheorem{theorem}{Theorem}

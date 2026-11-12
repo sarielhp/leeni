@@ -427,4 +427,23 @@ class TestLeeniBuildRuntime < LeeniTestBase
     end
     flunk "leeni (pid #{pid}) started no engine within #{limit}s"
   end
+
+  # Diagnostics come from the highest-numbered pass log, so one left by an
+  # earlier, longer build would be reported instead of the current build's.
+  # Every build clears the pass logs before its first pass.
+  def test_pass_log_of_an_earlier_build_is_not_reported
+    Dir.mktmpdir('leeni_pass_logs') do |dir|
+      Dir.chdir(dir) do
+        File.write('main.tex', "\\documentclass{article}\n\\begin{document}\nx\n\\end{document}\n")
+        opts = { engine: 'pdflatex', passes: 3, lock: false, force: true }
+        capture_io { assert LatexBuilder.new('main.tex', opts).run!, 'first build failed' }
+        stale = File.join(LeeniBuildWorkspace.cache_dir('.'), 'err_pdflatex_9')
+        File.write(stale, "! Undefined control sequence.\nl.3 \\StalePassError\n")
+
+        out, err = capture_io { assert LatexBuilder.new('main.tex', opts).run!, 'a stale pass log failed the build' }
+        refute_includes strip_ansi(out + err), 'StalePassError'
+        refute File.exist?(stale), 'the stale pass log survived the build'
+      end
+    end
+  end
 end

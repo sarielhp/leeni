@@ -526,7 +526,9 @@ module LatexBuildRuntime
 
   # A failure inside generated files is the cache's fault, not the source's:
   # keep the evidence as a quarantine case, clean, and rebuild once. A second
-  # failure in the same run is reported as usual.
+  # failure in the same run is reported as usual. The rebuild may still meet a
+  # stale .bbl (a leftover .aux failed first), so it recovers from that too;
+  # each kind of recovery happens at most once.
   def run_convergence_loop_with_recovery
     run_convergence_loop
   rescue StaleBibliography
@@ -540,7 +542,7 @@ module LatexBuildRuntime
     LaTeXUtils.clean_directory('.', false, workspace_dir: @junk_dir)
     junk_dir_create
     discard_stale_bib_format_files
-    run_convergence_loop
+    run_convergence_loop_with_recovery
   end
 
   def quarantine_build(failure)

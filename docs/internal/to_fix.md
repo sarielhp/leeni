@@ -352,7 +352,7 @@ Empirical analysis identified 5 distinct mechanisms causing line number instabil
 
 ### 5.4 Multi-Pass Convergence Shifts (Unresolved `??` vs Resolved Citations)
 - **Location** (as of 1.0.91): [`pass_log_files`](file:///home/sariel/prog/26/leeni/lib/leeni/diagnostics.rb#L353) and [`find_last_latex_log`](file:///home/sariel/prog/26/leeni/lib/leeni/diagnostics.rb#L362).
-- **Status**: Open: diagnostics still come from the latest pass log present.
+- **Status**: Fixed: every build deletes all pass logs before its first pass (`clean_pass_logs`), so the latest log is always the current build's; an aborted build drops `.build_state.json`, so the next run rebuilds rather than reporting old logs. Covered by `test_pass_log_of_an_earlier_build_is_not_reported`.
 - **Mechanism**:
   `find_last_latex_log` reads the log from the latest available pass (`err_xelatex_3`, `_2`, or `_1`).
   On pass 1, references are unresolved (`??`), equations lack numbers, and bibliographies are empty. On pass 3, resolved text expands paragraphs and pushes subsequent lines down.

@@ -75,9 +75,7 @@ class TestStaleBbl < LeeniTestBase
     refute_includes detail, 'biber_tmp'
   end
 
-  # biblatex sits behind a conditional that is off (a submission-version flag),
-  # so the document uses BibTeX, but the .bbl next to it is the biblatex one an
-  # earlier build left: it must be regenerated, not fail with a missing package.
+  # A plain BibTeX document (the other tests drop the biblatex lines).
   BIBTEX_MAIN = <<~'TEX'
     \newif\ifbiblatex
     \documentclass{article}
@@ -88,31 +86,37 @@ class TestStaleBbl < LeeniTestBase
     \bibliography{refs}
     \end{document}
   TEX
-  BIBLATEX_BBL = <<~'BBL'
-    % $ biblatex auxiliary file $
-    % $ biblatex bbl format version 3.3 $
-    \begingroup
-    \makeatletter
-    \@ifundefined{ver@biblatex.sty}
-      {\@latex@error
-         {Missing 'biblatex' package}
-         {The bibliography requires the 'biblatex' package.}
-          \aftergroup\endinput}
-      {}
-    \endgroup
-    \refsection{0}
-    \endrefsection
-  BBL
 
-  def test_biblatex_bbl_under_bibtex_is_regenerated
-    skip 'bibtex not installed' unless system('bibtex --version', out: File::NULL, err: File::NULL)
-    Dir.mktmpdir('leeni_foreign_bbl') do |dir|
+  # One source, two bibliography systems behind a flag (a submission version
+  # uses BibTeX, the full version biblatex), as in a LIPIcs paper.
+  def switchable_main(biblatex)
+    <<~TEX
+      \\newif\\ifbiblatex\\biblatex#{biblatex}
+      \\documentclass{article}
+      \\ifbiblatex\\usepackage[backend=biber]{biblatex}\\addbibresource{refs.bib}\\fi
+      \\begin{document}
+      \\cite{k}
+      \\ifbiblatex\\printbibliography\\else\\bibliographystyle{plain}\\bibliography{refs}\\fi
+      \\end{document}
+    TEX
+  end
+
+  # The biblatex build leaves its .bbl next to the source; switching the flag
+  # to BibTeX must regenerate it, not fail on "Missing 'biblatex' package"
+  # (the source scan sees \usepackage{biblatex}, so it keeps the .bbl).
+  def test_switch_from_biblatex_to_bibtex_regenerates_the_bbl
+    %w[bibtex biber].each do |tool|
+      skip "#{tool} not installed" unless system("#{tool} --version", out: File::NULL, err: File::NULL)
+    end
+    Dir.mktmpdir('leeni_switch_bbl') do |dir|
       with_cache(dir) do
-        File.write('main.tex', BIBTEX_MAIN)
+        File.write('main.tex', switchable_main('true'))
         File.write('refs.bib', BIB)
-        File.write('main.bbl', BIBLATEX_BBL)
-        File.utime(Time.now + 60, Time.now + 60, 'main.bbl')
-        out, err = capture_io { assert LatexBuilder.new('main.tex', options).run!, 'biblatex .bbl blocked the build' }
+        capture_io { assert LatexBuilder.new('main.tex', options(trace: true)).run!, 'biblatex build failed' }
+        assert_includes File.read('main.bbl'), 'biblatex bbl format', 'the biblatex build left no .bbl in the tree'
+
+        File.write('main.tex', switchable_main('false'))
+        out, err = capture_io { assert LatexBuilder.new('main.tex', options).run!, 'the biblatex .bbl blocked the build' }
         refute_includes strip_ansi(out + err), 'Missing'
         assert_includes File.read('main.bbl'), '\begin{thebibliography}'
       end

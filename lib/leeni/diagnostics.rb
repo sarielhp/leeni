@@ -18,6 +18,7 @@ require_relative 'diagnostic_output'
 require_relative 'diagnostic_alerts'
 require_relative 'diagnostic_summary'
 require_relative 'diagnostic_bib_messages'
+require_relative 'diagnostic_key_suggestions'
 
 module LaTeXDiagnostics
   include Formatting
@@ -26,6 +27,7 @@ module LaTeXDiagnostics
   include Alerts
   include Summary
   include BibMessages
+  include KeySuggestions
 
   DIAGNOSTIC_EXPLANATIONS = LaTeXErrorCatalog::WARNING_EXPLANATIONS
 
@@ -107,6 +109,7 @@ module LaTeXDiagnostics
     err_items = extract_errors(clean_content)
     append_bib_diagnostics!(raw_warns, err_items) if counts[:cbib].positive?
     consolidate_missing_bib_entries!(raw_warns)
+    suggest_undefined_keys!(raw_warns)
 
     alert_items, reg_warns, what_items = partition_diagnostics(clean_content, raw_warns)
     reg_warns = drop_empty_key_citation_warnings(alert_items, reg_warns)

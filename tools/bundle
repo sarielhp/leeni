@@ -58,6 +58,8 @@ module LatexBundler
     diagnostic_alerts.rb
     diagnostic_summary.rb
     diagnostic_bib_messages.rb
+    key_suggester.rb
+    diagnostic_key_suggestions.rb
     diagnostics.rb
     bbl_provenance.rb
     bib_manager.rb

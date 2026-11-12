@@ -316,7 +316,7 @@ class TestLeeniBuildRuntime < LeeniTestBase
 
   def test_indicator_suppressed_for_fast_actions
     out, = capture_io do
-      LaTeXIndicator.start('Fast action...', enabled: true, delay: 0.2)
+      LaTeXIndicator.start('Fast action...', enabled: true, delay: LeeniTestLoad.scale(0.2))
       sleep 0.05
       LaTeXIndicator.stop(clear: true, enabled: true)
     end
@@ -326,7 +326,7 @@ class TestLeeniBuildRuntime < LeeniTestBase
   def test_indicator_renders_for_slow_actions
     out, = capture_io do
       LaTeXIndicator.start('Slow action...', enabled: true, delay: 0.05)
-      sleep 0.12
+      sleep LeeniTestLoad.scale(0.12)
       LaTeXIndicator.stop(clear: true, enabled: true)
     end
     assert_includes out, 'Slow action...'

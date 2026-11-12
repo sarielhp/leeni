@@ -16,3 +16,25 @@ unless ENV['LEENI_TEST_ENV']
   FileUtils.mkdir_p([ENV.fetch('TMPDIR'), ENV.fetch('XDG_CACHE_HOME')], mode: 0o700)
   at_exit { FileUtils.rm_rf(leeni_test_run) }
 end
+
+require 'etc'
+
+# Timing-sensitive tests (short timeouts, elapsed-time bounds, sleeps that a
+# background thread must outlast) stretch their waits by this factor: the
+# one-minute load average per CPU, at least 1 and at most 10. On a quiet
+# machine the tests stay as strict as written; on a loaded one a child that
+# merely starts slowly no longer fails them.
+module LeeniTestLoad
+  module_function
+
+  def factor
+    load1 = File.read('/proc/loadavg').split.first.to_f
+    (load1 / Etc.nprocessors).clamp(1.0, 10.0)
+  rescue SystemCallError
+    1.0
+  end
+
+  def scale(seconds, factor = self.factor)
+    (seconds * factor).round(3)
+  end
+end

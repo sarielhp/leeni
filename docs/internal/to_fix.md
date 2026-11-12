@@ -218,7 +218,8 @@ Summary stats: `Errors: 0, Alerts: 193, Warnings: 114, Whatevers: 92 (Whatevers 
 Empirical analysis of the diagnostic run on `~/rand_alg/notes/book.tex` identified 5 distinct root causes responsible for the user-reported "colors changing in mid flight":
 
 ### 4.1 Intra-Tier Color Flipping (Yellow ↔ Magenta ↔ Cyan within Warnings)
-- **Location**: [`lib/leeni/diagnostics.rb`](file:///home/sariel/prog/26/leeni/lib/leeni/diagnostics.rb#L396-L404) and [`lib/leeni/diagnostics.rb`](file:///home/sariel/prog/26/leeni/lib/leeni/diagnostics.rb#L501).
+- **Location** (as of 1.0.91): [`clean_box_diagnostic`](file:///home/sariel/prog/26/leeni/lib/leeni/diagnostic_log_parsing.rb#L60) and [`extract_alerts`](file:///home/sariel/prog/26/leeni/lib/leeni/diagnostic_alerts.rb#L146).
+- **Status**: Fixed: box warnings no longer get their own `base_color`; a tier has one color.
 - **Mechanism**:
   When LaTeX log items are parsed, `Overfull \hbox` is unconditionally assigned `base_color: :magenta` and `Underfull \hbox` is assigned `base_color: :cyan`.
   If an overfull box has severity $\ge 20\,\text{pt}$, `extract_alerts` reassigns its `base_color` to `:red` and promotes it to the `alerts` tier.
@@ -246,7 +247,8 @@ Empirical analysis of the diagnostic run on `~/rand_alg/notes/book.tex` identifi
   Harsh, highly saturated, dark 16-color ANSI purple and blue suddenly flash amid smooth, high-luminance pastel peach and pink tones.
 
 ### 4.3 Mid-Line Banner Color Flip
-- **Location**: [`lib/leeni/diagnostics.rb`](file:///home/sariel/prog/26/leeni/lib/leeni/diagnostics.rb#L959-L972).
+- **Location** (as of 1.0.91): [`format_file_separator`](file:///home/sariel/prog/26/leeni/lib/leeni/diagnostic_output.rb#L336).
+- **Status**: Fixed: the counts and brackets carry the tier color; only the file name is deliberately bold in the default color.
 - **Mechanism**:
   `format_file_separator` constructs:
   ```ruby
@@ -263,7 +265,8 @@ Empirical analysis of the diagnostic run on `~/rand_alg/notes/book.tex` identifi
   The line changes color mid-flight twice across a single banner.
 
 ### 4.4 Broken `reassert` Reset in Tag Highlighting
-- **Location**: [`lib/leeni/diagnostics.rb`](file:///home/sariel/prog/26/leeni/lib/leeni/diagnostics.rb#L142-L149).
+- **Location** (as of 1.0.91): [`highlight_leeni_tag`](file:///home/sariel/prog/26/leeni/lib/leeni/diagnostic_formatting.rb#L209).
+- **Status**: Fixed: the text after each tag is colored on its own, with no empty-string reset.
 - **Mechanism**:
   ```ruby
   def highlight_leeni_tag(str, base_color = :red)
@@ -280,7 +283,8 @@ Empirical analysis of the diagnostic run on `~/rand_alg/notes/book.tex` identifi
   Instead of restoring `base_color`, `reassert` executes `\e[0m`, immediately stripping all foreground color and weight from the rest of the diagnostic message! The remainder of the line bleeds into plain uncolored text.
 
 ### 4.5 Split Tier Iteration vs. File-Grouped Traversal
-- **Location**: [`lib/leeni/diagnostics.rb`](file:///home/sariel/prog/26/leeni/lib/leeni/diagnostics.rb#L1792-L1800).
+- **Location** (as of 1.0.91): [`render_grouped_tiers`](file:///home/sariel/prog/26/leeni/lib/leeni/diagnostics.rb#L261).
+- **Status**: Fixed: all tiers of a file are printed together; `render_non_error_tiers` was unused and was removed in 1.0.91.
 - **Mechanism**:
   `render_non_error_tiers` executes:
   ```ruby
@@ -298,7 +302,8 @@ Empirical analysis of the diagnostic run on `~/rand_alg/notes/book.tex` identifi
 Empirical analysis identified 5 distinct mechanisms causing line number instability, ordering jumps, and color mutations:
 
 ### 5.1 Non-Monotonic / Jumbled Line Ordering (Severity-Sorted Overfull Boxes)
-- **Location**: [`lib/leeni/diagnostics.rb`](file:///home/sariel/prog/26/leeni/lib/leeni/diagnostics.rb#L798-L813).
+- **Location** (as of 1.0.91): [`diagnostic_item_sort_key`](file:///home/sariel/prog/26/leeni/lib/leeni/diagnostic_output.rb#L43).
+- **Status**: Fixed: items sort by file, tier and line; box severity plays no part.
 - **Mechanism**:
   In `sort_diagnostic_items`, overfull box warnings are partitioned into `sorted_overfull` and sorted by `sev.to_f` (box width), rather than source line number:
   ```ruby
@@ -320,7 +325,8 @@ Empirical analysis identified 5 distinct mechanisms causing line number instabil
   Instead of progressing downward monotonically through the source file (`99 -> 121 -> 157 -> 304 -> 371 -> 546`), line numbers jump back and forth erratically because severity sorting overrides document order.
 
 ### 5.2 Intra-File Line Number Color Flipping (Cyan vs. Blue)
-- **Location**: [`lib/leeni/diagnostics.rb`](file:///home/sariel/prog/26/leeni/lib/leeni/diagnostics.rb#L71-L75).
+- **Location** (as of 1.0.91): [`colorize_line_num`](file:///home/sariel/prog/26/leeni/lib/leeni/diagnostic_formatting.rb#L13).
+- **Status**: Fixed: line numbers are always cyan; the color argument is ignored.
 - **Mechanism**:
   ```ruby
   def colorize_line_num(str, base_color = nil)
@@ -337,21 +343,24 @@ Empirical analysis identified 5 distinct mechanisms causing line number instabil
   Two adjacent lines with the exact same line number render in two completely different colors, making it appear that line numbers are glitching or mutating mid-stream.
 
 ### 5.3 Redundant Range Formatting (`108--108` vs `108`)
-- **Location**: [`lib/leeni/diagnostics.rb`](file:///home/sariel/prog/26/leeni/lib/leeni/diagnostics.rb#L509).
+- **Location** (as of 1.0.91): [`parse_box_line_span`](file:///home/sariel/prog/26/leeni/lib/leeni/diagnostic_log_parsing.rb#L217).
+- **Status**: Fixed: `108--108` prints as `108`, a real range as `108…`.
 - **Mechanism**:
   TeX logs report paragraph-level boxes as `in paragraph at lines 108--108`, but statement-level boxes as `detected at line 125`.
   The parser extracts `line_str = "108--108"` and directly prints it as `108--108:`.
   This causes line representations to mutate arbitrarily between single integers and redundant ranges within the same file.
 
 ### 5.4 Multi-Pass Convergence Shifts (Unresolved `??` vs Resolved Citations)
-- **Location**: [`lib/leeni/diagnostics.rb`](file:///home/sariel/prog/26/leeni/lib/leeni/diagnostics.rb#L1847-L1853).
+- **Location** (as of 1.0.91): [`pass_log_files`](file:///home/sariel/prog/26/leeni/lib/leeni/diagnostics.rb#L353) and [`find_last_latex_log`](file:///home/sariel/prog/26/leeni/lib/leeni/diagnostics.rb#L362).
+- **Status**: Open: diagnostics still come from the latest pass log present.
 - **Mechanism**:
   `find_last_latex_log` reads the log from the latest available pass (`err_xelatex_3`, `_2`, or `_1`).
   On pass 1, references are unresolved (`??`), equations lack numbers, and bibliographies are empty. On pass 3, resolved text expands paragraphs and pushes subsequent lines down.
   If an error or aborted pass leaves an earlier pass log in `junk/`, or if a user checks diagnostics during intermediate passes, box warning lines shift across builds.
 
 ### 5.5 TeX Log 79-Column Line-Wrapping Corrupting `file_stack`
-- **Location**: [`lib/leeni/diagnostics.rb`](file:///home/sariel/prog/26/leeni/lib/leeni/diagnostics.rb#L20) and [`lib/leeni/diagnostics.rb`](file:///home/sariel/prog/26/leeni/lib/leeni/diagnostics.rb#L407-L431).
+- **Location** (as of 1.0.91): [`LOG_FILE_PATTERN`](file:///home/sariel/prog/26/leeni/lib/leeni/diagnostics.rb#L36) and [`track_log_file`](file:///home/sariel/prog/26/leeni/lib/leeni/diagnostic_log_parsing.rb#L18).
+- **Status**: Fixed: leeni runs the engine with `max_print_line=2048` (`build_runtime.rb`), so file paths are no longer wrapped.
 - **Mechanism**:
   TeX hard-wraps log lines at 79 columns. When a file inclusion path spans a line break, `LOG_FILE_PATTERN` fails to recognize the file extension on the continuation line, pushing `nil` onto `file_stack`.
   Subsequent closing parentheses `)` pop the stack prematurely, causing `current_log_file` to fall back to `@filename` (`book.tex`) or an earlier chapter.
@@ -376,7 +385,7 @@ Empirical analysis identified 5 distinct mechanisms causing line number instabil
    - Replace `LaTeX Warning: (?:Hyper reference|Reference) \`([^\']+)\' on page (\d+) undefined on input line \d+\.?` with `undefined reference '$1' (page $2)`.
    - Replace `LaTeX Warning: Citation '([^']+)' on page (\d+) undefined on input line \d+\.?` with `undefined citation '$1' (page $2)`.
 4. **Duplicate Label Cross-Reference Aggregation**:
-   - During cataloging in `lib/leeni/diagnostics.rb`, build a label index: `{ label_name => [ { file: f, line: l }, ... ] }`.
+   - During cataloging (`lib/leeni/diagnostic_alerts.rb`), build a label index: `{ label_name => [ { file: f, line: l }, ... ] }`.
    - When rendering duplicate label warnings, list other target definitions: `also at #{other_locations.map { |loc| "#{loc[:file]}:#{loc[:line]}" }.join(', ')}`.
 
 ### Phase 2: Color & Line-Gutter Stabilization
@@ -393,7 +402,7 @@ Empirical analysis identified 5 distinct mechanisms causing line number instabil
 
 ### Phase 3: Terminal Link Integration (Regular Display)
 1. **Format Location Links**:
-   - In `lib/leeni/diagnostics.rb`'s standard human-readable printer, wrap line numbers in OSC 8 escape sequences when `link_enabled?` is active:
+   - In the standard human-readable printer (`lib/leeni/diagnostic_output.rb`), wrap line numbers in OSC 8 escape sequences when `link_enabled?` is active:
      ```ruby
      def format_line_prefix(file, line_str, link_enabled: true)
        return line_str.rjust(10) unless link_enabled
@@ -416,7 +425,7 @@ Empirical analysis identified 5 distinct mechanisms causing line number instabil
    - `test/test_diagnostic_formatting.rb`: Verifies regex transformations on box warnings, reference deduplication, duplicate label cross-referencing, monotonic line sorting, and consistent color assignments.
    - `test/test_regular_terminal_links.rb`: Verifies OSC 8 sequences in regular mode when run in simulated PTY.
 2. Verify sizing constraints:
-   - Keep [`lib/leeni/diagnostics.rb`](file:///home/sariel/prog/26/leeni/lib/leeni/diagnostics.rb) and [`lib/leeni/builder.rb`](file:///home/sariel/prog/26/leeni/lib/leeni/builder.rb) within standards.
+   - Keep the `lib/leeni/diagnostic*.rb` modules and [`lib/leeni/builder.rb`](file:///home/sariel/prog/26/leeni/lib/leeni/builder.rb) within standards.
    - Run `tools/gate_audit_code`, `tools/bundle --check`, and `tools/gate --medium`.
 
 

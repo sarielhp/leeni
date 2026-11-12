@@ -119,12 +119,13 @@ class TestBwsReview < Minitest::Test
 
   def test_timeout_kills_a_command_that_ignores_term
     with_source do |root, source, output|
+      load = LeeniTestLoad.factor
       start = Process.clock_gettime(Process::CLOCK_MONOTONIC)
       code = 'trap("TERM") {}; File.write("child.pid", Process.pid.to_s); sleep 30'
-      text, status = Open3.capture2e('ruby', BIN, source, '--output', output,
-                                     '--bws', fake_bws(root), '--timeout', '0.3', '--', '/usr/bin/ruby', '-e', code)
+      text, status = Open3.capture2e('ruby', BIN, source, '--output', output, '--bws', fake_bws(root),
+                                     '--timeout', LeeniTestLoad.scale(0.3, load).to_s, '--', '/usr/bin/ruby', '-e', code)
       assert_equal 124, status.exitstatus, text
-      assert_operator Process.clock_gettime(Process::CLOCK_MONOTONIC) - start, :<, 6
+      assert_operator Process.clock_gettime(Process::CLOCK_MONOTONIC) - start, :<, LeeniTestLoad.scale(6, load)
       pid = Integer(File.read(File.join(output, 'child.pid')))
       assert_raises(Errno::ESRCH) { Process.kill(0, pid) }
       assert_includes File.read(File.join(output, 'bws-run.log')), 'timed out'

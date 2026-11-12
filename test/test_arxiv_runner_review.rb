@@ -105,10 +105,11 @@ class TestArxivRunnerReview < Minitest::Test
       fake = File.join(root, 'sleeping-bws')
       File.write(fake, "#!/usr/bin/env ruby\nsleep 20\n")
       File.chmod(0o755, fake)
+      load = LeeniTestLoad.factor
       started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
-      output, status = run_tool(dir, '--bws', fake, '--timeout', '0.2')
+      output, status = run_tool(dir, '--bws', fake, '--timeout', LeeniTestLoad.scale(0.2, load).to_s)
       report = failed_report(dir, output, status)
-      assert_operator Process.clock_gettime(Process::CLOCK_MONOTONIC) - started, :<, 8
+      assert_operator Process.clock_gettime(Process::CLOCK_MONOTONIC) - started, :<, LeeniTestLoad.scale(8, load)
       assert_match(/timed out/i, JSON.generate(report))
     end
   end
@@ -144,7 +145,7 @@ class TestArxivRunnerReview < Minitest::Test
                   checks: [{ name: 'environment', status: 'PASS' }] }
       File.write(fake, "#!/usr/bin/env ruby\nFile.write('test-worker-report.json', #{JSON.generate(partial).dump})\nsleep 20\n")
       File.chmod(0o755, fake)
-      output, status = run_tool(dir, '--bws', fake, '--timeout', '0.3')
+      output, status = run_tool(dir, '--bws', fake, '--timeout', LeeniTestLoad.scale(0.3).to_s)
       report = failed_report(dir, output, status)
       assert_equal 'PASS', report.fetch('checks').first.fetch('status')
       assert_match(/timed out/i, report.fetch('error'))

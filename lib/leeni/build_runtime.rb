@@ -326,7 +326,7 @@ module LatexBuildRuntime
       reader = Thread.new { read_process_output(stdout_err, output) }
       return timeout_result(wait_thread, reader, timeout) unless wait_thread.join(timeout)
 
-      drain_reader(reader, output)
+      drain_reader(reader, output, wait_thread.pid)
       [output, wait_thread.value]
     ensure
       kill_process_group(wait_thread.pid) if wait_thread&.alive?
@@ -334,17 +334,35 @@ module LatexBuildRuntime
     end
   end
 
-  # The engine has exited; its output may still sit in the pipe, behind a
-  # reader slowed by a loaded machine (the driver's fatal message comes last).
-  # Reading goes on while it makes progress and stops after a quiet interval,
-  # so a grandchild that keeps the pipe open cannot hang the build.
-  def drain_reader(reader, output, quiet: 2.0)
-    loop do
-      size = output.bytesize
-      return if reader.join(quiet)
-      break if output.bytesize == size
+  # The engine has exited, but the pipe stays open while a process it started
+  # lives: XeTeX dies of SIGPIPE as soon as xdvipdfmx stops reading, and the
+  # driver writes its fatal message after that, seconds later on a loaded
+  # machine. Reading goes on while any process of the engine's group is alive
+  # (up to `limit`), or while output still arrives; once the group is gone, a
+  # quiet interval ends it, so a detached process holding the pipe cannot
+  # hang the build.
+  def drain_reader(reader, output, pgid, quiet: 2.0, limit: 60.0)
+    started = last_change = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+    size = output.bytesize
+    until reader.join(0.2)
+      now = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+      if output.bytesize != size
+        size = output.bytesize
+        last_change = now
+      end
+      break if now - started > limit
+      break if now - last_change > quiet && !process_group_alive?(pgid)
     end
     reader.kill
+  end
+
+  def process_group_alive?(pgid)
+    Process.kill(0, -pgid)
+    true
+  rescue Errno::ESRCH
+    false
+  rescue Errno::EPERM
+    true
   end
 
   def read_process_output(stream, output)

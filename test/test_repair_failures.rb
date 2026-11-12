@@ -461,6 +461,25 @@ class TestRepairFailures < Minitest::Test
     end
   end
 
+  # XeTeX dies of SIGPIPE when xdvipdfmx stops reading, before the driver has
+  # written its fatal message; on a loaded machine that takes seconds. A
+  # descendant that is silent for a while and then speaks must still be heard.
+  def test_process_capture_waits_for_a_slow_descendant_message
+    with_project do |builder|
+      script = <<~RUBY
+        Process.spawn(RbConfig.ruby, '-e', 'sleep 3; $stdout.puts "driver:fatal late message"', out: STDOUT)
+        exit 9
+      RUBY
+
+      output, status = builder.send(
+        :capture_with_timeout, {}, [RbConfig.ruby, '-rrbconfig', '-e', script], 30
+      )
+
+      assert_equal 9, status.exitstatus
+      assert_includes output, 'driver:fatal late message'
+    end
+  end
+
   def test_process_capture_preserves_output_when_descendant_holds_pipe
     with_project do |builder|
       child = 'sleep 3'

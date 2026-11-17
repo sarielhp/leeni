@@ -38,6 +38,8 @@ module LatexCLITargets
 
     if options[:make_indep]
       process_make_indep_target(target, options)
+    elsif options[:gitignore_init]
+      process_gitignore_target(target, options)
     elsif options[:meta_only]
       process_meta_target(target, options)
     elsif options[:arxiv]
@@ -62,6 +64,17 @@ module LatexCLITargets
     builder = LatexBuilder.new(target, options.merge(force: true, no_env: false))
     exit 1 unless builder.run!
     exit 1 unless LatexIndependizer.new(builder).run!
+  end
+
+  # The recorder file of a successful build lists the files the paper uses;
+  # a failed build leaves .gitignore alone.
+  def process_gitignore_target(target, options)
+    builder = LatexBuilder.new(target, options)
+    unless builder.run!
+      warn Rainbow('[FAIL] The paper did not build; .gitignore was not changed.').red.bright
+      exit 1
+    end
+    exit 1 unless LeeniGitignore.new(builder).run!
   end
 
   # --zip-alone first converts the paper in place as -I does, so every file

@@ -346,7 +346,9 @@ class TestLaTeXConfigAndConventions < Minitest::Test
       assert_includes content, '*.synctex.gz'
       assert_includes content, '*.aux'
       assert_includes content, '*.bbl'
-      assert_includes content, '# *.pdf'
+      assert_includes content, "\n/*.pdf\n"
+      refute_match(/^\*\.pdf$/, content)
+      LaTeXConfig::GITIGNORE_LATEX_ENTRIES.each { |entry| assert_includes content.lines.map(&:chomp), entry }
     end
   end
 
@@ -371,16 +373,6 @@ class TestLaTeXConfigAndConventions < Minitest::Test
       # Idempotency: second run when fully populated does not add anything
       _target2, action2 = LaTeXConfig.init_gitignore!(dir)
       assert_equal :unchanged, action2
-    end
-  end
-
-  def test_cli_gitignore_init_flag
-    Dir.mktmpdir('leeni_cli_gi') do |dir|
-      bin = File.expand_path('../leeni', __dir__)
-      out, status = Open3.capture2(bin, '--gitignore-init', chdir: dir)
-      assert_equal 0, status.exitstatus
-      assert_includes out, 'Created'
-      assert File.file?(File.join(dir, '.gitignore'))
     end
   end
 

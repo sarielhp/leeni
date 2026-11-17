@@ -316,9 +316,12 @@ module LaTeXConfig
     [tasks_path, settings_path]
   end
 
+  # Every rule --gitignore-init makes sure .gitignore has, in the order they
+  # are appended; DEFAULT_GITIGNORE_TEMPLATE has each of them, with comments.
   GITIGNORE_LATEX_ENTRIES = %w[
     junk/
     .junk/
+    **/junk/
     *.synctex.gz
     *.synctex(busy)
     *.aux
@@ -327,17 +330,37 @@ module LaTeXConfig
     *.log
     *.out
     *.toc
+    *.thm
+    *.vtc
     *.fls
     *.fdb_latexmk
     *.bcf
     *.run.xml
+    *.rel
+    *-blx.bib
     *.nav
     *.snm
     *.vrb
     *.idx
     *.ind
     *.ilg
+    /*.pdf
     old_ver_*.zip
+    refs/backup/
+    .auctex-auto/
+    auto/
+    prv/
+    tmp_overleaf/
+    _region_.tex
+    **/old/
+    .git_useless/
+    tempg/
+    u/
+    snapshot/
+    does_not_work/
+    x
+    err
+    !**/figs/**/*.pdf
   ].freeze
 
   DEFAULT_GITIGNORE_TEMPLATE = <<~GITIGNORE
@@ -346,6 +369,7 @@ module LaTeXConfig
     # ==============================================================================
     junk/
     .junk/
+    **/junk/
     *.synctex.gz
     *.synctex(busy)
 
@@ -358,10 +382,14 @@ module LaTeXConfig
     *.log
     *.out
     *.toc
+    *.thm
+    *.vtc
     *.fls
     *.fdb_latexmk
     *.bcf
     *.run.xml
+    *.rel
+    *-blx.bib
     *.nav
     *.snm
     *.vrb
@@ -369,19 +397,38 @@ module LaTeXConfig
     *.ind
     *.ilg
 
+    # Compiled PDFs in the paper's directory only; PDFs in subdirectories
+    # (figures) stay tracked.
+    /*.pdf
+
     # Backups of the originals written by leeni -I (--make-indep)
     old_ver_*.zip
+    refs/backup/
+
+    # Folding and editor-specific (Emacs/AUCTeX)
+    .auctex-auto/
+    auto/
+    prv/
+    tmp_overleaf/
+    _region_.tex
+
+    # Old versions and scratch directories
+    **/old/
+    .git_useless/
+    tempg/
+    u/
+    snapshot/
+    does_not_work/
+    x
+    err
 
     # Editor and OS noise
     *~
     *.swp
     .DS_Store
 
-    # ==============================================================================
-    # Target PDF: Commented out by default.
-    # Uncomment below if you prefer NOT to track the compiled PDF in git:
-    # ==============================================================================
-    # *.pdf
+    # Figures under figs/ are sources: keep them even when *.pdf is ignored.
+    !**/figs/**/*.pdf
   GITIGNORE
 
   def self.init_gitignore!(dir = '.')

@@ -241,9 +241,8 @@ module LatexCLI
       options[:vscode_lw] = true
       options[:color] = false
     end
-    opts.on('--gitignore-init', 'Create or add standard LaTeX and junk/ ignore rules to .gitignore and exit') do
-      LaTeXConfig.init_gitignore!('.')
-      exit 0
+    opts.on('-G', '--gitignore-init', 'Build; add LaTeX ignore rules to .gitignore; check git ignores no file the paper uses') do
+      options[:gitignore_init] = true
     end
   end
 

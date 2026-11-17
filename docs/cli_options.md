@@ -76,7 +76,7 @@ All long options accept either `-` or `--` and allow internal dashes to be omitt
 | `--config-save` | Config | Save specified CLI options to configuration file. |
 | `--config-unset KEY` | Config | Remove a saved setting from local or global configuration. |
 | `--vscode-init` | Config | Create VS Code `tasks.json` and `settings.json` in `.vscode/`. |
-| `--gitignore-init` | Config | Create or add standard LaTeX & `junk/` rules to `.gitignore`. |
+| `-G`, `--gitignore-init` | Config | Build the paper, add standard LaTeX & `junk/` rules to `.gitignore`, and check that git ignores no file the paper uses. |
 | `-m`, `--main` | Info | Print detected main LaTeX file and exit. |
 | `-h`, `--help` | Help | Show condensed help summary of everyday options. |
 | `-H`, `--help-all` | Help | Show complete manual with detailed explanations. |
@@ -436,10 +436,10 @@ Generates `.vscode/tasks.json` and `settings.json` configured for `leeni` proble
 l --vscode-init
 ```
 
-### `--gitignore-init`
-Appends standard `leeni` and LaTeX ignore rules to `.gitignore`.
+### `-G`, `--gitignore-init`
+Builds the paper and, if it builds, appends the standard `leeni` and LaTeX ignore rules that `.gitignore` lacks, editor and scratch-directory rules (`.auctex-auto/`, `auto/`, `**/old/`, `tempg/`, …). Compiled PDFs are ignored only in the paper's directory (`/*.pdf`), so figures in subdirectories stay tracked, and `!**/figs/**/*.pdf` keeps figures under `figs/` tracked even when an older `*.pdf` rule is present. Then, in a git repository, it checks that git ignores no untracked project file the paper uses: the inputs, styles and figures the build read, the paper's own `.bib` files, and the project copies `-I` made of files the build found through `TEXINPUTS` (a build without your environment uses those). Each ignored file is listed with the rule that ignores it, and the exit status is 1. Files git already tracks are fine whatever the rules say.
 ```bash
-l --gitignore-init
+l -G paper.tex
 ```
 
 ---

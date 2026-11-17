@@ -471,11 +471,17 @@ module LaTeXHelpManual
       '      Example:',
       '        l --vscode-init',
       '',
-      '  --gitignore-init',
-      '      Create or add standard LaTeX, SyncTeX, and junk/ rules to .gitignore and exit.',
-      '      Additive: preserves existing rules and only appends missing entries.',
+      '  -G, --gitignore-init',
+      '      Build the paper; if it builds, create or add standard LaTeX, SyncTeX, junk/,',
+      '      editor and scratch-directory rules to .gitignore (additive: existing rules are',
+      '      kept, only missing entries are appended). Compiled PDFs are ignored only in the',
+      '      paper directory (/*.pdf), and !**/figs/**/*.pdf keeps figures tracked even under',
+      '      an older *.pdf rule. Then, in a git repository, checks that git ignores no',
+      '      untracked project file the paper uses (inputs, styles, figures, its own .bib',
+      '      files, and the copies -I made of files found through TEXINPUTS); exits 1 and',
+      '      lists each with the rule that ignores it.',
       '      Example:',
-      '        l --gitignore-init'
+      '        l -G paper.tex'
     ].join("\n")
   end
 

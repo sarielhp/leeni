@@ -87,7 +87,7 @@ l --json paper.tex
 | `--whatever-pt` | float (pt) | `2.5` | Overfull `\hbox` size in pt demoted to **Whatever** (suppressed). |
 | `-cc` | `--compile` | flag | `false` | GNU standard compiler output (`file:line:col: severity: msg`). |
 | *(none)* | `--[no-]mirror-subdirs` | boolean | `false` | Mirror project subdirectories into build directory (alias: `--[no-]copy-subdirs`). |
-| *(none)* | `--gitignore-init` | flag | `false` | Additive setup: create or add standard LaTeX & `junk/` rules to `.gitignore`. |
+| `-G` | `--gitignore-init` | flag | `false` | Build the paper; if it builds, add the missing standard LaTeX & `junk/` rules (and `!**/figs/**/*.pdf`) to `.gitignore`, then exit 1 if git ignores an untracked project file the paper uses. |
 | *(none)* | `--set-main-file` | string | `nil` | Set main document in local `.l.jsonc` and exit. |
 
 ---

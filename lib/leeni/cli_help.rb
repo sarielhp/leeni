@@ -229,7 +229,7 @@ module LatexCLI
          l --set-main-file paper.tex    Set main LaTeX document in local .l.jsonc configuration
          l --config-init                Generate a starter .l.jsonc configuration file
          l --vscode-init                Generate .vscode/tasks.json and settings.json for VS Code
-         l --gitignore-init             Generate or update .gitignore with standard LaTeX & junk/ rules
+         l -G, --gitignore-init         Build, add LaTeX ignore rules, check no needed file is ignored
   EXAMPLES
 
   def self.detailed_examples(banner = nil)

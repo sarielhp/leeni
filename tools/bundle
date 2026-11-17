@@ -80,6 +80,7 @@ module LatexBundler
     arxiv.rb
     sandbox.rb
     make_indep.rb
+    gitignore_check.rb
     cli_targets.rb
     cli_options.rb
   ].freeze

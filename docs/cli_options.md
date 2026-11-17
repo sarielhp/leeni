@@ -476,7 +476,7 @@ When installed via `tools/install` (or manually symlinked), `leeni` inspects `$P
 | `lw` | Incremental rebuild (identical to `l`; preserved for compatibility with legacy shortcuts). |
 | `ll`, `llua` | Compile using LuaLaTeX (`--engine=lualatex`). |
 | `lp`, `pdflatex` | Compile using pdfLaTeX (`--engine=pdflatex`). |
-| `clean_latex`, `latex_clean` | Clean temporary and auxiliary files in current directory and exit. |
+| `clean_latex`, `latex_clean` | Clean temporary and auxiliary files, and `*.bak` backups, in current directory and exit. |
 | `latex_file_in_dir` | Detect and print the main `.tex` document in the current directory and exit. |
 | `latex_env_free` | Run `l` with environment sanitization enabled (`--no-env`). |
 

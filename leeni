@@ -199,7 +199,7 @@ module LatexCLI
   def self.dispatch_clean_personality(argv, prog_name)
     if argv.include?('-h') || argv.include?('--help')
       puts "Usage: #{prog_name} [directory...]\n" \
-           'Clean all LaTeX auxiliary and junk files in the specified directory (default: current directory).'
+           'Clean all LaTeX auxiliary and junk files, and *.bak backups, in the specified directory (default: current directory).'
       return
     end
     (argv.empty? ? [nil] : argv).each do |d|
@@ -207,6 +207,7 @@ module LatexCLI
       config = LaTeXConfig.load_merged_config(target)
       workspace = LeeniBuildWorkspace.resolve(target, config['junk_dir'])
       LaTeXUtils.clean_directory(target, true, workspace_dir: workspace)
+      LaTeXUtils.remove_backup_files(target)
     end
   end
 

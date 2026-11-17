@@ -477,6 +477,13 @@ module LaTeXUtils
     clean_custom_workspace(target_dir, workspace_dir) if workspace_dir
   end
 
+  # The latex_clean personality also drops editor and build backups (*.bak,
+  # including <file>.bbl.bak) in the directory itself; -C and the automatic
+  # cleans keep them.
+  def self.remove_backup_files(dir = '.')
+    Dir.glob('*.bak', base: dir).each { |f| FileUtils.rm_f(File.join(dir, f)) }
+  end
+
   # A clean resets the build, not the project's history: project.json survives.
   def self.remove_workspace(path)
     record = LeeniProjectRecord.read(path)

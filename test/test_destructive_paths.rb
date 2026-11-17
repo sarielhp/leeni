@@ -82,6 +82,28 @@ class TestDestructivePaths < Minitest::Test
     end
   end
 
+  def test_latex_clean_personality_removes_backups
+    Dir.mktmpdir('leeni_clean_bak') do |dir|
+      Dir.chdir(dir) do
+        FileUtils.mkdir_p('figs/bak')
+        File.write('figs/bak/old.pdf', 'user backup')
+        FileUtils.mkdir_p('sec')
+        File.write('sub.bak', 'x')
+        File.write('sec/keep.bak', 'x')
+        File.write('paper.tex.bak', 'old source')
+        File.write('paper.bbl.bak', 'old bibliography')
+        File.write('paper.bbl', '\\bibitem{kept} Bibliography')
+
+        LatexCLI.dispatch_clean_personality([], 'latex_clean')
+
+        %w[sub.bak paper.tex.bak paper.bbl.bak].each { |f| refute_path_exists f, "latex_clean left #{f}" }
+        assert_path_exists 'paper.bbl', 'latex_clean removed the bibliography'
+        assert_path_exists 'figs/bak/old.pdf', 'latex_clean removed figs/bak'
+        assert_path_exists 'sec/keep.bak', 'latex_clean recursed into a subdirectory'
+      end
+    end
+  end
+
   def test_clean_only_removes_external_project_cache_and_manual_auxiliaries
     Dir.mktmpdir('leeni_clean_external') do |base|
       project = File.join(base, 'project')

@@ -8,8 +8,9 @@
 # into styles/, the main file gets an \input@path entry for that directory,
 # and the cited bibliography entries are extracted into <paper>.bib. The plan
 # is first applied to a sandbox copy and verified there; only then are the
-# originals of every changed file saved to old_ver_yy_mm_dd_hh_mm.zip and the
-# project itself is changed.
+# originals of every changed file saved to archive/old_ver_yy_mm_dd_hh_mm.zip
+# (archive/ is kept out of git through the project's .gitignore, when it
+# has one) and the project itself is changed.
 # ==============================================================================
 
 require 'fileutils'
@@ -27,6 +28,11 @@ class LatexIndependizer
   FONT_EXTS = %w[.tfm .vf .pfb .otf .ttf .enc .map].freeze
   NEW_FILES_LIST = 'leeni-make-indep-new-files.txt'
   SKIP_IN_SANDBOX = %w[.git .hg .svn junk .junk].freeze
+  ARCHIVE_DIR = 'archive'
+  ARCHIVE_IGNORE = "#{ARCHIVE_DIR}/".freeze
+  # .gitignore lines (leading and trailing / dropped) that already keep the
+  # whole archive/ directory out of git.
+  IGNORE_COVERS = %w[archive archive/* **/archive].freeze
 
   Plan = Struct.new(:copies, :edits) do
     def empty?
@@ -85,6 +91,7 @@ class LatexIndependizer
     backup = write_backup(plan)
     return false unless backup
 
+    keep_archive_out_of_git
     apply_plan(plan, '.')
     report(plan, backup)
     true
@@ -435,7 +442,8 @@ class LatexIndependizer
   # --------------------------------------------------------------- backup
 
   def backup_name
-    base = "old_ver_#{Time.now.strftime('%y_%m_%d_%H_%M')}"
+    FileUtils.mkdir_p(ARCHIVE_DIR)
+    base = File.join(ARCHIVE_DIR, "old_ver_#{Time.now.strftime('%y_%m_%d_%H_%M')}")
     name = "#{base}.zip"
     counter = 2
     while File.exist?(name)
@@ -460,6 +468,34 @@ class LatexIndependizer
       warn Rainbow("[FAIL] Could not write #{name}: #{out}; nothing was changed.").red.bright
       nil
     end
+  rescue SystemCallError => e
+    warn Rainbow("[FAIL] Could not write the backup in #{ARCHIVE_DIR}/: #{e.message}; nothing was changed.").red.bright
+    nil
+  end
+
+  # Backups never go into git: a project .gitignore that does not already
+  # ignore archive/ gets a line for the whole directory. A project without
+  # one is left alone.
+  def keep_archive_out_of_git
+    return unless File.file?('.gitignore')
+    return if archive_ignored?
+
+    content = LaTeXUtils.safe_read('.gitignore')
+    separator = content.empty? || content.end_with?("\n") ? '' : "\n"
+    File.write('.gitignore', "#{separator}\n# leeni -I backups\n#{ARCHIVE_IGNORE}\n", mode: 'a')
+    puts " -- Added #{ARCHIVE_IGNORE} to .gitignore"
+  rescue SystemCallError => e
+    warn Rainbow("[WARN] Could not add #{ARCHIVE_IGNORE} to .gitignore: #{e.message}").yellow
+  end
+
+  def archive_ignored?
+    lines = LaTeXUtils.safe_read('.gitignore').lines.map { |line| line.strip.delete_prefix('/').delete_suffix('/') }
+    return true if lines.intersect?(IGNORE_COVERS)
+
+    _, status = Open3.capture2e('git', 'check-ignore', '-q', ARCHIVE_IGNORE)
+    status.success?
+  rescue SystemCallError
+    false
   end
 
   def fill_backup_stage(plan, stage)

@@ -129,14 +129,14 @@ module LatexCLI
     opts.separator ''
     opts.separator '  Paper Bundling, Bibliography & Portability:'
     opts.on('-z', '--zip', 'Create a self-contained portable zip archive of paper, styles, and figures') { options[:zip] = true }
-    opts.on('--zip-alone', 'Bundle styles and verify an isolated rebuild with no errors or alerts and matching PDF') do
+    opts.on('-Z', '--zip-alone', 'Convert the paper as -I does, then zip it after an isolated rebuild with no errors or alerts and matching PDF') do
       options.merge!(zip_alone: true, zip: true, inject_styles: true, verify: true, force: true)
     end
     opts.on('--sandbox', 'After building, rebuild from an isolated copy with --no-env (kept in the cache) and compare the PDFs') do
       options[:sandbox] = true
       options[:inject_styles] = true
     end
-    opts.on('-Z', '--zip-flat', 'Create a self-contained portable zip archive with inlined/flattened .tex') do
+    opts.on('--zip-flat', 'Create a self-contained portable zip archive with inlined/flattened .tex') do
       options[:zip] = true
       options[:zip_flat] = true
     end
@@ -157,7 +157,7 @@ module LatexCLI
       options[:bib_fix] = true
     end
     opts.on('--bib-missing', 'Build; print only the keys of cited entries missing from the bibliography (regular output on errors)') { options[:bib_missing] = true }
-    opts.on('-I', '--make-indep', 'Convert the paper in place to compile with --no-env: copy external styles to styles/, extract cited entries to <doc>.bib; originals saved in old_ver_yy_mm_dd_hh_mm.zip') do
+    opts.on('-I', '--make-indep', 'Convert the paper in place to compile with --no-env: copy external styles to styles/, extract cited entries to <doc>.bib; originals saved in archive/old_ver_yy_mm_dd_hh_mm.zip') do
       options[:make_indep] = true
     end
     opts.on('--dry-run', 'With -I or --bib-fix: show the changes without making them') do

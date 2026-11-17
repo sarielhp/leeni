@@ -64,6 +64,15 @@ module LatexCLITargets
     exit 1 unless LatexIndependizer.new(builder).run!
   end
 
+  # --zip-alone first converts the paper in place as -I does, so every file
+  # found through TEXINPUTS and similar paths is in the project; the build
+  # it then archives runs with --no-env and can only find those copies.
+  def zip_alone_options(target, options)
+    indep = options.except(:zip, :zip_alone, :verify, :inject_styles, :sandbox, :final)
+    process_make_indep_target(target, indep.merge(make_indep: true))
+    options.merge(zip: true, inject_styles: true, verify: true, force: true, no_env: true)
+  end
+
   def print_synctex_status(target, options)
     Dir.chdir(File.expand_path(File.dirname(target))) do
       junk_dir = LatexBuilder.new(File.basename(target), options).junk_dir
@@ -132,7 +141,7 @@ module LatexCLITargets
   end
 
   def process_standard_target(target, options)
-    options = options.merge(zip: true, inject_styles: true, verify: true, force: true) if options[:zip_alone]
+    options = zip_alone_options(target, options) if options[:zip_alone]
     options = options.merge(final: true) if options[:zip] || options[:verify]
     builder = LatexBuilder.new(target, options)
     built = builder.run!

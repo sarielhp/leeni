@@ -54,10 +54,10 @@ All long options accept either `-` or `--` and allow internal dashes to be omitt
 | `--json` | Diagnostics | Output structured compilation and diagnostic results as JSON. |
 | `-z`, `--zip` | Packaging | Create self-contained portable zip archive of paper. |
 | `--sandbox` | Packaging | Rebuild from an isolated copy kept in the cache with `--no-env` and compare the PDFs. |
-| `--zip-alone` | Packaging | `--sandbox` with strict checks (no errors or alerts), then zip the sandbox. |
-| `-Z`, `--zip-flat` | Packaging | Create self-contained portable zip archive with inlined `.tex`. |
+| `-Z`, `--zip-alone` | Packaging | Convert the paper as `-I` does, then `--sandbox` with strict checks (no errors or alerts) and zip the sandbox. |
+| `--zip-flat` | Packaging | Create self-contained portable zip archive with inlined `.tex`. |
 | `-t`, `--verify` | Packaging | Check the zip's contents in the cache sandbox with `--no-env`, then zip that sandbox. |
-| `-I`, `--make-indep` | Packaging | Convert the paper in place to compile with `--no-env`; originals saved in `old_ver_yy_mm_dd_hh_mm.zip`. |
+| `-I`, `--make-indep` | Packaging | Convert the paper in place to compile with `--no-env`; originals saved in `archive/old_ver_yy_mm_dd_hh_mm.zip`. |
 | `--dry-run` | Packaging | With `-I`: check the conversion and show the changes without making them. |
 | `--bib-fix` | Bibliography | Build; add missing entries, `@string` macros and `@preamble` blocks to the paper's own `.bib` from `bib_fix_sources` and `BIBINPUTS` (see [bibkit.md](bibkit.md)). |
 | `--bib-missing` | Diagnostics | Build as usual; print only the keys of cited entries missing from the bibliography (regular output on errors). |
@@ -278,11 +278,11 @@ After the normal build, copies every file the paper used into a sandbox kept in 
 l --sandbox paper.tex
 ```
 
-### `--zip-alone`
-Runs `--sandbox` with a forced rebuild and strict checks, then zips the sandbox, so the archive is exactly what built without the environment (minus SyncTeX files). Verification requires a newly generated, nonempty PDF, zero errors and alerts, identical extracted text layout, and identical rendered pages at 150 dpi. Requires `pdftotext` and `pdftoppm`; verification failure preserves any existing archive. Standard LaTeX packages must still be installed.
+### `-Z`, `--zip-alone`
+First converts the paper in place as `-I` (`--make-indep`) does, so files found through `TEXINPUTS` and similar paths (styles, inputs, figures a style tests for) are copied into the project; on a paper already converted this changes nothing. Then builds with `--no-env`, runs `--sandbox` with a forced rebuild and strict checks, and zips the sandbox, so the archive is exactly what built without the environment (minus SyncTeX files). Verification requires a newly generated, nonempty PDF, zero errors and alerts, identical extracted text layout, and identical rendered pages at 150 dpi. Requires `pdftotext` and `pdftoppm`; verification failure preserves any existing archive. Standard LaTeX packages must still be installed.
 
 ```bash
-l --zip-alone paper.tex
+l -Z paper.tex
 ```
 
 Add `--errors-only` to suppress alerts and warnings in both builds and allow alerts during archive verification:
@@ -293,10 +293,10 @@ l --zipalone --errors-only paper.tex
 
 Real errors still fail verification. PDF text and rendered-page comparisons still apply.
 
-### `-Z`, `--zip-flat`
+### `--zip-flat`
 Creates a flattened `.zip` archive where all nested `\input` and `\include` subfiles are recursively inlined into a single monolithic `.tex` file (required by journals like IEEE, Springer, and Elsevier).
 ```bash
-l -Z paper.tex
+l --zip-flat paper.tex
 ```
 
 ### `-t`, `--verify`
@@ -314,7 +314,7 @@ Converts the paper in place so it compiles with `--no-env`:
 - a `.bst` file found through `BSTINPUTS` is copied next to the paper;
 - the cited entries of `.bib` files outside the project are extracted into `<doc>.bib` (with leeni's own Bibkit for BibTeX, `biber` for biblatex), and `\bibliography` / `\addbibresource` are pointed at it.
 
-The converted tree is first rebuilt with `--no-env` in a `/tmp` sandbox and its PDF text compared with the original; if that fails, nothing is changed. Otherwise the originals of every changed file are saved in `old_ver_yy_mm_dd_hh_mm.zip`, together with `leeni-make-indep-new-files.txt` listing the files that were added. Running it again on a converted paper changes nothing. If `styles/` is a symbolic link (for example to a shared styles collection), or any file it would write is one, it stops with an error instead of writing through the link; an existing real `styles/` directory is used as is. Fonts from a personal TeX tree cannot be moved this way and are reported.
+The converted tree is first rebuilt with `--no-env` in a `/tmp` sandbox and its PDF text compared with the original; if that fails, nothing is changed. Otherwise the originals of every changed file are saved in `archive/old_ver_yy_mm_dd_hh_mm.zip`, together with `leeni-make-indep-new-files.txt` listing the files that were added. If the project has a `.gitignore` that does not already ignore the `archive/` directory, `archive/` is added to it; a project without one is left alone. Running it again on a converted paper changes nothing. If `styles/` is a symbolic link (for example to a shared styles collection), or any file it would write is one, it stops with an error instead of writing through the link; an existing real `styles/` directory is used as is. Fonts from a personal TeX tree cannot be moved this way and are reported.
 Add `--dry-run` to run the sandbox check and print what would be copied, plus a diff of every file that would be edited, without changing anything.
 ```bash
 l -I paper.tex

@@ -164,7 +164,7 @@ For technical guides, configuration options, and advanced features, see:
 - **Editor Integrations**: [Visual Studio Code](docs/vscode.md) • [GNU Emacs / AUCTeX](docs/emacs.md) • [Vi / Vim / Neovim](docs/vim.md).
 - **[docs/arxiv.md](docs/arxiv.md)**: arXiv submission packaging, flattening, comment stripping, and verification.
 - **[docs/orchestration.md](docs/orchestration.md)**: Orchestrating complex multi-chapter and book setups using `just` and `leeni`.
-- **[docs/advanced_topics.md](docs/advanced_topics.md)**: Advanced paper packaging (`-z`, `-Z`), cited bibliography extraction (`-B`), text-diff guards, sandboxing, and environment isolation.
+- **[docs/advanced_topics.md](docs/advanced_topics.md)**: Advanced paper packaging (`-z`, `-Z`, `--zip-flat`), cited bibliography extraction (`-B`), text-diff guards, sandboxing, and environment isolation.
 - **[docs/architecture.md](docs/architecture.md)**: Internal design, build lifecycle, modular Ruby structure, and Architectural Decision Records (ADRs).
 
 ---
@@ -175,7 +175,7 @@ For technical guides, configuration options, and advanced features, see:
 Yes, if `relatex` is on `PATH`: set `"relatex_synctex": true` in `.l.jsonc` (or pass `--relatex-synctex`). Each lualatex rebuild then starts `relatex synctex` in the background with the same pinned build date (`SOURCE_DATE_EPOCH`, `FORCE_SOURCE_DATE`); when its PDF is byte-identical to leeni's, it replaces `<doc>.synctex.gz` with a word-level one, so a viewer that re-reads the SyncTeX file needs no PDF reload. `l --synctex-status` shows the outcome; see [docs/cli_options.md](docs/cli_options.md). Add `--xelatex-preview` (`"xelatex_preview": true`) to build a quick XeLaTeX preview instead, which relatex then replaces with its own LuaLaTeX PDF and word-level SyncTeX.
 
 ### Does `leeni` modify my `.tex` source files?
-**No.** Standard compilation (`l`, `l paper.tex`) never touches or modifies your source documents. When generating publication packages (`-Z` or `--arxiv`), source flattening and comment stripping operate exclusively inside isolated temporary staging directories.
+**No.** Standard compilation (`l`, `l paper.tex`) never touches or modifies your source documents. When generating publication packages (`--zip-flat` or `--arxiv`), source flattening and comment stripping operate exclusively inside isolated temporary staging directories. The exceptions are `-I` (`--make-indep`) and `-Z` (`--zip-alone`), which convert the paper in place so it compiles without your TeX environment, after verifying the result; the originals of changed files are saved in `archive/old_ver_yy_mm_dd_hh_mm.zip`.
 
 ### Where do intermediate build files go?
 Intermediate build files (`.aux`, `.log`, `.out`, `.toc`, `.fls`, `.bcf`, etc.) go under `$XDG_CACHE_HOME/leeni/projects/` (or `~/.cache/leeni/projects/` when unset). Each project gets a directory named with its basename and a hash of its canonical path, including projects outside home. Only final outputs (`<doc>.pdf`, `<doc>.bbl`, and `<doc>.synctex.gz`) remain in the working directory. Use `--junk-dir junk` or set `"junk_dir": "junk"` to keep the former local layout. `l -C` removes the selected project's cache and root auxiliary files; `l -c` does the same before compiling. Existing `junk/` and `.junk/` directories are also removed by cleanup. Once a day, after a build, leeni prunes cached build directories of deleted projects and of projects idle for more than `cache_days` days (default 10); `l --doctor prune` does it on demand.

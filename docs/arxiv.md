@@ -24,7 +24,7 @@ This creates:
 - `arxiv_<document>_meta.txt`: Formatted metadata (when `--meta` is used).
 
 > [!NOTE]
-> For preparing publisher/journal archives (IEEE, Springer, Elsevier) that require flat `.tex` files without stripping comments or applying arXiv-specific constraints, use `-Z` / `--zip-flat`. See [Packaging Modes Comparison](advanced_topics.md#packaging-modes-comparison).
+> For preparing publisher/journal archives (IEEE, Springer, Elsevier) that require flat `.tex` files without stripping comments or applying arXiv-specific constraints, use `--zip-flat`. See [Packaging Modes Comparison](advanced_topics.md#packaging-modes-comparison).
 
 ---
 

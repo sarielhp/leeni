@@ -509,20 +509,19 @@ class TestLeeniBuild < LeeniTestBase
     end
   end
 
+  # -Z is --zip-alone; --zip-flat has no short form.
   def test_cli_zip_flat_flag_parsing
     options = LatexCLI.build_default_options({}, 'l', [])
-    parser = LatexCLI.build_option_parser(options)
-
-    parser.parse(['-Z'])
+    LatexCLI.build_option_parser(options).parse(['-Z'])
+    assert_equal true, options[:zip_alone]
     assert_equal true, options[:zip]
-    assert_equal true, options[:zip_flat]
+    refute options[:zip_flat]
 
     options2 = LatexCLI.build_default_options({}, 'l', [])
-    parser2 = LatexCLI.build_option_parser(options2)
-
-    parser2.parse(['--zip-flat'])
+    LatexCLI.build_option_parser(options2).parse(['--zip-flat'])
     assert_equal true, options2[:zip]
     assert_equal true, options2[:zip_flat]
+    refute options2[:zip_alone]
   end
 
   def test_cli_zip_with_separator

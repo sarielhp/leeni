@@ -148,7 +148,7 @@ Start with [help by topic]({{ "/help/" | relative_url }}) to find the right guid
 - **Editor Integrations**: [Visual Studio Code](vscode.html) • [GNU Emacs / AUCTeX](emacs.html) • [Vi / Vim / Neovim](vim.html).
 - **[arXiv Packaging Guide](arxiv.html)**: arXiv submission packaging, flattening, comment stripping, and verification.
 - **[Multi-Chapter Orchestration](orchestration.html)**: Orchestrating complex multi-chapter and book setups using `just` and `leeni`.
-- **[Advanced Topics](advanced_topics.html)**: Advanced paper packaging (`-z`, `-Z`), cited bibliography extraction (`-B`), text-diff guards, sandboxing, and environment isolation.
+- **[Advanced Topics](advanced_topics.html)**: Advanced paper packaging (`-z`, `-Z`, `--zip-flat`), cited bibliography extraction (`-B`), text-diff guards, sandboxing, and environment isolation.
 - **[Architecture & Internal Design](architecture.html)**: Internal design, build lifecycle, modular Ruby structure, and Architectural Decision Records (ADRs).
 
 ---
@@ -156,7 +156,7 @@ Start with [help by topic]({{ "/help/" | relative_url }}) to find the right guid
 ## Frequently Asked Questions (FAQ)
 
 ### Does `leeni` modify my `.tex` source files?
-**No.** Standard compilation (`l`, `l paper.tex`) never touches or modifies your source documents. When generating publication packages (`-Z` or `--arxiv`), source flattening and comment stripping operate exclusively inside isolated temporary staging directories.
+**No.** Standard compilation (`l`, `l paper.tex`) never touches or modifies your source documents. When generating publication packages (`--zip-flat` or `--arxiv`), source flattening and comment stripping operate exclusively inside isolated temporary staging directories. The exceptions are `-I` (`--make-indep`) and `-Z` (`--zip-alone`), which convert the paper in place so it compiles without your TeX environment, after verifying the result; the originals of changed files are saved in `archive/old_ver_yy_mm_dd_hh_mm.zip`.
 
 ### Where do intermediate build files go?
 All intermediate build files (`.aux`, `.log`, `.out`, `.toc`, `.fls`, `.bcf`, etc.) are placed in the `junk/` directory. Only your final outputs (`<doc>.pdf`, `<doc>.bbl`, and `<doc>.synctex.gz`) reside in your working directory.

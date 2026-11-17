@@ -6,7 +6,7 @@ This guide covers operational controls and power-user workflows beyond everyday 
 
 ---
 
-## 1. Journal & Publisher Packaging (`-z` and `-Z`)
+## 1. Journal & Publisher Packaging (`-z`, `-Z` and `--zip-flat`)
 
 When submitting to peer-reviewed journals, conferences, or collaborating with co-authors, `leeni` can package your document into a clean, standalone `.zip` archive.
 
@@ -28,21 +28,21 @@ To include arbitrary supplementary datasets or notes:
 l -z paper.tex -- notes.txt data/*.csv
 ```
 
-### Verified Standalone Archive (`--zip-alone`)
-
-```bash
-l --zip-alone paper.tex
-```
-
-Combines ZIP creation, style isolation and search-path injection, and mandatory verification. It builds fresh dependencies, extracts the ZIP into a new temporary directory, and runs `l --no-env` there with an empty user home and no personal TeX tree. Success requires a new nonempty PDF, no errors or alerts, identical extracted text layout, and identical rendered pages at 150 dpi. Ordinary warnings are permitted. Both `pdftotext` and `pdftoppm` are required. An unsuccessful verification leaves an existing ZIP unchanged. Standard LaTeX packages remain an installation requirement.
-
-### Flattened Single-File Archive (`-Z` / `--zip-flat`)
-Many journal portals (such as Springer Nature, IEEE Author Portal, and Elsevier Editorial Manager) require all LaTeX content in a single monolithic `.tex` file without nested `\input` or `\include` directories.
-
-`-Z` (or `--zip-flat`) recursively inlines all subfiles into a single `<document>.tex`, bundles active figures and styles, retains the `.bbl`, and omits subordinate `.tex` files:
+### Verified Standalone Archive (`-Z` / `--zip-alone`)
 
 ```bash
 l -Z paper.tex
+```
+
+First converts the paper in place as `-I` does (files found through `TEXINPUTS` and similar paths are copied to `styles/`; originals saved in `archive/`), then builds with `--no-env`. Combines ZIP creation, style isolation and search-path injection, and mandatory verification. It builds fresh dependencies, extracts the ZIP into a new temporary directory, and runs `l --no-env` there with an empty user home and no personal TeX tree. Success requires a new nonempty PDF, no errors or alerts, identical extracted text layout, and identical rendered pages at 150 dpi. Ordinary warnings are permitted. Both `pdftotext` and `pdftoppm` are required. An unsuccessful verification leaves an existing ZIP unchanged. Standard LaTeX packages remain an installation requirement.
+
+### Flattened Single-File Archive (`--zip-flat`)
+Many journal portals (such as Springer Nature, IEEE Author Portal, and Elsevier Editorial Manager) require all LaTeX content in a single monolithic `.tex` file without nested `\input` or `\include` directories.
+
+`--zip-flat` recursively inlines all subfiles into a single `<document>.tex`, bundles active figures and styles, retains the `.bbl`, and omits subordinate `.tex` files:
+
+```bash
+l --zip-flat paper.tex
 ```
 
 ### Style File Organization (`--[no-]styles-inject`)
@@ -51,7 +51,7 @@ l -Z paper.tex
 
 ### Packaging Modes Comparison
 
-| Feature | Standard Zip (`-z`) | Flat Zip (`-Z`) | arXiv Package (`--arxiv`) |
+| Feature | Standard Zip (`-z`) | Flat Zip (`--zip-flat`) | arXiv Package (`--arxiv`) |
 | :--- | :--- | :--- | :--- |
 | **TeX Structure** | Multi-file tree preserved | **Inlined single `.tex` file** | Inlined single `.tex` file |
 | **Subordinate `.tex`** | Copied into archive | **Omitted** | Omitted |

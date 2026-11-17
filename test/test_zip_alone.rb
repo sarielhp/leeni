@@ -51,14 +51,19 @@ class TestZipAlone < Minitest::Test
       assert_includes output, 'Isolated build has no errors or alerts'
       assert_includes output, 'Text layout exact match confirmed'
       assert_includes output, 'All PDF pages match visually'
-      assert_equal tex, File.read(File.join(project, 'paper.tex'))
+      # The paper was converted in place first, as -I does.
+      converted = "\\makeatletter\n\\def\\input@path{{styles/}}\n\\makeatother\n#{tex}"
+      assert_equal converted, File.read(File.join(project, 'paper.tex'))
+      %w[customouter.sty custominner.sty].each { |name| assert_path_exists File.join(project, 'styles', name) }
+      assert_equal 1, Dir.glob(File.join(project, 'archive', 'old_ver_*.zip')).size
 
       extracted = File.join(root, 'extracted')
       _, unzip_status = Open3.capture2e('unzip', '-q', File.join(project, 'paper.zip'), '-d', extracted)
       assert unzip_status.success?
       %w[customouter.sty custominner.sty].each { |name| assert_path_exists File.join(extracted, 'styles', name) }
       assert_path_exists File.join(extracted, 'notes.txt')
-      assert_includes File.read(File.join(extracted, 'paper.tex')), '\\def\\input@path{{styles/}{./}}'
+      assert_includes File.read(File.join(extracted, 'paper.tex')), '\\def\\input@path{{styles/}}'
+      assert_empty Dir.glob(File.join(extracted, '**', '*.zip'))
     end
   end
 
@@ -85,17 +90,25 @@ class TestZipAlone < Minitest::Test
     end
   end
 
-  def test_missing_external_tex_dependency_rejects_archive
-    Dir.mktmpdir('zip_alone_missing') do |root|
+  # Files other than styles, such as an \input or a figure a style tests for
+  # with \IfFileExists, are found through TEXINPUTS too; the -I step copies
+  # them into the project, so the --no-env build and the archive have them.
+  def test_external_input_and_figure_are_copied_and_archived
+    Dir.mktmpdir('zip_alone_external') do |root|
       project = File.join(root, 'project')
       external = File.join(root, 'external')
-      FileUtils.mkdir_p([project, external])
+      FileUtils.mkdir_p([project, File.join(external, 'figs')])
       File.write(File.join(external, 'externaltext.tex'), 'External input.')
-      File.write(File.join(project, 'paper.tex'), "\\documentclass{article}\n\\begin{document}\\input{externaltext}\\end{document}\n")
-      output, status = Open3.capture2e({ 'TEXINPUTS' => ".:#{external}:" }, BIN, '--zip-alone', 'paper.tex', chdir: project)
-      refute status.success?, output
-      assert_includes output, 'Document did not compile in clean environment'
-      refute_path_exists File.join(project, 'paper.zip')
+      File.write(File.join(external, 'marked.sty'),
+                 "\\ProvidesPackage{marked}\n\\RequirePackage{graphicx}\n" \
+                 "\\newcommand{\\duckmark}{\\IfFileExists{figs/mark.pdf}{\\includegraphics{figs/mark.pdf}}{No mark.}}\n")
+      make_pdf(File.join(external, 'figs', 'mark.pdf'))
+      File.write(File.join(project, 'paper.tex'),
+                 "\\documentclass{article}\n\\usepackage{marked}\n\\begin{document}\\input{externaltext}\\duckmark\\end{document}\n")
+      output, status = Open3.capture2e({ 'TEXINPUTS' => ".:#{external}//:" }, BIN, '--zip-alone', 'paper.tex', chdir: project)
+      assert status.success?, output
+      listing = Open3.capture2e('unzip', '-Z1', File.join(project, 'paper.zip')).first.lines.map(&:strip)
+      %w[styles/externaltext.tex styles/marked.sty styles/figs/mark.pdf].each { |rel| assert_includes listing, rel }
     end
   end
 
@@ -160,6 +173,16 @@ class TestZipAlone < Minitest::Test
       packaged, unzip_status = Open3.capture2e('unzip', '-p', File.join(dir, 'paper.zip'), 'paper.tex')
       assert unzip_status.success?
       assert_includes packaged, '\\g@addto@macro\\input@path{{styles/}{./}}'
+    end
+  end
+
+  private
+
+  def make_pdf(path)
+    Dir.mktmpdir('mark') do |dir|
+      File.write(File.join(dir, 'm.tex'), "\\documentclass{standalone}\\begin{document}MARK\\end{document}\n")
+      Open3.capture2e('pdflatex', '-interaction=nonstopmode', 'm.tex', chdir: dir)
+      FileUtils.cp(File.join(dir, 'm.pdf'), path)
     end
   end
 end

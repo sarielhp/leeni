@@ -77,7 +77,7 @@ The codebase is organized into modular files under `lib/leeni/`:
 | `meta_extractor.rb` | Source parser extracting Title, Authors, and MathJax-compatible Abstract. |
 | `arxiv.rb` | arXiv submission manager, biblatex version shielding, and visual page verification. |
 | `sandbox.rb` | Persistent `--no-env` sandbox (`--sandbox`), refreshed by content each run; the base of `--zip-alone`. |
-| `make_indep.rb` | In-place conversion to an environment-free project (`-I`): styles to `styles/`, cited entries to `<doc>.bib`, sandbox check, `old_ver_*.zip` backup. |
+| `make_indep.rb` | In-place conversion to an environment-free project (`-I`): styles to `styles/`, cited entries to `<doc>.bib`, sandbox check, `archive/old_ver_*.zip` backup. |
 | `cli_targets.rb` | CLI target dispatch for compilation, metadata, bibliography extraction, and arXiv workflows. |
 
 ---

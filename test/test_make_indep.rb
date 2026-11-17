@@ -74,9 +74,9 @@ class TestMakeIndep < Minitest::Test
       %w[a proc b].each { |key| assert_match(/\{\s*#{key},/, bib) }
       refute_includes bib, 'unused'
 
-      backups = Dir.glob(File.join(project, 'old_ver_*.zip'))
+      backups = Dir.glob(File.join(project, 'archive', 'old_ver_*.zip'))
       assert_equal 1, backups.size
-      assert_match(/old_ver_\d\d_\d\d_\d\d_\d\d_\d\d\.zip\z/, backups.first)
+      assert_match(%r{/archive/old_ver_\d\d_\d\d_\d\d_\d\d_\d\d\.zip\z}, backups.first)
       extracted = File.join(root, 'backup')
       Open3.capture2e('unzip', '-q', backups.first, '-d', extracted)
       assert_equal tex, File.read(File.join(extracted, 'paper.tex'))
@@ -90,7 +90,7 @@ class TestMakeIndep < Minitest::Test
       again, again_status = Open3.capture2e(env, BIN, '-e', 'p', '-I', 'paper.tex', chdir: project)
       assert again_status.success?, again
       assert_includes again, 'nothing to change'
-      assert_equal 1, Dir.glob(File.join(project, 'old_ver_*.zip')).size
+      assert_equal 1, Dir.glob(File.join(project, 'archive', 'old_ver_*.zip')).size
     end
   end
 
@@ -107,7 +107,7 @@ class TestMakeIndep < Minitest::Test
       assert_match %r{ -- copy \S*/shared\.tex -> styles/shared\.tex}, output
       assert_equal tex, File.read(File.join(project, 'paper.tex'))
       refute_path_exists File.join(project, 'styles')
-      assert_empty Dir.glob(File.join(project, 'old_ver_*.zip'))
+      assert_empty Dir.glob(File.join(project, 'archive', 'old_ver_*.zip'))
 
       alone, alone_status = Open3.capture2e(BIN, '--dry-run', 'paper.tex', chdir: project)
       assert_equal 2, alone_status.exitstatus, alone
@@ -149,9 +149,9 @@ class TestMakeIndep < Minitest::Test
       assert status.success?, output
       assert_includes output, 'Converted project compiles with --no-env and matches the original PDF'
 
-      zipped, zip_status = Open3.capture2e(BIN, '-e', 'p', '-z', '-t', 'paper.tex', '--', '*.zip', chdir: project)
+      zipped, zip_status = Open3.capture2e(BIN, '-e', 'p', '-z', '-t', 'paper.tex', '--', 'archive/*.zip', chdir: project)
       assert zip_status.success?, zipped
-      assert_includes zipped, 'Left out archive old_ver_'
+      assert_includes zipped, 'Left out archive archive/old_ver_'
       listing = Open3.capture2e('unzip', '-Z1', File.join(project, 'paper.zip')).first.lines.map(&:strip)
       %w[styles/customouter.sty styles/custominner.sty myplain.bst paper.bib].each { |rel| assert_includes listing, rel }
       assert_empty listing.grep(/\.zip\z/)
@@ -166,6 +166,28 @@ class TestMakeIndep < Minitest::Test
   def test_gitignore_rules_cover_backups
     assert_includes LaTeXConfig::GITIGNORE_LATEX_ENTRIES, 'old_ver_*.zip'
     assert_includes LaTeXConfig::DEFAULT_GITIGNORE_TEMPLATE, "old_ver_*.zip\n"
+  end
+
+  # The backup goes to archive/; an existing .gitignore that does not ignore
+  # that directory gets a line for it (old_ver_*.zip alone is not enough), one
+  # that does is left as is, and none is created.
+  def test_backup_goes_to_archive_and_out_of_git
+    cases = { "*.aux\n" => :added, "old_ver_*.zip\n" => :added, "*.aux\n/archive/\n" => :kept, nil => :none }
+    cases.each do |gitignore, expected|
+      with_external_tree do |root, project, env|
+        File.write(File.join(root, 'shared.tex'), "Shared text.\n")
+        File.write(File.join(project, 'paper.tex'),
+                   "\\documentclass{article}\n\\begin{document}\\input{../shared}\\end{document}\n")
+        ignore = File.join(project, '.gitignore')
+        File.write(ignore, gitignore.chomp) if gitignore
+
+        output, status = Open3.capture2e(env, BIN, '-e', 'p', '-I', 'paper.tex', chdir: project)
+        assert status.success?, output
+        assert_equal 1, Dir.glob(File.join(project, 'archive', 'old_ver_*.zip')).size, output
+        assert_includes output, 'saved in archive/old_ver_'
+        assert_gitignore(ignore, gitignore, expected)
+      end
+    end
   end
 
   def test_biblatex_resources_are_replaced
@@ -259,7 +281,7 @@ class TestMakeIndep < Minitest::Test
       assert_empty Dir.children(shared)
       assert_equal tex, File.read(File.join(project, 'paper.tex'))
       refute_path_exists File.join(project, 'paper.pdf')
-      assert_empty Dir.glob(File.join(project, 'old_ver_*.zip'))
+      assert_empty Dir.glob(File.join(project, 'archive', 'old_ver_*.zip'))
     end
   end
 
@@ -276,7 +298,7 @@ class TestMakeIndep < Minitest::Test
       assert_includes output, 'will not write through them'
       assert_includes output, 'paper.bib ->'
       assert_equal before, File.read(shared_bib)
-      assert_empty Dir.glob(File.join(project, 'old_ver_*.zip'))
+      assert_empty Dir.glob(File.join(project, 'archive', 'old_ver_*.zip'))
     end
   end
 
@@ -297,11 +319,19 @@ class TestMakeIndep < Minitest::Test
       assert_includes output, 'nothing was changed'
       assert_equal tex, File.read(File.join(project, 'paper.tex'))
       refute_path_exists File.join(project, 'styles')
-      assert_empty Dir.glob(File.join(project, 'old_ver_*.zip'))
+      assert_empty Dir.glob(File.join(project, 'archive', 'old_ver_*.zip'))
     end
   end
 
   private
+
+  def assert_gitignore(ignore, before, expected)
+    case expected
+    when :none then refute_path_exists ignore
+    when :kept then assert_equal before.chomp, File.read(ignore)
+    else assert_equal "#{before}\n# leeni -I backups\narchive/\n", File.read(ignore)
+    end
+  end
 
   def make_figure(path, label)
     Dir.mktmpdir('fig') do |dir|

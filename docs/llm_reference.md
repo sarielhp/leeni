@@ -67,9 +67,10 @@ l --json paper.tex
 | `-m` | `--main` | flag | `false` | Print detected root `.tex` filename and exit. |
 | `-M` | `--deps` | flag | `false` | Output Makefile dependency rule for document and exit. |
 | `-z` | `--zip` | flag | `false` | Create self-contained portable zip archive of paper, styles, and figures. |
-| `-Z` | `--zip-flat` | flag | `false` | Create portable zip with flattened/inlined `.tex` source. |
+| *(none)* | `--zip-flat` | flag | `false` | Create portable zip with flattened/inlined `.tex` source. |
 | `-t` | `--verify` | flag | `false` | Build the zip's contents in the cache sandbox with `--no-env`, compare PDF text, then zip that sandbox. |
-| `-I` | `--make-indep` | flag | `false` | Convert the paper in place to compile with `--no-env` (styles to `styles/`, cited entries to `<doc>.bib`); verified in a sandbox first; originals saved in `old_ver_yy_mm_dd_hh_mm.zip`. |
+| `-I` | `--make-indep` | flag | `false` | Convert the paper in place to compile with `--no-env` (styles to `styles/`, cited entries to `<doc>.bib`); verified in a sandbox first; originals saved in `archive/old_ver_yy_mm_dd_hh_mm.zip`. |
+| `-Z` | `--zip-alone` | flag | `false` | Convert the paper in place as `-I` does, rebuild with `--no-env` in the cache sandbox, require no errors or alerts and a matching PDF, then zip that sandbox. |
 | *(none)* | `--sandbox` | flag | `false` | After the build, rebuild an isolated copy (kept in the cache) with `--no-env` and compare PDFs; exit 1 on mismatch. |
 | *(none)* | `--dry-run` | flag | `false` | With `-I`: run the sandbox check and print copies and diffs; change nothing. |
 | *(none)* | `--bib-fix` | flag | `false` | Build; add missing entries, `@string` macros and `@preamble` blocks to the paper's local `.bib` from `bib_fix_sources` and `BIBINPUTS`; conflicts become `<key>_leeni_alt_N` entries with an alert; exit 1 if keys remain missing. |

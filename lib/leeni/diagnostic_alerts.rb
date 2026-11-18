@@ -308,11 +308,14 @@ module LaTeXDiagnostics
     end
 
     # A package found through \input@path (styles/ from -z --styles-inject or
-    # --make-indep) is requested as `styles/foo' by the LaTeX kernel, so its own
-    # \ProvidesPackage{foo} looks like a mismatch. Same name, so harmless.
+    # --make-indep), or a class kept in a subdirectory (\documentclass{lipics/x}),
+    # is requested by its path, so its own \ProvidesPackage{foo} or
+    # \ProvidesClass{x} looks like a mismatch. Same name, so harmless.
+    PROVIDED_KIND = '(?:package|(?:document )?class)'
+    PATH_PREFIXED_NAME = %r{requested #{PROVIDED_KIND} .(?:[^'`]*/)([^'`/]+)', but the #{PROVIDED_KIND} provides .([^'`]+)'}io
+
     def path_prefixed_package?(txt)
-      pattern = %r{requested (?:package|class) .(?:[^'`]*/)([^'`/]+)', but the (?:package|class) provides .([^'`]+)'}
-      match = txt.gsub(/\s+/, ' ').match(pattern)
+      match = txt.gsub(/\s+/, ' ').match(PATH_PREFIXED_NAME)
       match && match[1] == match[2]
     end
 

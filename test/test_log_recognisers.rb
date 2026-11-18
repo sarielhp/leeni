@@ -140,6 +140,37 @@ class TestLogRecognisers < Minitest::Test
                     'a real warning was absorbed into a Whatever and suppressed by default'
   end
 
+  # A class kept in a subdirectory (\documentclass{lipics/socg-lipics-v2021})
+  # is requested by its path but provides its bare name: noise, not a warning.
+  def test_path_prefixed_document_class_is_a_whatever
+    log = <<~LOG
+      LaTeX Warning: You have requested document class `lipics/socg-lipics-v2021',
+                     but the document class provides `socg-lipics-v2021'.
+    LOG
+
+    b = builder
+    items = b.send(:extract_warnings, log, verbose: false)
+    _alerts, regular, whatevers = b.send(:partition_diagnostics, log, items)
+
+    assert_equal 1, items.size, 'the class-name warning was not recognised'
+    assert_empty regular, 'a path-prefixed class name was reported as a warning'
+    assert_equal 1, whatevers.size
+  end
+
+  def test_differently_named_document_class_stays_a_warning
+    log = <<~LOG
+      LaTeX Warning: You have requested document class `lipics/socg-lipics-v2021',
+                     but the document class provides `lipics-v2019'.
+    LOG
+
+    b = builder
+    items = b.send(:extract_warnings, log, verbose: false)
+    _alerts, regular, whatevers = b.send(:partition_diagnostics, log, items)
+
+    assert_equal 1, regular.size, 'a real class-name mismatch was hidden'
+    assert_empty whatevers
+  end
+
   def test_underscored_and_starred_package_names_are_recognised
     %w[epstopdf-base fontspec l3backend].each do |pkg|
       log = "Package #{pkg} Warning: something happened on input line 3.\n"

@@ -63,20 +63,23 @@ class TestBibExtractor < Minitest::Test
     end
   end
 
-  # BIBINPUTS=.:/global/bib: is the common setting; its '.' and empty entries
-  # name the document directory, so they must not forbid writing paper.bib there.
-  def test_dot_and_empty_bibinputs_entries_do_not_forbid_the_document_dir
-    Dir.mktmpdir('bibinputs_dot') do |dir|
-      global_dir = File.join(dir, 'global_bibs')
-      FileUtils.mkdir_p(global_dir)
+  # -B writes only into the document directory, whatever BIBINPUTS says: with
+  # BIBINPUTS=.:/global/bib: the '.' entry is the document directory itself.
+  def test_bib_extract_writes_only_into_the_document_directory
+    Dir.mktmpdir('bib_local_only') do |dir|
+      sub_dir = File.join(dir, 'refs')
+      FileUtils.mkdir_p(sub_dir)
       dummy_builder = Struct.new(:filename, :bfilename, :bdir, :options).new('paper.tex', 'paper', dir, {})
       saved = ENV.fetch('BIBINPUTS', nil)
-      ENV['BIBINPUTS'] = ".:#{global_dir}:"
+      ENV['BIBINPUTS'] = ".:#{sub_dir}:"
       Dir.chdir(dir) do
         extractor = LaTeXBibExtractor.new(dummy_builder)
         assert extractor.send(:validate_target_safety!, File.expand_path('paper.bib')),
-               "a '.' BIBINPUTS entry forbade the document directory"
-        refute extractor.send(:validate_target_safety!, File.join(global_dir, 'paper.bib'))
+               'the document directory itself was refused'
+        refute extractor.send(:validate_target_safety!, File.join(sub_dir, 'paper.bib')),
+               'a subdirectory was accepted'
+        refute extractor.send(:validate_target_safety!, File.expand_path('../paper.bib')),
+               'the parent directory was accepted'
       end
     ensure
       ENV['BIBINPUTS'] = saved

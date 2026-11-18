@@ -92,29 +92,15 @@ class LaTeXBibExtractor
     end
   end
 
-  def forbidden_bib_dirs
-    dirs = []
-    dirs.concat(Array(@options[:bib_dirs]))
-    dirs.concat(LaTeXUtils::DEFAULT_BIB_DIRS)
-    # '.' and empty BIBINPUTS entries mean the current (document) directory,
-    # which is exactly where the extracted file belongs, not a global one.
-    dirs.concat((ENV['BIBINPUTS'] || '').split(File::PATH_SEPARATOR))
-    dirs.map { |d| d.to_s.strip }.reject { |d| d.empty? || d == '.' }.map { |d| File.expand_path(d) }.uniq
-  end
-
+  # -B writes only into the document directory (the caller has chdir'd there):
+  # never into a subdirectory or any other place, a global .bib database included.
   def validate_target_safety!(target_abs)
-    forbidden = forbidden_bib_dirs
-    forbidden.each do |fdir|
-      next unless File.directory?(fdir)
+    return true if File.identical?(File.dirname(target_abs), Dir.pwd)
 
-      next unless File.identical?(File.dirname(target_abs), fdir) || target_abs.start_with?(fdir + File::SEPARATOR)
-
-      warn Rainbow('==> Fatal Error: Refusing to write to global bibliography directory:').red.bright
-      warn "    #{target_abs}"
-      warn '    Extracted bibliography must reside in the local document directory.'
-      return false
-    end
-    true
+    warn Rainbow('==> Fatal Error: Refusing to write the extracted bibliography outside the document directory:').red.bright
+    warn "    #{target_abs}"
+    warn '    Extracted bibliography must reside in the local document directory.'
+    false
   end
 
   def extract_biblatex(stage_file)

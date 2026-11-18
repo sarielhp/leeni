@@ -63,6 +63,26 @@ class TestBibExtractor < Minitest::Test
     end
   end
 
+  # BIBINPUTS=.:/global/bib: is the common setting; its '.' and empty entries
+  # name the document directory, so they must not forbid writing paper.bib there.
+  def test_dot_and_empty_bibinputs_entries_do_not_forbid_the_document_dir
+    Dir.mktmpdir('bibinputs_dot') do |dir|
+      global_dir = File.join(dir, 'global_bibs')
+      FileUtils.mkdir_p(global_dir)
+      dummy_builder = Struct.new(:filename, :bfilename, :bdir, :options).new('paper.tex', 'paper', dir, {})
+      saved = ENV.fetch('BIBINPUTS', nil)
+      ENV['BIBINPUTS'] = ".:#{global_dir}:"
+      Dir.chdir(dir) do
+        extractor = LaTeXBibExtractor.new(dummy_builder)
+        assert extractor.send(:validate_target_safety!, File.expand_path('paper.bib')),
+               "a '.' BIBINPUTS entry forbade the document directory"
+        refute extractor.send(:validate_target_safety!, File.join(global_dir, 'paper.bib'))
+      end
+    ensure
+      ENV['BIBINPUTS'] = saved
+    end
+  end
+
   def test_backup_logic_preserves_previous_file
     Dir.mktmpdir('backup_test') do |dir|
       dummy_builder = Struct.new(:filename, :bfilename, :bdir, :options).new('paper.tex', 'paper', dir, {})

@@ -96,8 +96,10 @@ class LaTeXBibExtractor
     dirs = []
     dirs.concat(Array(@options[:bib_dirs]))
     dirs.concat(LaTeXUtils::DEFAULT_BIB_DIRS)
+    # '.' and empty BIBINPUTS entries mean the current (document) directory,
+    # which is exactly where the extracted file belongs, not a global one.
     dirs.concat((ENV['BIBINPUTS'] || '').split(File::PATH_SEPARATOR))
-    dirs.map { |d| File.expand_path(d.to_s.strip) }.reject(&:empty?).uniq
+    dirs.map { |d| d.to_s.strip }.reject { |d| d.empty? || d == '.' }.map { |d| File.expand_path(d) }.uniq
   end
 
   def validate_target_safety!(target_abs)

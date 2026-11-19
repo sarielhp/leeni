@@ -1,0 +1,17 @@
+{
+  "engine": "xelatex",
+  "diagnostics": [
+    {
+      "file": "example.tex",
+      "line": 3,
+      "tier": "errors",
+      "category": "environment_undefined"
+    },
+    {
+      "file": "example.tex",
+      "line": 5,
+      "tier": "errors",
+      "category": "mismatched_environment"
+    }
+  ]
+}

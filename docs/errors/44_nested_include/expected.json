@@ -1,0 +1,11 @@
+{
+  "engine": "xelatex",
+  "diagnostics": [
+    {
+      "file": "sub_outer.tex",
+      "line": 1,
+      "tier": "errors",
+      "category": "nested_include"
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "engine": "xelatex",
+  "diagnostics": [
+    {
+      "file": "example.tex",
+      "line": 7,
+      "tier": "errors",
+      "category": "not_in_outer_par_mode"
+    },
+    {
+      "file": "example.tex",
+      "line": 7,
+      "tier": "errors",
+      "category": "undefined_control_sequence"
+    },
+    {
+      "file": "example.tex",
+      "line": 7,
+      "tier": "errors",
+      "category": "missing_number_treated_as_zero"
+    }
+  ]
+}

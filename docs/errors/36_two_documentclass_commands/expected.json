@@ -1,0 +1,11 @@
+{
+  "engine": "xelatex",
+  "diagnostics": [
+    {
+      "file": "example.tex",
+      "line": 2,
+      "tier": "errors",
+      "category": "two_documentclass_commands"
+    }
+  ]
+}

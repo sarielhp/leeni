@@ -1,119 +1,51 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
+# Runs the error-corpus expectations (test/test_error_corpus.rb), or drafts
+# expected.json for a new docs/errors case.
+require 'json'
 require 'open3'
 require 'fileutils'
-require 'rainbow'
-require 'etc'
-require 'rbconfig'
+require_relative 'settings'
+require_relative 'tmp_space'
 
-class ErrorCorpusRunner
-  ROOT = File.expand_path('..', __dir__)
-  LEENI = File.join(ROOT, 'leeni')
-  CORPUS_DIR = File.join(ROOT, 'docs', 'errors')
+ProjectTmp.project = ToolSettings::PROJECT_NAME
 
-  def self.run
-    new.run
-  end
+ROOT = File.expand_path('..', __dir__)
 
-  def run
-    examples = discover_examples
-    if examples.empty?
-      puts Rainbow('No error examples found in docs/errors/').yellow
-      exit 0
+HELP = <<~TEXT
+  Usage: tools/test_error_corpus [--draft CASE_DIR]
+
+  Without options, run test/test_error_corpus.rb: every docs/errors case must
+  report exactly the diagnostics in its expected.json, and the clean documents
+  in test/corpus/clean must report none.
+
+  --draft CASE_DIR  Build CASE_DIR/example.tex in a scratch copy and print the
+                    current diagnostics in expected.json form. The draft is a
+                    snapshot, not an expectation: check every location and
+                    category against the source before saving it.
+  -h, --help        Show this help; nothing is run.
+TEXT
+
+def draft(dir)
+  abort "#{dir}: no example.tex" unless File.file?(File.join(dir, 'example.tex'))
+  ProjectTmp.mktmpdir('corpus-draft') do |tmp|
+    work = File.join(tmp, File.basename(dir))
+    FileUtils.cp_r(dir, work)
+    out, = Open3.capture2(File.join(ROOT, 'leeni'), '--no-lock', '--json', 'example.tex', chdir: work)
+    data = JSON.parse(out)
+    diags = data['diagnostics'].map do |d|
+      h = { 'file' => d['file'].start_with?('/') ? "<texmf>/#{File.basename(d['file'])}" : d['file'], 'line' => d['line'] }
+      h['col'] = d['col'] if d['col']
+      h.merge('tier' => d['tier'], 'category' => d['category'])
     end
-
-    puts Rainbow("==> Running Error Corpus Test Suite (#{examples.size} cases, parallel)...").bold
-    passed, failed = execute_suite(examples)
-    report_summary(passed, failed, examples.size)
-  end
-
-  private
-
-  def discover_examples
-    Dir.glob(File.join(CORPUS_DIR, '*/example.tex'))
-  end
-
-  def execute_suite(examples)
-    queue = Queue.new
-    examples.each_with_index { |tex_path, idx| queue << [tex_path, idx] }
-    results = Array.new(examples.size)
-    mutex = Mutex.new
-    workers = [Etc.nprocessors, 8].min
-
-    threads = Array.new(workers) do
-      Thread.new { process_queue(queue, results, mutex, examples.size) }
-    end
-    threads.each(&:join)
-
-    passed = results.count { |r| r[:success] }
-    failed = results.reject { |r| r[:success] }
-    [passed, failed]
-  end
-
-  def process_queue(queue, results, mutex, total)
-    loop do
-      item = begin
-        queue.pop(true)
-      rescue StandardError
-        nil
-      end
-      break unless item
-
-      run_single_test(item, results, mutex, total)
-    end
-  end
-
-  def run_single_test(item, results, mutex, total)
-    tex_path, idx = item
-    dir = File.dirname(tex_path)
-    name = File.basename(dir)
-    t0 = Process.clock_gettime(Process::CLOCK_MONOTONIC)
-    success, msg = test_example(dir)
-    elapsed = (Process.clock_gettime(Process::CLOCK_MONOTONIC) - t0).round(2)
-    results[idx] = { name: name, success: success, error: msg, elapsed: elapsed }
-
-    mutex.synchronize do
-      status_str = success ? Rainbow('PASS').green : Rainbow('FAIL').red.bright
-      puts "  #{Rainbow("[#{idx + 1}/#{total}]").cyan} #{name} ... #{status_str} (#{elapsed}s)"
-    end
-  end
-
-  def test_example(dir)
-    cmd = [RbConfig.ruby, LEENI, '--no-lock', '--junk-dir', 'junk', '-f', 'example.tex']
-    out, status = Open3.capture2e(*cmd, chdir: dir)
-    cleanup_junk(dir)
-
-    return [false, "Expected non-zero exit code, got #{status.exitstatus}"] if status.success?
-    return [false, "Did not report compilation failure: #{out.lines.first(3).join}"] unless out.include?('Latex compilation failed!')
-    return [false, 'Failed to extract specific error (used fallback lines)'] if out.include?('Output written on junk/')
-    return [false, 'Failed to extract catalog remediation hint'] unless out.include?('Hint:') || out.include?('^')
-
-    [true, nil]
-  rescue StandardError => e
-    [false, e.message]
-  end
-
-  def cleanup_junk(dir)
-    junk = File.join(dir, 'junk')
-    FileUtils.rm_rf(junk)
-    %w[pdf aux log synctex.gz fls out].each do |ext|
-      f = File.join(dir, "example.#{ext}")
-      FileUtils.rm_f(f)
-    end
-  end
-
-  def report_summary(_passed, failed, total)
-    puts ''
-    if failed.empty?
-      puts Rainbow("✔ All #{total} error corpus tests passed successfully!").green.bright
-      exit 0
-    else
-      puts Rainbow("✘ #{failed.size} of #{total} tests failed:").red.bright
-      failed.each { |f| puts "  - #{f[:name]}: #{f[:error]}" }
-      exit 1
-    end
+    puts JSON.pretty_generate('engine' => data.dig('build', 'engine'), 'diagnostics' => diags)
   end
 end
 
-ErrorCorpusRunner.run if __FILE__ == $PROGRAM_NAME
+case ARGV
+in [] then exec(RbConfig.ruby, '-w', File.join(ROOT, 'test', 'test_error_corpus.rb'))
+in ['-h' | '--help'] then puts HELP
+in ['--draft', dir] then draft(File.expand_path(dir))
+else abort HELP
+end

@@ -1,0 +1,20 @@
+{
+  "engine": "xelatex",
+  "diagnostics": [
+    {
+      "file": "example.tex",
+      "line": 2,
+      "tier": "errors",
+      "category": "package_babel_unknown_language"
+    }
+  ],
+  "known_issue": "The error is located inside babel.sty instead of at the \\usepackage line that passes the option.",
+  "current": [
+    {
+      "file": "<texmf>/babel.sty",
+      "line": 4481,
+      "tier": "errors",
+      "category": "package_babel_unknown_language"
+    }
+  ]
+}

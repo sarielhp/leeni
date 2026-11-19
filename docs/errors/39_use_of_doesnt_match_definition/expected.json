@@ -1,0 +1,17 @@
+{
+  "engine": "xelatex",
+  "diagnostics": [
+    {
+      "file": "example.tex",
+      "line": 4,
+      "tier": "errors",
+      "category": "use_of_doesnt_match_definition"
+    },
+    {
+      "file": "example.tex",
+      "line": 4,
+      "tier": "errors",
+      "category": "extra_closing_brace"
+    }
+  ]
+}

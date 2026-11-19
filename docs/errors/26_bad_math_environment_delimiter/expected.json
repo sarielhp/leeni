@@ -1,0 +1,17 @@
+{
+  "engine": "xelatex",
+  "diagnostics": [
+    {
+      "file": "example.tex",
+      "line": 3,
+      "tier": "errors",
+      "category": "bad_math_environment_delimiter"
+    },
+    {
+      "file": "example.tex",
+      "line": 4,
+      "tier": "errors",
+      "category": "missing_dollar"
+    }
+  ]
+}

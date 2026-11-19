@@ -1,0 +1,38 @@
+{
+  "engine": "xelatex",
+  "diagnostics": [
+    {
+      "file": "example.tex",
+      "line": 5,
+      "tier": "errors",
+      "category": "paragraph_ended_before_complete"
+    },
+    {
+      "file": "example.tex",
+      "line": 5,
+      "tier": "errors",
+      "category": "extra_closing_brace"
+    }
+  ],
+  "known_issue": "\"Runaway argument?\" is the lead-in of the line-5 error but is reported as its own error at line 0.",
+  "current": [
+    {
+      "file": "example.tex",
+      "line": 0,
+      "tier": "errors",
+      "category": "paragraph_ended_before_complete"
+    },
+    {
+      "file": "example.tex",
+      "line": 5,
+      "tier": "errors",
+      "category": "paragraph_ended_before_complete"
+    },
+    {
+      "file": "example.tex",
+      "line": 5,
+      "tier": "errors",
+      "category": "extra_closing_brace"
+    }
+  ]
+}

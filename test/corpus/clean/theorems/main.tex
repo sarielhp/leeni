@@ -1,0 +1,29 @@
+\documentclass{article}
+\usepackage{amsmath,amssymb,amsthm}
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{lemma}[theorem]{Lemma}
+\begin{document}
+\section{Introduction}\label{sec:intro}
+We prove Theorem~\ref{thm:main} using Lemma~\ref{lem:sum}, see also
+Section~\ref{sec:proof} and Eq.~\eqref{eq:sum}.
+
+\section{Proof}\label{sec:proof}
+\begin{lemma}\label{lem:sum}
+  For every $n \geq 1$,
+  \begin{equation}\label{eq:sum}
+    \sum_{i=1}^{n} i = \frac{n(n+1)}{2}.
+  \end{equation}
+\end{lemma}
+\begin{proof}
+  By induction on $n$.
+\end{proof}
+\begin{theorem}\label{thm:main}
+  The sum of the first $n$ odd numbers is $n^2$.
+\end{theorem}
+\begin{proof}
+  \begin{align*}
+    \sum_{i=1}^{n} (2i-1) &= 2\sum_{i=1}^{n} i - n \\
+                          &= n(n+1) - n = n^2. \qedhere
+  \end{align*}
+\end{proof}
+\end{document}

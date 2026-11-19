@@ -1,0 +1,29 @@
+{
+  "engine": "xelatex",
+  "diagnostics": [
+    {
+      "file": "example.tex",
+      "line": 4,
+      "tier": "errors",
+      "category": "misplaced_noalign"
+    },
+    {
+      "file": "example.tex",
+      "line": 4,
+      "tier": "errors",
+      "category": "cant_use_hrule_here"
+    },
+    {
+      "file": "example.tex",
+      "line": 4,
+      "tier": "errors",
+      "category": "missing_number_treated_as_zero"
+    },
+    {
+      "file": "example.tex",
+      "line": 4,
+      "tier": "errors",
+      "category": "illegal_unit_of_measure"
+    }
+  ]
+}

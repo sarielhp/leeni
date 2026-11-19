@@ -44,7 +44,7 @@ This document provides architectural guidelines, core invariants, development wo
   - [`tools/install`](tools/install): Bundles `leeni` into a standalone binary at `~/bin/leeni` with `~/bin/l` symlink.
   - [`tools/bump`](tools/bump): Increments the version, runs the full gate on that version, commits, and atomically publishes the branch and tag.
   - [`tools/release`](tools/release): Commits checked changes, runs `tools/bump`, and installs after publication unless `--no-install`; steps already done are skipped.
-  - [`tools/test_error_corpus`](tools/test_error_corpus): Standalone on-demand test runner verifying real-world error fixtures in `docs/errors/`.
+  - [`tools/test_error_corpus`](tools/test_error_corpus): Runs the error-corpus expectations (`docs/errors/*/expected.json`, also in the medium test tier); `--draft` prints the current diagnostics of a new case.
 - **Automated Test Suite** (`test/`):
   - `test/test_*.rb`: Fast regression and end-to-end tests using `minitest`.
   - `test/fixups/`: ArXiv test repair records and schema.

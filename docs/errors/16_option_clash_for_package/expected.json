@@ -1,0 +1,11 @@
+{
+  "engine": "xelatex",
+  "diagnostics": [
+    {
+      "file": "example.tex",
+      "line": 4,
+      "tier": "errors",
+      "category": "option_clash_for_package"
+    }
+  ]
+}

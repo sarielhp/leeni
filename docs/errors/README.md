@@ -99,11 +99,14 @@ Errors during compilation originate in one of three layers:
 The reproducer cases in this directory provide verification fixtures. Each subdirectory contains:
 - `example.tex`: Minimal self-contained document triggering the error.
 - `README.md`: Explanation of why the error occurs, the raw log signature, and how to resolve it.
+- `expected.json`: The diagnostics leeni must report (file, line, column, tier, category), reviewed by hand against the source. A case leeni does not yet get right adds `known_issue` and the `current` output.
 
 ### Running Corpus Verification
-To keep continuous integration and quality gates fast, the error corpus is executed **on demand** and completely decoupled from `tools/gate`:
+The corpus runs in the medium test tier (`test/test_error_corpus.rb`, also `tools/test_error_corpus`). Every case must report exactly the diagnostics in its `expected.json`; the `-llm` output must name the same locations as `--json`; and the clean documents in `test/corpus/clean/` must report no errors, alerts or warnings.
 
 ```bash
-# Run standalone verification across all 60 error corpus reproducers
-rtk ./tools/test_error_corpus
+# Run the corpus expectations
+tools/test_error_corpus
+# Draft expected.json for a new case (check every location by hand before saving)
+tools/test_error_corpus --draft docs/errors/63_new_case
 ```

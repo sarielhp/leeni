@@ -1,0 +1,11 @@
+{
+  "engine": "xelatex",
+  "diagnostics": [
+    {
+      "file": "example.tex",
+      "line": 5,
+      "tier": "errors",
+      "category": "package_amsmath_invalid_intertext"
+    }
+  ]
+}

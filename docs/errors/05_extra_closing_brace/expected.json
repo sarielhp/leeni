@@ -1,0 +1,28 @@
+{
+  "engine": "xelatex",
+  "diagnostics": [
+    {
+      "file": "example.tex",
+      "line": 3,
+      "col": 38,
+      "tier": "errors",
+      "category": "extra_closing_brace"
+    }
+  ],
+  "known_issue": "The stray brace is reported twice: by TeX (no column) and by the pre-flight brace check (with column).",
+  "current": [
+    {
+      "file": "example.tex",
+      "line": 3,
+      "tier": "errors",
+      "category": "extra_closing_brace"
+    },
+    {
+      "file": "example.tex",
+      "line": 3,
+      "col": 38,
+      "tier": "errors",
+      "category": "generic"
+    }
+  ]
+}

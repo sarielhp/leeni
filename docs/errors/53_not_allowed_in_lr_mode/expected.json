@@ -1,0 +1,41 @@
+{
+  "engine": "xelatex",
+  "diagnostics": [
+    {
+      "file": "example.tex",
+      "line": 4,
+      "tier": "errors",
+      "category": "not_allowed_in_lr_mode"
+    },
+    {
+      "file": "example.tex",
+      "line": 4,
+      "tier": "errors",
+      "category": "missing_closing_brace"
+    },
+    {
+      "file": "example.tex",
+      "line": 4,
+      "tier": "errors",
+      "category": "undefined_control_sequence"
+    },
+    {
+      "file": "example.tex",
+      "line": 4,
+      "tier": "errors",
+      "category": "generic"
+    },
+    {
+      "file": "example.tex",
+      "line": 4,
+      "tier": "errors",
+      "category": "generic"
+    },
+    {
+      "file": "example.tex",
+      "line": 4,
+      "tier": "errors",
+      "category": "generic"
+    }
+  ]
+}

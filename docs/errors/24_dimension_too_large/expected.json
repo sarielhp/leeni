@@ -1,0 +1,11 @@
+{
+  "engine": "xelatex",
+  "diagnostics": [
+    {
+      "file": "example.tex",
+      "line": 3,
+      "tier": "errors",
+      "category": "dimension_too_large"
+    }
+  ]
+}

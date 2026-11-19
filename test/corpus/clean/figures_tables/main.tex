@@ -1,0 +1,26 @@
+\documentclass{article}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\begin{document}
+\section{Results}
+Figure~\ref{fig:sample} shows an image and Table~\ref{tab:values} lists values.
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=0.4\textwidth]{example-image}
+  \caption{A sample image.}\label{fig:sample}
+\end{figure}
+\begin{table}[ht]
+  \centering
+  \caption{Some values.}\label{tab:values}
+  \begin{tabular}{lr}
+    \toprule
+    Name & Value \\
+    \midrule
+    Alpha & 1 \\
+    Beta  & 2 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+More text follows the floats, with a footnote.\footnote{A short footnote.}
+\end{document}

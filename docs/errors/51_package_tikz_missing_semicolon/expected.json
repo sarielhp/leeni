@@ -1,0 +1,11 @@
+{
+  "engine": "xelatex",
+  "diagnostics": [
+    {
+      "file": "example.tex",
+      "line": 6,
+      "tier": "errors",
+      "category": "package_tikz_missing_semicolon"
+    }
+  ]
+}

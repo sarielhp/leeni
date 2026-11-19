@@ -1,0 +1,12 @@
+{
+  "engine": "xelatex",
+  "diagnostics": [
+    {
+      "file": "example.tex",
+      "line": 5,
+      "col": 9,
+      "tier": "errors",
+      "category": "misplaced_alignment_tab"
+    }
+  ]
+}

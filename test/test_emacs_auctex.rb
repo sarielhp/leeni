@@ -98,7 +98,8 @@ class TestEmacsAuctex < Minitest::Test
     ]
 
     out, = capture_io do
-      builder.send(:render_diagnostics_tiers, errors, alerts, warnings, [], 1)
+      analysis = Leeni::DiagnosticAnalysis.new(errors: errors, alerts: alerts, warnings: warnings, whatevers: [], error_count: 1)
+      builder.send(:render_diagnostics_tiers, analysis)
     end
 
     assert_includes out, 'l.10 \\foo'

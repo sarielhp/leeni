@@ -128,6 +128,18 @@ module LaTeXDiagnostics
       @options && @options[:json] == true
     end
 
+    RECORD_TIERS = %i[errors alerts warnings whatevers].freeze
+
+    # The normalised records of an analysis, by tier. Each tier is normalised
+    # once, on first use, and shared by every machine-readable renderer, so
+    # --json and -llm cannot describe the same diagnostic differently.
+    def diagnostic_records(analysis, tiers = RECORD_TIERS)
+      analysis.records ||= {}
+      tiers.to_h do |tier|
+        [tier, analysis.records[tier] ||= analysis[tier].map { |item| normalize_diagnostic(item, tier.to_s) }]
+      end
+    end
+
     def normalize_diagnostic(item, tier)
       cat = item[:category] || item.dig(:catalog, :category) || (respond_to?(:diagnostic_category, true) ? diagnostic_category(item) : nil)
       {

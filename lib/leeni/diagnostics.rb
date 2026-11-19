@@ -101,7 +101,17 @@ module LaTeXDiagnostics
       return
     end
 
-    new_content = LaTeXUtils.safe_read(pdferr)
+    analysis = analyze_log_content(LaTeXUtils.safe_read(pdferr))
+    return report_bib_missing if @options[:bib_missing] && analysis.error_count.zero?
+
+    revert_bib_missing_output! if @options[:bib_missing]
+    display_analyzed_diagnostics(analysis)
+  end
+
+  # Everything analyze_output decides about the log of a finished build,
+  # without printing any of it: the tiers, with error-grade alerts promoted
+  # into the (prepared) errors, and the error count.
+  def analyze_log_content(new_content)
     counts = collect_diagnostic_counts(new_content)
     clean_content = LaTeXUtils.filter_subcommand_noise(new_content)
     raw_warns = extract_warnings(clean_content, verbose: @options[:verbose])
@@ -116,11 +126,8 @@ module LaTeXDiagnostics
     errors = count_latex_errors(new_content, 0) + counts[:biberr]
     promoted, alert_items, reg_warns = promote_error_grade_items(alert_items, reg_warns)
     err_items.concat(promoted.map { |item| alert_as_error(item) })
-    errors += promoted.size
-    return report_bib_missing if @options[:bib_missing] && errors.zero?
-
-    revert_bib_missing_output! if @options[:bib_missing]
-    display_analyzed_diagnostics(err_items, alert_items, reg_warns, what_items, errors)
+    Leeni::DiagnosticAnalysis.new(errors: prepare_error_items(err_items), alerts: alert_items, warnings: reg_warns,
+                                  whatevers: what_items, error_count: errors + promoted.size, brace_errors: [])
   end
 
   # Duplicate labels silently rebind every \ref to the last definition, so they
@@ -155,71 +162,61 @@ module LaTeXDiagnostics
     err
   end
 
-  def display_analyzed_diagnostics(err_items, alert_items, reg_warns, what_items, errors)
-    alerts = alert_items.sum { |i| i[:count] || 1 }
-    warnings = reg_warns.sum { |i| i[:count] || 1 }
-    whatevers = what_items.sum { |i| i[:count] || 1 }
+  def display_analyzed_diagnostics(analysis)
+    errors = analysis.error_count
+    alerts = analysis.alerts.sum { |i| i[:count] || 1 }
+    warnings = analysis.warnings.sum { |i| i[:count] || 1 }
+    whatevers = analysis.whatevers.sum { |i| i[:count] || 1 }
 
     if json_mode?
-      errors = render_json_mode_tiers(err_items, alert_items, reg_warns, what_items, errors)
+      errors = render_json_mode_tiers(analysis)
     elsif errors.positive? || alerts.positive? || warnings.positive? || whatevers.positive?
-      errors = render_diagnostics_tiers(err_items, alert_items, reg_warns, what_items, errors)
+      errors = render_diagnostics_tiers(analysis)
     end
 
     summarize_and_check_werror(errors, alerts, warnings, whatevers)
   end
 
-  def render_compile_mode_tiers(err_items, alert_items, reg_warns, what_items, errors)
-    return render_json_mode_tiers(err_items, alert_items, reg_warns, what_items, errors) if json_mode?
+  # The error count a renderer reports: TeX's own count, or the errors leeni
+  # extracted when that is more.
+  def reported_error_count(analysis)
+    [analysis.errors.size, analysis.error_count].max
+  end
 
-    return render_llm_mode_tiers(err_items, alert_items, reg_warns, what_items, errors) if llm_mode?
+  def render_compile_mode_tiers(analysis)
+    return render_json_mode_tiers(analysis) if json_mode?
 
-    prepared_errors = prepare_error_items(err_items)
-    displayed_errors, cascade_info = throttle_errors(prepared_errors)
-    has_errors = errors.positive? || !prepared_errors.empty?
+    return render_llm_mode_tiers(analysis) if llm_mode?
+
+    displayed_errors, cascade_info = throttle_errors(analysis.errors)
+    has_errors = analysis.error_count.positive? || !analysis.errors.empty?
     show_non_errors = @options[:all] || !has_errors || @options[:vscode_lw]
 
     out_io = @options[:vscode_lw] ? $stdout : $stderr
     emit_compile_diagnostics(
       errors: displayed_errors,
-      alerts: show_non_errors ? alert_items : [],
-      warnings: show_non_errors ? reg_warns : [],
-      whatevers: show_non_errors ? what_items : [],
+      alerts: show_non_errors ? analysis.alerts : [],
+      warnings: show_non_errors ? analysis.warnings : [],
+      whatevers: show_non_errors ? analysis.whatevers : [],
       io: out_io
     )
     emit_compile_cascade_notice(cascade_info, io: out_io) unless @options[:vscode_lw]
-    [prepared_errors.size, errors].max
+    reported_error_count(analysis)
   end
 
-  def render_llm_mode_tiers(err_items, alert_items, reg_warns, what_items, errors)
-    prepared_errors = prepare_error_items(err_items)
-    err_records = prepared_errors.map { |e| normalize_diagnostic(e, 'errors') }
-    alt_records = alert_items.map { |a| normalize_diagnostic(a, 'alerts') }
-    wrn_records = reg_warns.map { |w| normalize_diagnostic(w, 'warnings') }
-    wht_records = what_items.map { |wh| normalize_diagnostic(wh, 'whatevers') }
-
+  def render_llm_mode_tiers(analysis)
     presenter = LaTeXAgentPresenter.new(@options)
-    presenter.render_diagnostics(
-      errors: err_records,
-      alerts: alt_records,
-      warnings: wrn_records,
-      whatevers: wht_records,
-      file: @filename,
-      io: $stderr
-    )
-    [prepared_errors.size, errors].max
+    presenter.render_diagnostics(**diagnostic_records(analysis), file: @filename, io: $stderr)
+    reported_error_count(analysis)
   end
 
-  def render_json_mode_tiers(err_items, alert_items, reg_warns, what_items, errors)
-    prepared_errors = prepare_error_items(err_items)
-    has_errors = errors.positive? || !prepared_errors.empty?
-    has_werrors = @options[:werror] && (alert_items.any? || reg_warns.any?)
+  def render_json_mode_tiers(analysis)
+    has_errors = analysis.error_count.positive? || !analysis.errors.empty?
+    has_werrors = @options[:werror] && (analysis.alerts.any? || analysis.warnings.any?)
     failed = has_errors || has_werrors
 
-    err_records = prepared_errors.map { |e| normalize_diagnostic(e, 'errors') }
-    alt_records = alert_items.map { |a| normalize_diagnostic(a, 'alerts') }
-    wrn_records = reg_warns.map { |w| normalize_diagnostic(w, 'warnings') }
-    wht_records = what_items.map { |wh| normalize_diagnostic(wh, 'whatevers') }
+    records = diagnostic_records(analysis)
+    err_records, alt_records, wrn_records, wht_records = records.values_at(:errors, :alerts, :warnings, :whatevers)
 
     all_records = err_records
     all_records += alt_records unless tier_suppressed?(:alerts)
@@ -241,26 +238,25 @@ module LaTeXDiagnostics
     )
     presenter = LaTeXJsonPresenter.new(@options)
     presenter.render_result(result, io: $stdout)
-    [prepared_errors.size, errors].max
+    reported_error_count(analysis)
   end
 
-  def render_diagnostics_tiers(err_items, alert_items, reg_warns, what_items, errors)
-    return render_compile_mode_tiers(err_items, alert_items, reg_warns, what_items, errors) if compile_mode?
+  def render_diagnostics_tiers(analysis)
+    return render_compile_mode_tiers(analysis) if compile_mode?
 
-    if errors.positive? || !err_items.empty?
-      prepared_errors = prepare_error_items(err_items)
-      displayed_errors, cascade_info = throttle_errors(prepared_errors)
-      if @options[:emacs] || @options[:all]
-        render_grouped_tiers(displayed_errors, alert_items, reg_warns, what_items, io: $stdout)
-      else
-        _num_warnings, _num_errors = print_diagnostics_body([], displayed_errors, tier_label: 'errors')
-      end
-      print_cascade_notice(cascade_info, io: $stdout) if cascade_info
-      [prepared_errors.size, errors].max
-    else
-      render_grouped_tiers([], alert_items, reg_warns, what_items, io: $stdout)
-      errors
+    unless analysis.error_count.positive? || !analysis.errors.empty?
+      render_grouped_tiers([], analysis.alerts, analysis.warnings, analysis.whatevers, io: $stdout)
+      return analysis.error_count
     end
+
+    displayed_errors, cascade_info = throttle_errors(analysis.errors)
+    if @options[:emacs] || @options[:all]
+      render_grouped_tiers(displayed_errors, analysis.alerts, analysis.warnings, analysis.whatevers, io: $stdout)
+    else
+      _num_warnings, _num_errors = print_diagnostics_body([], displayed_errors, tier_label: 'errors')
+    end
+    print_cascade_notice(cascade_info, io: $stdout) if cascade_info
+    reported_error_count(analysis)
   end
 
   def render_grouped_tiers(error_items, alert_items, reg_warns, what_items, fallback_lines: [], io: $stdout)

@@ -87,6 +87,13 @@ module Leeni
       JSON.generate(to_h, *args)
     end
   end
+
+  # What one compiler log says, decided before anything is printed: the four
+  # tiers as item hashes (errors already prepared), the error count, and the
+  # pre-flight brace errors among them. `records` caches, per tier, the
+  # normalised records the machine-readable renderers (--json, -llm) share.
+  DiagnosticAnalysis = Struct.new(:errors, :alerts, :warnings, :whatevers, :error_count, :brace_errors, :records,
+                                  keyword_init: true)
 end
 
 LaTeXDiagnosticRecord = Leeni::DiagnosticRecord

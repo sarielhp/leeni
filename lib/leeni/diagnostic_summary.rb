@@ -212,19 +212,19 @@ module LaTeXDiagnostics
       end
     end
 
-    def report_compile_mode_errors(errors, content, io: $stderr)
+    def report_compile_mode_errors(analysis, content, io: $stderr)
       if json_mode?
-        report_json_mode_errors(errors, content, io: $stdout)
+        report_json_mode_errors(analysis, content, io: $stdout)
         exit 1
       end
 
       if llm_mode?
-        report_llm_mode_errors(errors, content, io: io)
+        report_llm_mode_errors(analysis, content, io: io)
         exit 1
       end
 
       io = $stdout if @options[:vscode_lw]
-      displayed_errors, cascade_info = throttle_errors(errors)
+      displayed_errors, cascade_info = throttle_errors(analysis.errors)
       if displayed_errors.empty?
         disp = format_display_path(@filename)
         disp = "./#{disp}" if @options[:vscode_lw] && !disp.start_with?('/', './')
@@ -236,36 +236,27 @@ module LaTeXDiagnostics
         }]
       end
 
-      alerts = []
-      warns = []
-      whats = []
-      if @options[:all] || @options[:vscode_lw]
-        raw_warns = extract_warnings(content, verbose: false)
-        alerts, warns, whats = partition_diagnostics(content, raw_warns)
-      end
-
+      show_non_errors = @options[:all] || @options[:vscode_lw]
       emit_compile_diagnostics(
         errors: displayed_errors,
-        alerts: alerts,
-        warnings: warns,
-        whatevers: whats,
+        alerts: show_non_errors ? analysis.alerts : [],
+        warnings: show_non_errors ? analysis.warnings : [],
+        whatevers: show_non_errors ? analysis.whatevers : [],
         io: io
       )
       emit_compile_cascade_notice(cascade_info, io: io) unless @options[:vscode_lw]
       exit 1
     end
 
-    def report_llm_mode_errors(errors, content, io: $stderr)
-      log_tail = errors.empty? ? content : nil
-      records = errors.map { |e| normalize_diagnostic(e, 'errors') }
-      alerts, = partition_diagnostics(content, extract_warnings(content, verbose: false))
-      alert_records = alerts.map { |a| normalize_diagnostic(a, 'alerts') }
+    def report_llm_mode_errors(analysis, content, io: $stderr)
+      log_tail = analysis.errors.empty? ? content : nil
+      records = diagnostic_records(analysis, %i[errors alerts])
       presenter = LaTeXAgentPresenter.new(@options)
-      presenter.render_diagnostics(errors: records, alerts: alert_records, log_tail: log_tail, file: @filename, io: io)
+      presenter.render_diagnostics(**records, log_tail: log_tail, file: @filename, io: io)
     end
 
-    def report_json_mode_errors(errors, content, io: $stdout)
-      records = errors.map { |e| normalize_diagnostic(e, 'errors') }
+    def report_json_mode_errors(analysis, content, io: $stdout)
+      records = diagnostic_records(analysis, %i[errors])[:errors]
       result = LaTeXDiagnosticResult.new(
         build: json_build_report,
         success: false,
@@ -273,7 +264,7 @@ module LaTeXDiagnostics
         pdf_path: nil,
         records: records,
         summary: { errors: records.size, alerts: 0, warnings: 0, whatevers: 0 },
-        log_tail: errors.empty? ? content.to_s.lines.last(10).join : nil
+        log_tail: analysis.errors.empty? ? content.to_s.lines.last(10).join : nil
       )
       presenter = LaTeXJsonPresenter.new(@options)
       presenter.render_result(result, io: io)
@@ -283,7 +274,30 @@ module LaTeXDiagnostics
       LaTeXIndicator.stop(clear: true)
       raw = LaTeXUtils.safe_read(loga)
       content = LaTeXUtils.filter_subcommand_noise(raw)
+      analysis = analyze_failed_log(content)
+      return report_compile_mode_errors(analysis, content, io: io) if compile_mode?
 
+      errors = analysis.errors
+      fallback = errors.empty? ? content.lines.last(15) : []
+      displayed_errors, cascade_info = throttle_errors(errors)
+      if @options[:emacs] || @options[:all]
+        render_grouped_tiers(displayed_errors, analysis.alerts, analysis.warnings, analysis.whatevers,
+                             fallback_lines: fallback, io: io)
+      else
+        _num_warnings, _num_errors = print_diagnostics_body([], displayed_errors, fallback_lines: fallback, tier_label: 'errors', io: io)
+      end
+      print_cascade_notice(cascade_info, io: io) if cascade_info
+
+      io.puts "See #{loga} for full error details." if @options[:verbose] || fallback.any? || errors.empty?
+      report_error_summary(analysis, raw, io: io)
+      exit 1
+    end
+
+    # Everything report_errors decides about the log of a failed pass, without
+    # printing any of it: the compiler errors (cascades of a brace fault or an
+    # environment mismatch dropped) followed by the pre-flight brace errors,
+    # and the tiers of the warnings.
+    def analyze_failed_log(content)
       compiler_errors = extract_errors(content)
       brace_errors = if compiler_errors.empty? || compiler_indicates_brace_error?(content)
                        check_source_braces
@@ -293,34 +307,17 @@ module LaTeXDiagnostics
       compiler_errors = suppress_compiler_brace_cascades(compiler_errors, brace_errors)
       compiler_errors = suppress_environment_mismatch_cascades(compiler_errors)
       errors = prepare_error_items(compiler_errors) + brace_errors
-
-      return report_compile_mode_errors(errors, content, io: io) if compile_mode?
-
-      fallback = errors.empty? ? content.lines.last(15) : []
-      displayed_errors, cascade_info = throttle_errors(errors)
-      if @options[:emacs] || @options[:all]
-        raw_warns = extract_warnings(content, verbose: false)
-        alert_items, regular_warns, whatever_items = partition_diagnostics(content, raw_warns)
-        render_grouped_tiers(displayed_errors, alert_items, regular_warns, whatever_items, fallback_lines: fallback, io: io)
-      else
-        _num_warnings, _num_errors = print_diagnostics_body([], displayed_errors, fallback_lines: fallback, tier_label: 'errors', io: io)
-      end
-      print_cascade_notice(cascade_info, io: io) if cascade_info
-
-      io.puts "See #{loga} for full error details." if @options[:verbose] || fallback.any? || errors.empty?
-      report_error_summary(content, raw, brace_errors, errors.size, io: io)
-      exit 1
+      alerts, warnings, whatevers = partition_diagnostics(content, extract_warnings(content, verbose: false))
+      Leeni::DiagnosticAnalysis.new(errors: errors, alerts: alerts, warnings: warnings, whatevers: whatevers,
+                                    error_count: errors.size, brace_errors: brace_errors)
     end
 
-    def report_error_summary(content, raw, brace_errors, num_errors, io: $stdout)
-      raw_warns = extract_warnings(content, verbose: false)
-      alert_items, regular_warns, whatever_items = partition_diagnostics(content, raw_warns)
-
-      brace_alerts_count = brace_errors.count { |e| e[:has_alert] }
-      errors_count = [num_errors, count_latex_errors(raw, 1)].max
-      alerts_count = alert_items.size + brace_alerts_count
-      warnings_count = regular_warns.size
-      whatevers_count = whatever_items.size
+    def report_error_summary(analysis, raw, io: $stdout)
+      brace_alerts_count = analysis.brace_errors.count { |e| e[:has_alert] }
+      errors_count = [analysis.errors.size, count_latex_errors(raw, 1)].max
+      alerts_count = analysis.alerts.size + brace_alerts_count
+      warnings_count = analysis.warnings.size
+      whatevers_count = analysis.whatevers.size
       suppressed = !@options[:emacs] && !@options[:all]
       print_summary_line(
         errors_count, alerts_count, warnings_count, whatevers_count,

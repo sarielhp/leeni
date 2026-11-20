@@ -25,7 +25,7 @@ Errors during compilation originate in one of three layers:
 
 ---
 
-## 3. Master Error Index (79 Errors)
+## 3. Master Error Index (80 Errors)
 
 | # | Error Message / Pattern | Layer | Cause & Summary | Support | Reproducer & Details |
 |---|:--- |:--- |:--- |:--- |:--- |
@@ -108,6 +108,7 @@ Errors during compilation originate in one of three layers:
 | **77** | `Illegal parameter number in definition of \iterate` (in a frame) | TeX Primitive | A `#1` inside a beamer frame body (a TikZ style) must be written `##1`. TeX reports it at `\end{frame}` and names beamer's macros; `leeni` reports one error at the `#1`. | **Catalog Hint** | [`77_parameter_in_frame`](77_parameter_in_frame/) |
 | **78** | `[\directlua]:1: unexpected symbol near ...` | LuaTeX | Lua code in `\directlua` is expanded by TeX first; active characters (csquotes `"`) break it. LuaTeX names the Lua chunk, not the file; `leeni` reports the TeX line that ran it. | **Catalog Hint** | [`78_lua_directlua_error`](78_lua_directlua_error/) |
 | **79** | `Package tikz Error: Sorry, the system call ... did NOT result in a usable output file` | Package (tikz) | `\tikzexternalize` needs shell escape to build each picture. The failed call and the unclosed environment and groups it leaves are one error. | **Catalog Hint** | [`79_tikz_external_failed`](79_tikz_external_failed/) |
+| **80** | `LaTeX Error: Unknown option ... for package ...` | LaTeX Kernel | An option the package does not declare. Repeated by every later package that loads the same one (tikz loading xcolor); `leeni` reports one error at the `\usepackage` that gave it. | **Catalog Hint** | [`80_unknown_package_option`](80_unknown_package_option/) |
 
 ---
 

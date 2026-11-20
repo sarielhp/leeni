@@ -540,7 +540,8 @@ module LaTeXErrorCatalog
     lines = File.readlines(source_file)
     last = line.to_i.positive? ? [line.to_i, lines.size].min : lines.size
     first = [last - RUNAWAY_SEARCH_LINES, 0].max
-    idx = runaway_line_index(lines, first, last, shown.gsub(/[\s{}]+/, ''))
+    # A blank line is shown as \par, which the source does not spell out.
+    idx = runaway_line_index(lines, first, last, shown.gsub(/\\par\b|[\s{}]+/, ''))
     return nil unless idx
 
     pos = lines[idx].index(shown)

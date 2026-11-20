@@ -130,4 +130,25 @@ class TestTexseRegressions < Minitest::Test
     assert_includes hint, 'exists only inside a tikzpicture'
     assert_includes hint, '\\protect\\draw'
   end
+
+  # TeX.SE 554070: an \addplot table without its closing ; runs to the end of
+  # the file; TeX shows the runaway text with \par for each blank line.
+  def test_addplot_without_semicolon_is_placed_after_the_plot
+    _, errors = build(<<~'TEX')
+      \documentclass{article}
+      \usepackage{pgfplots}
+      \begin{document}
+      \begin{tikzpicture}
+      \begin{axis}
+      \addplot table {
+      x y
+      1 2
+      }
+
+      \end{axis}
+      \end{tikzpicture}
+      \end{document}
+    TEX
+    assert_match(/\Amain\.tex:11: error: file ended while scanning .*\\addplot was never ended: it must end with ;/, errors.first.to_s)
+  end
 end

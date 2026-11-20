@@ -468,6 +468,18 @@ module LaTeXErrorCatalog
       doc_slug: '73_keyval_unknown_key'
     },
     {
+      id: :unknown_package_option,
+      pattern: /LaTeX Error: Unknown option [`'](.+?)' for package [`']?([^\s'.]+)/,
+      title: 'LaTeX Error: Unknown option for package',
+      token_extractor: ->(match, _block) { match[1] },
+      hint: lambda { |tok|
+        "The package has no option '#{tok}'; check its spelling in the package documentation (texdoc), or remove it"
+      },
+      why: 'Options in \\usepackage[...]{pkg} must be ones the package declares. LaTeX also passes them on when another package loads the same one later, so the error can repeat at that later \\usepackage.',
+      fix: 'Correct the option name (xcolor has x11names, not 11names) or remove it.',
+      doc_slug: '80_unknown_package_option'
+    },
+    {
       id: :tikz_external_failed,
       pattern: /Package tikz Error: Sorry, the system call '.*?' did NOT result in a usable output file/m,
       title: 'Package tikz Error: externalization system call failed',
@@ -548,6 +560,8 @@ module LaTeXErrorCatalog
       hint: lambda { |tok|
         if tok.to_s.match?(/collect@*body|get@body|Collect@Body/i)
           'Environment never closed; add its \\end{...} (the \\begin is on this line)'
+        elsif tok.to_s.include?('pgfplots@addplotimpl')
+          'An \\addplot was never ended: it must end with ; (after the closing } of table {...} or {expression}), and its braces must balance'
         elsif tok
           "Unclosed brace in argument of '#{tok}'; add missing '}' before EOF"
         else

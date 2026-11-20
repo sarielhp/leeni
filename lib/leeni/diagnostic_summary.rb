@@ -267,21 +267,29 @@ module LaTeXDiagnostics
       unlocated.size == errors.size ? errors : errors - unlocated
     end
 
-    # A matrix & read with the wrong catcode makes pgf look for its internal
-    # cell macros and typeset the cells as loose text; with the ampersand error
-    # reported, those are not shown as faults of their own.
     # One # in a frame body is reported for each macro that reads it
-    # (\iterate, \beamer@doifinframe); at one place it is one fault.
-    def merge_parameter_errors(errors)
+    # (\iterate, \beamer@doifinframe); at one place it is one fault. Other
+    # faults reported more than once are merged by repeated_fault_key.
+    def merge_repeated_faults(errors)
       seen = {}
       errors.reject do |error|
-        next false unless error[:catalog_id] == :illegal_parameter_number
-
-        place = [format_display_path(error[:file]), error[:line]]
-        seen.key?(place).tap { seen[place] = true }
+        key = repeated_fault_key(error)
+        key && seen.key?(key).tap { seen[key] = true }
       end
     end
 
+    # A package option LaTeX does not know is reported again wherever another
+    # package loads that package (tikz loading xcolor): one fault, one error.
+    def repeated_fault_key(error)
+      case error[:catalog_id]
+      when :illegal_parameter_number then [format_display_path(error[:file]), error[:line]]
+      when :unknown_package_option then error[:text].to_s[/Unknown option .*/]
+      end
+    end
+
+    # A matrix & read with the wrong catcode makes pgf look for its internal
+    # cell macros and typeset the cells as loose text; with the ampersand error
+    # reported, those are not shown as faults of their own.
     def suppress_ampersand_cascades(errors)
       primary = errors.select { |error| error[:catalog_id] == :wrong_catcode_ampersand }
       return errors if primary.empty?
@@ -475,7 +483,7 @@ module LaTeXDiagnostics
       compiler_errors = suppress_environment_mismatch_cascades(compiler_errors)
       compiler_errors = suppress_hyphenation_cascades(compiler_errors)
       compiler_errors = suppress_ampersand_cascades(compiler_errors)
-      compiler_errors = merge_parameter_errors(compiler_errors)
+      compiler_errors = merge_repeated_faults(compiler_errors)
       compiler_errors = suppress_unlocated_dropped_text(compiler_errors)
       errors = place_merged_brace_errors(prepare_error_items(compiler_errors), brace_errors)
       alerts, warnings, whatevers = partition_diagnostics(content, extract_warnings(content, verbose: false))

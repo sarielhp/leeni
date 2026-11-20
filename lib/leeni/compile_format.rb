@@ -66,7 +66,9 @@ module LaTeXCompileFormat
 
     # Append token if relevant and missing
     token = record[:token] || record.dig(:catalog, :token)
-    if token && !token.to_s.empty?
+    # A bare word is taken for a command name and gets its backslash, unless the
+    # message already names it (an option or a language: Unknown option 'x').
+    if token && !token.to_s.empty? && !base_msg.include?(token.to_s.strip)
       clean_token = token.to_s.strip
       clean_token = "\\#{clean_token}" if clean_token =~ /\A[a-zA-Z@]+\z/ && !clean_token.start_with?('\\')
       base_msg = "#{base_msg} #{clean_token}" unless base_msg.include?(clean_token)

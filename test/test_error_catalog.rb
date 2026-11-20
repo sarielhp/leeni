@@ -762,4 +762,16 @@ class TestErrorCatalog < Minitest::Test
     assert_includes LaTeXErrorCatalog.math_mode_advice('\\large'), '{\\large $...$}'
     assert_includes LaTeXErrorCatalog.math_mode_advice('\\scshape'), '\\math... equivalent'
   end
+
+  def test_runaway_start_finds_the_nearest_line_opening_the_argument
+    Dir.mktmpdir do |dir|
+      path = File.join(dir, 'p.tex')
+      File.write(path, "\\textbf{First line.\n\nOld.\n\\emph{First line.\n\nSecond.}\n")
+      assert_equal [4, 6], LaTeXErrorCatalog.runaway_start(path, 6, "{First line. \n")
+      assert_equal [1, 8], LaTeXErrorCatalog.runaway_start(path, 3, '{First line.')
+      assert_nil LaTeXErrorCatalog.runaway_start(path, 6, '{ab}'), 'too short to be telling'
+      assert_nil LaTeXErrorCatalog.runaway_start(path, 6, '{Nowhere in the file.')
+      assert_nil LaTeXErrorCatalog.runaway_start(path, 0, '{First line.'), 'no reported line'
+    end
+  end
 end

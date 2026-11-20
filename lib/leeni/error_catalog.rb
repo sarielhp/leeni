@@ -491,6 +491,35 @@ module LaTeXErrorCatalog
     [line, nil]
   end
 
+  RUNAWAY_SEARCH_LINES = 200
+
+  # Where a runaway argument began: TeX's "Runaway argument?" shows the start
+  # of the argument ("{First line."), and the error that follows is reported
+  # where the paragraph or file ended. The nearest source line at or above the
+  # reported one holding that text is the unclosed brace to fix. Returns
+  # [line, col], col nil when spacing differs, or nil when the text is too
+  # short to be telling or is not found.
+  def self.runaway_start(file, line, runaway_text)
+    shown = runaway_text.to_s.lines.first.to_s.strip.delete_suffix('...').strip
+    return nil if shown.delete('{}\\ ').length < 4 || !line.to_i.positive?
+
+    source_file = find_source_file(file)
+    return nil unless source_file
+
+    lines = File.readlines(source_file)
+    wanted = shown.gsub(/\s+/, ' ')
+    (line.to_i - 1).downto([line.to_i - RUNAWAY_SEARCH_LINES, 0].max) do |idx|
+      text = lines[idx].to_s
+      next unless text.gsub(/\s+/, ' ').include?(wanted)
+
+      pos = text.index(shown)
+      return [idx + 1, pos && (pos + 1)]
+    end
+    nil
+  rescue StandardError
+    nil
+  end
+
   def self.extract_misplaced_tab_col(file, line)
     source_file = find_source_file(file)
     return nil unless source_file && line&.to_i&.positive?

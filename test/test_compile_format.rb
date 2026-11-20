@@ -163,4 +163,14 @@ class TestCompileFormat < Minitest::Test
       Rainbow.enabled = orig
     end
   end
+
+  def test_render_does_not_repeat_a_token_the_message_already_names
+    rec = { file: 'p.tex', line: 2, tier: 'errors', token: 'unknownlangxyz',
+            message: "Package babel Error: Unknown option 'unknownlangxyz'." }
+    assert_equal "p.tex:2: error: package babel Error: Unknown option 'unknownlangxyz'",
+                 LaTeXCompileFormat.render(rec, color: false)
+
+    rec = { file: 'p.tex', line: 3, tier: 'errors', token: 'foo', message: 'Undefined control sequence.' }
+    assert_equal 'p.tex:3: error: undefined control sequence \\foo', LaTeXCompileFormat.render(rec, color: false)
+  end
 end

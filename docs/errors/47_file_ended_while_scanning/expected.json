@@ -8,15 +8,5 @@
       "tier": "errors",
       "category": "file_ended_while_scanning"
     }
-  ],
-  "known_issue": "Located correctly by the pre-flight brace check, but its category is generic instead of file_ended_while_scanning.",
-  "current": [
-    {
-      "file": "example.tex",
-      "line": 4,
-      "col": 8,
-      "tier": "errors",
-      "category": "generic"
-    }
   ]
 }

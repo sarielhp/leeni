@@ -197,7 +197,47 @@ module LaTeXDiagnostics
     def suppress_compiler_brace_cascades(errors, brace_errors)
       return errors if brace_errors.empty?
 
+      errors = errors.reject { |error| merge_brace_fault(error, brace_errors) }
       errors.reject { |error| COMPILER_BRACE_CASCADE_IDS.include?(error[:catalog_id]) }
+    end
+
+    # The compiler error each kind of pre-flight brace error can stand for.
+    BRACE_FAULT_KINDS = {
+      extra_closing_brace: :extra, missing_closing_brace: :unclosed,
+      file_ended_while_scanning: :unclosed, paragraph_ended_before_complete: :unclosed
+    }.freeze
+    SAME_LINE_BRACE_FAULTS = %i[extra_closing_brace missing_closing_brace].freeze
+
+    # TeX and the pre-flight brace check often report one brace fault twice:
+    # "Too many }'s" beside "Extra closing brace", or "Missing } inserted" /
+    # "File ended while scanning" beside "Unclosed open brace". The pre-flight
+    # error knows the column and the line the brace was opened on; the compiler
+    # error knows the category and the hint. The brace error takes those over
+    # and the compiler error is dropped (returns true).
+    def merge_brace_fault(error, brace_errors)
+      kind = BRACE_FAULT_KINDS[error[:catalog_id]]
+      return false unless kind
+
+      brace = brace_errors.find do |b|
+        !b[:catalog_id] && brace_fault_kind(b) == kind && brace_fault_matches?(error, b)
+      end
+      return false unless brace
+
+      # The token belongs to the compiler message (the macro whose argument ran
+      # away); the hint already names it, and it would mark the wrong span here.
+      brace[:catalog] = (error[:catalog] || {}).merge(root_line: brace[:line], root_col: brace[:col], token: nil)
+      brace[:catalog_id] = error[:catalog_id]
+      true
+    end
+
+    def brace_fault_kind(brace)
+      brace[:text].to_s.include?("Extra closing brace '}'") ? :extra : :unclosed
+    end
+
+    def brace_fault_matches?(error, brace)
+      return true unless SAME_LINE_BRACE_FAULTS.include?(error[:catalog_id])
+
+      error[:line].to_i == brace[:line].to_i && File.basename(error[:file].to_s) == File.basename(brace[:file].to_s)
     end
 
     def suppress_environment_mismatch_cascades(errors)

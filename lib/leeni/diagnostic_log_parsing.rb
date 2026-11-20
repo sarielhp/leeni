@@ -433,7 +433,39 @@ module LaTeXDiagnostics
           i += 1
         end
       end
-      errors
+      fold_runaway_lead_ins(errors)
+    end
+
+    RUNAWAY_LEAD_IN = /\ARunaway argument\?/
+
+    # TeX opens "Paragraph ended before ..." and "File ended while scanning ..."
+    # with "Runaway argument?" and the start of the runaway text. That lead-in
+    # has no location of its own; reported separately it became a second error
+    # for one fault, at line 0. It is kept on the error it introduces instead
+    # (:runaway_text), and stays an error of its own only when nothing follows it.
+    # The text also says where the argument began, which becomes the root of
+    # that error: TeX reports where the paragraph ended, the fix is the brace
+    # left open above it.
+    def fold_runaway_lead_ins(errors)
+      errors.each_with_index.filter_map do |err, idx|
+        following = errors[idx + 1]
+        next err unless following && err[:text].to_s.match?(RUNAWAY_LEAD_IN)
+
+        following[:runaway_text] = err[:err_block].drop(1).join("\n")
+        root_runaway_error(following)
+        nil
+      end
+    end
+
+    def root_runaway_error(err)
+      return if err[:root_line].to_i.positive? && err[:root_line].to_i != err[:line].to_i
+
+      root_line, root_col = LaTeXErrorCatalog.runaway_start(err[:file], err[:line], err[:runaway_text])
+      return unless root_line && root_line < err[:line].to_i
+
+      err[:root_line] = root_line
+      err[:root_col] = root_col
+      err[:formatted] = format_error_block(err[:err_block], err[:line], catalog: err[:catalog], item: err)
     end
 
     def build_error_entry(lines, idx, err_file, file_stack = [], bib_entry: nil)
@@ -445,7 +477,7 @@ module LaTeXDiagnostics
       classification = LaTeXErrorCatalog.classify(
         err_text, err_block, file: file_name, line: line_no, junk_dir: diagnostics_junk_dir
       )
-      source_location = locate_error_source(classification, err_text)
+      source_location = locate_error_source(classification, err_text) || locate_package_load(file_name)
       if source_location
         file_name, line_no = source_location
         classification = LaTeXErrorCatalog.classify(
@@ -484,7 +516,51 @@ module LaTeXDiagnostics
         locate_missing_character(classification[:token])
       when :pdf_driver_image_failed
         locate_image_request(classification[:token], err_text[/include page (\d+) of image/, 1])
+      when :pdf_driver_fatal
+        locate_driver_file_request(classification[:token])
       end
+    end
+
+    DISTRIBUTION_STYLE = %r{/texmf-dist/.+\.(?:sty|cls)\z}
+
+    # TeX reports an error raised while a class or package of the TeX
+    # distribution is being read inside that file (babel.sty:4481), which the
+    # author cannot change; the \usepackage or \documentclass that loads it,
+    # with the option at fault, is the line to fix. A package loaded only by
+    # another package is not found and keeps TeX's location.
+    def locate_package_load(file)
+      path = file.to_s
+      return nil unless path.match?(DISTRIBUTION_STYLE)
+
+      command = path.end_with?('.cls') ? 'documentclass|LoadClass' : 'usepackage|RequirePackage'
+      name = Regexp.escape(File.basename(path, '.*'))
+      pattern = /\\(?:#{command})\s*(?:\[[^\]]*\])?\s*\{(?:[^}]*[,\s])?#{name}\s*(?:,[^}]*)?\}/
+      collect_source_candidates.each do |src_file|
+        LaTeXUtils.safe_read(src_file).each_line.with_index(1) do |line, line_no|
+          return [src_file, line_no] if LaTeXUtils.strip_latex_comments(line).match?(pattern)
+        end
+      end
+      nil
+    end
+
+    DRIVER_MISSING_FILE = /Could not (?:find|open) file:?\s*['`"]?([^\s'"]+)/i
+
+    # A fatal driver message that names a file it could not find ("Image
+    # inclusion failed. Could not find file: x.pdf") points at the
+    # \includegraphics or \special that asked for it. A message naming no file
+    # stays without a location: guessing one would mislead.
+    def locate_driver_file_request(message)
+      file = message.to_s[DRIVER_MISSING_FILE, 1]
+      stem = File.basename(file.to_s).sub(/\.[A-Za-z0-9]+\z/, '')
+      return nil if stem.empty?
+
+      pattern = /\\(?:includegraphics\s*\*?\s*(?:\[[^\]]*\])?\s*\{|special\s*\{)[^}]*#{Regexp.escape(stem)}/
+      collect_source_candidates.each do |src_file|
+        LaTeXUtils.safe_read(src_file).each_line.with_index(1) do |line, line_no|
+          return [src_file, line_no] if LaTeXUtils.strip_latex_comments(line).match?(pattern)
+        end
+      end
+      nil
     end
 
     # The \includegraphics of the image, preferring the one that asks for the

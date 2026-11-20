@@ -8,21 +8,5 @@
       "tier": "errors",
       "category": "missing_closing_brace"
     }
-  ],
-  "known_issue": "The unclosed brace is reported twice: by TeX (no column) and by the pre-flight brace check (with column).",
-  "current": [
-    {
-      "file": "example.tex",
-      "line": 3,
-      "tier": "errors",
-      "category": "missing_closing_brace"
-    },
-    {
-      "file": "example.tex",
-      "line": 3,
-      "col": 7,
-      "tier": "errors",
-      "category": "generic"
-    }
   ]
 }

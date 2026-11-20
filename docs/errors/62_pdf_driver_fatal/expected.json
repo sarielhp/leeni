@@ -7,14 +7,5 @@
       "tier": "errors",
       "category": "pdf_driver_fatal"
     }
-  ],
-  "known_issue": "The PDF driver failure caused by the \\special on line 3 has no location.",
-  "current": [
-    {
-      "file": "example.tex",
-      "line": 0,
-      "tier": "errors",
-      "category": "pdf_driver_fatal"
-    }
   ]
 }

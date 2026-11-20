@@ -241,6 +241,23 @@ class TestErrorCatalog < Minitest::Test
     end
   end
 
+  # A paragraph longer than the scanned window: the window starts inside the
+  # math opened on line 3, so its odd count of dollars names no culprit.
+  def test_missing_dollar_names_no_unclosed_dollar_when_the_window_is_cut
+    Dir.mktmpdir do |dir|
+      file = File.join(dir, 'test.tex')
+      rows = Array.new(30) { |i| "#{i} & #{i + 1} \\\\" }
+      content = ['\\documentclass{article}', '\\begin{document}', '$\\left( \\begin{matrix}', *rows,
+                 '30 & 31 \\end{matrix} \\right)$ and $x$ then', 'text with \\alpha here', '', '\\end{document}']
+      File.write(file, content.join("\n"))
+      line = content.index('text with \\alpha here') + 1
+      text = "#{file}:#{line}: Missing $ inserted.\nl.#{line}"
+      item = LaTeXErrorCatalog.classify(text, text.lines, file: file, line: line)
+      assert_equal :missing_dollar, item[:id]
+      refute_includes item[:hint], "Unclosed '$'"
+    end
+  end
+
   def test_classify_missing_dollar_currency
     Dir.mktmpdir do |dir|
       file = File.join(dir, 'test.tex')

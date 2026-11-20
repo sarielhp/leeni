@@ -93,13 +93,24 @@ module CorpusCompare
       stdin.close
       reader = Thread.new { out.read }
       timed_out = wait.join(timeout).nil?
-      Process.kill('KILL', -wait.pid) if timed_out
+      stop_group(wait) if timed_out
       status = wait.value
       { output: reader.value.to_s, status: timed_out ? nil : status.exitstatus, timed_out: timed_out,
         elapsed: (Process.clock_gettime(Process::CLOCK_MONOTONIC) - started).round(1) }
     end
   rescue Errno::ESRCH
     { output: '', status: nil, timed_out: true, elapsed: timeout }
+  end
+
+  # leeni runs TeX in a process group of its own, which it stops on TERM; a
+  # KILL would leave TeX running (a looping document runs on for good).
+  def self.stop_group(wait)
+    Process.kill('TERM', -wait.pid)
+    return if wait.join(10)
+
+    Process.kill('KILL', -wait.pid)
+  rescue Errno::ESRCH
+    nil
   end
 
   def self.pdf_facts(pdf)

@@ -25,6 +25,10 @@ module LaTeXLogPromoter
   UNCLOSED_CONDITIONAL = /^\(\\end occurred when (\\\w+) on line (\d+) was incomplete\)\s*$/
   MISSING_INCLUDE = /^No file (\S+\.tex)\.\s*$/
   MISSING_CHARACTER = /^(?:! |(?<at>.+?:\d+: ))?Missing character: There is no (?<glyph>.+?) in font (?<font>.+?)[.!]?\s*$/
+  NULLFONT_NOTE = /^(?:! |.+?:\d+: )?Missing character: There is no .+? in font nullfont[.!]?[ \t]*\n/
+  # LuaTeX reports the characters at shipout, each followed by a few lines
+  # of context; the run goes on across them while no error intervenes.
+  NULLFONT_RUN = /(?:#{NULLFONT_NOTE.source}(?:(?:^(?!! |\S+:\d+: |Missing character: )[^\n]*\n){1,8}(?=#{NULLFONT_NOTE.source}))?)+(?:^\.\n(?:^(?:<[^>\n]+>|[ \t]+)[^\n]*\n)*)?/
   NO_PAGES = /^No pages of output\.\s*$/
   DRIVER_IMAGE_FAILED = /^xdvipdfmx:fatal: Image inclusion failed for "(?<path>.+?)" \(page=(?<page>\d+)\)\.?\s*$/
   DRIVER_FATAL = /^xdvipdfmx:fatal: (?<what>.+?)\.?\s*$/
@@ -38,6 +42,7 @@ module LaTeXLogPromoter
     # An empty output after a real compiler error is a consequence, not a
     # second fault, and a bibliography-only body has no pages until the
     # bibliography tool has run; the no-pages note is left alone in both cases.
+    text = collapse_dropped_text(text)
     skip_no_pages = text.match?(COMPILER_ERROR) || text.match?(PENDING_BIBLIOGRAPHY)
     state = { armed: false, seen: {}, counts: missing_character_counts(text), skip_no_pages: skip_no_pages }
     text.each_line.map { |line| rewrite_line(line, state) }.join
@@ -129,6 +134,19 @@ module LaTeXLogPromoter
     count = state[:counts][key]
     times = count > 1 ? " (#{count} occurrences)" : ''
     "LaTeX Warning: Duplicate hyperlink destination '#{name}'#{times}; every link to it lands on the first occurrence.\n\n"
+  end
+
+  # Text typeset where no font is active (in a picture, outside any node) is
+  # dropped character by character, one note each, in order: a run of
+  # consecutive notes spells the dropped text, which is one fault (and one
+  # error, located by that text) rather than a missing glyph per letter.
+  def self.collapse_dropped_text(text)
+    text.gsub(NULLFONT_RUN) do |block|
+      # The engines add the code: ' ("73)' (pdfTeX), ' (U+0073)' (XeTeX, LuaTeX).
+      glyphs = block.each_line.filter_map { |line| line[MISSING_CHARACTER, :glyph] }
+      dropped = glyphs.map { |glyph| glyph.sub(/ \((?:"\h+|U\+\h+)\)\z/, '') }.join
+      error("Text typeset with no font (nullfont) was dropped from the PDF: '#{dropped}'", note: false)
+    end
   end
 
   def self.missing_character_counts(text)

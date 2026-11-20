@@ -291,14 +291,24 @@ module LaTeXErrorCatalog
 
     start_idx = idx
     while start_idx.positive? && (idx - start_idx) < 25
-      prev = lines[start_idx - 1].strip
-      break if prev.empty? || prev =~ /\A\\par\b/ || prev =~ /\A\\(?:section|chapter|subsection|subsubsection)\b/
-      break if prev =~ /\A\\(?:begin|end)\{/
+      break if paragraph_boundary?(lines[start_idx - 1])
 
       start_idx -= 1
     end
 
     [start_idx, idx]
+  end
+
+  def self.paragraph_boundary?(line)
+    prev = line.to_s.strip
+    prev.empty? || prev.match?(/\A\\par\b/) || prev.match?(/\A\\(?:section|chapter|subsection|subsubsection)\b/) ||
+      prev.match?(/\A\\(?:begin|end)\{/)
+  end
+
+  # A window cut by the line cap may start inside math: the parity of its
+  # dollars then says nothing about which one is unclosed.
+  def self.window_capped?(lines, start_idx)
+    start_idx.positive? && !paragraph_boundary?(lines[start_idx - 1])
   end
 
   def self.extract_dollars_in_range(lines, start_idx, end_idx)
@@ -390,7 +400,7 @@ module LaTeXErrorCatalog
     start_idx, end_idx = find_paragraph_bounds(lines, err_idx)
     dollars = extract_dollars_in_range(lines, start_idx, end_idx)
 
-    if dollars.size.odd?
+    if dollars.size.odd? && !window_capped?(lines, start_idx)
       cand = find_best_unclosed_dollar(lines, dollars)
       if cand[:currency]
         "Literal '$' in '$#{cand[:currency]}'; escape as '\\$' for currency"

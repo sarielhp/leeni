@@ -601,6 +601,16 @@ module LaTeXErrorCatalog
       doc_slug: '58_missing_character'
     },
     {
+      id: :dropped_text,
+      pattern: /Text typeset with no font \(nullfont\) was dropped from the PDF: '(.*)'/,
+      title: 'Text dropped: no font active',
+      token_extractor: ->(match, _block) { match[1] },
+      hint: 'Text inside a picture but outside any node is dropped; put it in a node or remove it (often a stray ; or a misplaced [options] list)',
+      why: 'Inside a tikzpicture (or another picture) no font is active outside nodes, so TeX typesets stray text in nullfont and drops it, noting each lost character in the log.',
+      fix: 'Put the text in a node, attach an option list to the command it belongs to, or delete the stray characters.',
+      doc_slug: '72_dropped_text'
+    },
+    {
       id: :no_pages_of_output,
       pattern: /No pages of output: the document body typeset nothing/,
       title: 'No pages of output',

@@ -20,6 +20,8 @@ module LaTeXDiagnostics
         locate_missing_resource_request(classification[:token])
       when :missing_character
         locate_missing_character(classification[:token])
+      when :dropped_text
+        locate_dropped_text(classification[:token].to_s)
       when :pdf_driver_image_failed
         locate_image_request(classification[:token], err_text[/include page (\d+) of image/, 1])
       when :pdf_driver_fatal
@@ -154,6 +156,32 @@ module LaTeXDiagnostics
       end
       best = hits.find { |_f, _l, opts| page && opts.match?(/\bpage\s*=\s*\{?#{page}\b/) } || hits.first
       best&.first(2)
+    end
+
+    # The dropped text has lost its spaces and braces and may span lines, so it is looked
+    # up in the source with whitespace removed; a run of one or two characters
+    # (a stray ';' or two) falls back to its first character.
+    def locate_dropped_text(text)
+      probes = [text, text[0, 8]]
+      probes << text[0] if text.size <= 2
+      collect_source_candidates.each do |file|
+        joined, starts = joined_source(file)
+        probes.uniq.each do |probe|
+          at = !probe.empty? && joined.index(probe)
+          return [file, starts.rindex { |offset| offset <= at } + 1] if at
+        end
+      end
+      nil
+    end
+
+    def joined_source(file)
+      joined = +''
+      starts = LaTeXUtils.safe_read(file).each_line.map do |line|
+        offset = joined.size
+        joined << LaTeXUtils.strip_latex_comments(line).gsub(/[\s{}]+/, '') # braces only group
+        offset
+      end
+      [joined, starts]
     end
 
     def locate_missing_character(glyph)

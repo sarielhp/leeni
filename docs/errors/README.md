@@ -25,7 +25,7 @@ Errors during compilation originate in one of three layers:
 
 ---
 
-## 3. Master Error Index (74 Errors)
+## 3. Master Error Index (75 Errors)
 
 | # | Error Message / Pattern | Layer | Cause & Summary | Support | Reproducer & Details |
 |---|:--- |:--- |:--- |:--- |:--- |
@@ -103,6 +103,7 @@ Errors during compilation originate in one of three layers:
 | **72** | `Missing character: There is no s in font nullfont!` | TikZ / pgf | Text inside a picture but outside any node is dropped, one log note per character, with no line. `leeni` reports the dropped text once, at its line. | **Catalog Hint** | [`72_dropped_text`](72_dropped_text/) |
 | **73** | `Package keyval Error: widht undefined.` | keyval / graphicx | An unknown `key=value` option, reported where the command was read to its end (a frame's `\end{frame}`). `leeni` finds the key; a key reported with its value points at an active `=` (babel shorthand). | **Catalog Hint** | [`73_keyval_unknown_key`](73_keyval_unknown_key/) |
 | **74** | `./example.tex:13: ...` at `\end{frame}` | beamer | Errors inside a frame are all reported at its `\end{frame}`. `leeni` places them in the frame body by the command, `_`/`^` or `\end{...}` they name. | **Standard** | [`74_error_inside_frame`](74_error_inside_frame/) |
+| **75** | `Improper \hyphenation will be flushed.` | TeX Primitive | An accent macro or babel shorthand inside `\hyphenation`; TeX reports each non-letter token and the cascade it causes. `leeni` reports one error. | **Catalog Hint** | [`75_improper_hyphenation`](75_improper_hyphenation/) |
 
 ---
 
@@ -120,7 +121,7 @@ The corpus runs in the medium test tier (`test/test_error_corpus.rb`, also `tool
 # Run the corpus expectations
 tools/test_error_corpus
 # Draft expected.json for a new case (check every location by hand before saving)
-tools/test_error_corpus --draft docs/errors/75_new_case
+tools/test_error_corpus --draft docs/errors/76_new_case
 ```
 
 ### Comparing Real Papers with latexmk

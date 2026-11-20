@@ -255,6 +255,20 @@ module LaTeXDiagnostics
       error[:line].to_i == brace[:line].to_i && File.basename(error[:file].to_s) == File.basename(brace[:file].to_s)
     end
 
+    # One bad word in \hyphenation (an accent macro, a babel shorthand) makes
+    # TeX expand its commands inside the list: an "Improper \hyphenation" for
+    # each, and Missing \begin{document}, Extra } and the like. Every later
+    # error on that line is part of it and is counted in the first.
+    def suppress_hyphenation_cascades(errors)
+      primary = errors.find { |error| error[:catalog_id] == :improper_hyphenation }
+      return errors unless primary
+
+      place = [format_display_path(primary[:file]), primary[:line]]
+      errors.reject do |error|
+        !error.equal?(primary) && [format_display_path(error[:file]), error[:line]] == place
+      end
+    end
+
     def suppress_environment_mismatch_cascades(errors)
       primary = errors.find { |error| error[:catalog_id] == :mismatched_environment }
       return errors unless primary && format_display_path(primary[:file]) != format_display_path(@filename)
@@ -411,6 +425,7 @@ module LaTeXDiagnostics
       compiler_errors.each_with_index { |error, index| error[:log_index] = index }
       compiler_errors = suppress_compiler_brace_cascades(compiler_errors, brace_errors)
       compiler_errors = suppress_environment_mismatch_cascades(compiler_errors)
+      compiler_errors = suppress_hyphenation_cascades(compiler_errors)
       errors = place_merged_brace_errors(prepare_error_items(compiler_errors), brace_errors)
       alerts, warnings, whatevers = partition_diagnostics(content, extract_warnings(content, verbose: false))
       Leeni::DiagnosticAnalysis.new(errors: errors, alerts: alerts, warnings: warnings, whatevers: whatevers,

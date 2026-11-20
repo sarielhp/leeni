@@ -106,8 +106,17 @@ module LaTeXDiagnostics
     # author cannot change; the \usepackage or \documentclass that loads it,
     # with the option at fault, is the line to fix. A package loaded only by
     # another package is not found and keeps TeX's location.
-    def locate_package_load(file)
-      path = file.to_s
+    # A package the document does not load itself (hyperref loaded by a class)
+    # is traced through TeX's open files to the one the document does load.
+    def locate_package_load(file, file_stack = [])
+      [file, *file_stack.compact.reverse].uniq.each do |path|
+        found = locate_load_of(path.to_s)
+        return found if found
+      end
+      nil
+    end
+
+    def locate_load_of(path)
       return nil unless path.match?(DISTRIBUTION_STYLE)
 
       command = path.end_with?('.cls') ? 'documentclass|LoadClass' : 'usepackage|RequirePackage'

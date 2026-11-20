@@ -429,6 +429,15 @@ module LaTeXErrorCatalog
       doc_slug: '42_package_babel_unknown_language'
     },
     {
+      id: :improper_hyphenation,
+      pattern: /Improper \\hyphenation will be flushed/,
+      title: 'Improper \\hyphenation will be flushed',
+      hint: 'A \\hyphenation word may hold only letters and -; type accented letters directly (UTF-8 with \\usepackage[T1]{fontenc}), not as \\"a or "a',
+      why: 'TeX accepts only characters of the current font and hyphens in \\hyphenation. An accent macro (\\"a), a babel shorthand ("a) or any other command expands to something that is not a letter, and TeX drops the word with one error per such token.',
+      fix: 'Write the word with the accented characters themselves, using UTF-8 input and a T1 font encoding, or leave the word out.',
+      doc_slug: '75_improper_hyphenation'
+    },
+    {
       id: :keyval_unknown_key,
       pattern: /Package keyval Error: (\S+) undefined/,
       title: 'Package keyval Error: unknown key',

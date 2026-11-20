@@ -249,6 +249,35 @@ class TestPathologicalLatex < Minitest::Test
     end
   end
 
+  # TeX's errors before it loops name the cause; they reach only the flushed
+  # part of its .log (16 KB blocks), so enough of them are written to fill one.
+  def test_timed_out_pass_keeps_the_errors_reported_before_the_loop
+    with_project('loop_after_errors') do |dir|
+      write(dir, 'main.tex', document(("\\undefinedBeforeLoop\n\n" * 60) + '\\def\\spin{\\spin}\\spin'))
+
+      out, status = compile(dir, '--timeout', '5', 'main.tex')
+
+      assert_equal 1, status.exitstatus, out
+      assert_match(/^main\.tex:\d+:\d+: error: undefined control sequence/i, out)
+      assert_match(/timed out/i, out)
+    end
+  end
+
+  # TeX reports an undefined command in a macro's body at each use; leeni
+  # shows it at the definition, once.
+  def test_error_in_macro_body_is_shown_once_at_the_definition
+    with_project('macro_body') do |dir|
+      write(dir, 'main.tex', "\\documentclass{article}\n\\newcommand\\here{at \\nosuchcommand}\n" \
+                             "\\begin{document}\n\\here\n\n\\here\n\n\\here\n\\end{document}\n")
+
+      out, status = compile(dir, 'main.tex')
+
+      assert_equal 1, status.exitstatus, out
+      assert_equal 1, out.scan(/^main\.tex:2:\d+: error:/).size, out
+      assert_match(/repeated 3 times/i, out)
+    end
+  end
+
   def test_repeated_failing_input_is_declustered_with_repeat_count
     with_project('repeated_failure') do |dir|
       write(dir, 'main.tex', document("\\input{shared}\n\\input{shared}"))

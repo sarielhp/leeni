@@ -242,7 +242,7 @@ module LaTeXDiagnostics
       end
       append_error_hint(lines, { hint: cat[:note] }, indent) if cat&.[](:note)
 
-      append_repeat_note(lines, repeat_count, line_no, indent) if repeat_count > 1
+      append_repeat_note(lines, repeat_count, item&.[](:repeat_lines) || [line_no], indent) if repeat_count > 1
 
       append_verbose_error_context(lines, err_block, indent, file_path) if @options[:verbose]
 
@@ -571,8 +571,10 @@ module LaTeXDiagnostics
       end
     end
 
-    def append_repeat_note(lines, repeat_count, line_no, indent)
-      note = "Repeated #{repeat_count} times on line #{line_no}."
+    def append_repeat_note(lines, repeat_count, at_lines, indent)
+      at_lines = Array(at_lines)
+      where = at_lines.size > 1 ? "at lines #{at_lines.join(', ')}" : "on line #{at_lines.first}"
+      note = "Repeated #{repeat_count} times #{where}."
       note_colored = @options[:color] == false ? note : Rainbow(note).yellow
       arrow = @options[:color] == false ? '▸' : Rainbow('▸').yellow.bright
       lines << "#{indent}#{arrow} #{note_colored}"

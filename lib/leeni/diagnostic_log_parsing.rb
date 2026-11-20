@@ -590,13 +590,25 @@ module LaTeXDiagnostics
       item
     end
 
+    # File, shown line and message; for an error shown away from where TeX
+    # reported it, TeX's location of the use ("./f.tex:6:", "l.6 ...") is left out.
+    def repeat_key(error)
+      root = (error[:root_line] || error.dig(:catalog, :root_line)).to_i
+      line = error[:line].to_i
+      text = error[:text].to_s
+      if root.positive? && root != line
+        text = text.lines.grep_v(/\Al\.\d+ /).join.sub(/\A\S*?:\d+: /, '')
+        line = root
+      end
+      [format_display_path(error[:file]), line, text.gsub(/\s+/, ' ').strip]
+    end
+
     def decluster_errors(errors)
       return errors if errors.size <= 1
 
-      grouped = errors.group_by do |e|
-        sig = e[:text].to_s.gsub(/\s+/, ' ').strip
-        [format_display_path(e[:file]), e[:line] || 0, sig]
-      end
+      # Errors are grouped by the line they are shown at: an error TeX reports
+      # at each use of a macro is shown at the macro's definition.
+      grouped = errors.group_by { |e| repeat_key(e) }
 
       clustered = []
       grouped.each_value do |group|
@@ -604,10 +616,11 @@ module LaTeXDiagnostics
         if group.size > 1
           item = first.dup
           item[:repeat_count] = group.size
+          item[:repeat_lines] = group.map { |e| e[:line] }.uniq
           item[:formatted] = format_error_block(
             first[:err_block], first[:line] || 0,
             catalog: first[:catalog], repeat_count: group.size,
-            item: first
+            item: item
           )
           item[:err_block] = first[:err_block] + ["  (Repeated #{group.size} times on line #{first[:line]})"] if @options[:emacs]
           clustered << item

@@ -121,9 +121,11 @@ class TestBwsReview < Minitest::Test
     with_source do |root, source, output|
       load = LeeniTestLoad.factor
       start = Process.clock_gettime(Process::CLOCK_MONOTONIC)
-      code = 'trap("TERM") {}; File.write("child.pid", Process.pid.to_s); sleep 30'
+      # A shell, not Ruby: it writes its pid within the timeout even under
+      # load. The ignored TERM and the pid both survive the exec.
+      code = 'echo $$ > child.pid; trap "" TERM; exec sleep 30'
       text, status = Open3.capture2e('ruby', BIN, source, '--output', output, '--bws', fake_bws(root),
-                                     '--timeout', LeeniTestLoad.scale(0.3, load).to_s, '--', '/usr/bin/ruby', '-e', code)
+                                     '--timeout', LeeniTestLoad.scale(0.3, load).to_s, '--', '/bin/sh', '-c', code)
       assert_equal 124, status.exitstatus, text
       assert_operator Process.clock_gettime(Process::CLOCK_MONOTONIC) - start, :<, LeeniTestLoad.scale(6, load)
       pid = Integer(File.read(File.join(output, 'child.pid')))

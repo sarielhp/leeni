@@ -394,7 +394,10 @@ module LatexBuildRuntime
     output, status = capture_pass_output(command)
     return run_latex_pass(suffix) if !status.success? && seed_missing_aux(output)
 
-    discard_truncated_outputs(pass_started_at) if killed_pass?(status)
+    if killed_pass?(status)
+      output = errors_before_kill + output
+      discard_truncated_outputs(pass_started_at)
+    end
     output = strip_draft_notice(output)
     exit_status = process_exit_status(status)
     File.open(pass_log, 'a') { |file| file.write(output) }
@@ -427,6 +430,15 @@ module LatexBuildRuntime
   # would read them and fail with runaway arguments at \begin{document}.
   def killed_pass?(status)
     (status.respond_to?(:signaled?) && status.signaled?) || status.exitstatus == 124
+  end
+
+  # TeX buffers what it writes to a pipe, so a pass killed in a loop leaves the
+  # errors it reported before looping (which usually name the cause) only in
+  # the part of its .log already flushed.
+  def errors_before_kill
+    text = LaTeXUtils.safe_read(File.join(@junk_dir, "#{@bfilename}.log"))
+    start = text.index(/^(?:! |\S+:\d+: )/)
+    start ? "#{text[start..]}\n" : +''
   end
 
   def discard_truncated_outputs(since)

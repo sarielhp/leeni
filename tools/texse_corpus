@@ -3,7 +3,8 @@
 
 # Real failing documents from TeX Stack Exchange. Questions are fetched from
 # the public API, their complete documents extracted and compiled once with
-# plain pdflatex; those that still fail, for a reason other than a missing
+# the engine each needs (pdflatex unless fontspec and the like ask for XeTeX
+# or LuaTeX); those that still fail, for a reason other than a missing
 # file, are run through leeni in batches and its first error compared with
 # TeX's. There is no known fault line, so differences are listed for review,
 # not scored. Datasets stay outside the repository (datasets/ is ignored).
@@ -25,9 +26,9 @@ module TexseCorpus
 
     Commands:
       fetch     download questions, top-voted first, into DATASET_DIR/download
-      prepare   extract complete documents, compile new ones once with pdflatex,
+      prepare   extract complete documents, compile new ones once with their engine,
                 and write the next batch of still-failing ones (corpus/batch-N.json)
-      run       run leeni (pdflatex) on a batch, compare its first error with
+      run       run leeni (with the engine the document needs) on a batch, compare its first error with
                 TeX's, and list the documents where they differ
 
     Options:
@@ -141,20 +142,39 @@ module TexseCorpus
   end
 
   def compile_new(root, opts)
-    ids = Dir.children(corpus_dir(root)).grep(/\A\d+\z/).reject { |id| read_entry(root, id).key?('tex_errors') }
+    # A document is compiled again when the engine it needs has changed.
+    ids = Dir.children(corpus_dir(root)).grep(/\A\d+\z/).reject do |id|
+      entry = read_entry(root, id)
+      entry.key?('tex_errors') && entry['engine'] == engine_for(File.join(corpus_dir(root), id, 'paper')).first
+    end
     lock = Mutex.new
     each_parallel(ids, opts[:jobs]) do |id|
-      errors = tex_errors(File.join(corpus_dir(root), id, 'paper'))
-      lock.synchronize { File.write(entry_path(root, id), JSON.pretty_generate(read_entry(root, id).merge('tex_errors' => errors))) }
+      paper = File.join(corpus_dir(root), id, 'paper')
+      errors = tex_errors(paper)
+      update = { 'tex_errors' => errors, 'engine' => engine_for(paper).first }
+      lock.synchronize { File.write(entry_path(root, id), JSON.pretty_generate(read_entry(root, id).merge(update))) }
     end
     ids.size
   end
 
-  # TeX's first errors from one plain pdflatex run in a scratch copy.
+  # fontspec, polyglossia and unicode-math need XeTeX or LuaTeX, Lua code
+  # LuaTeX; anything else is compiled as pdflatex, as leeni would.
+  ENGINES = [
+    [/\\directlua|\\usepackage(?:\[[^\]]*\])?\{[^}]*\b(?:luacode|luatexbase|luaotfload)\b/, %w[lualatex l]],
+    [/\\setmainfont|\\usepackage(?:\[[^\]]*\])?\{[^}]*\b(?:fontspec|polyglossia|unicode-math|xeCJK|mathspec)\b/,
+     %w[xelatex x]]
+  ].freeze
+
+  def engine_for(paper)
+    source = File.read(File.join(paper, 'main.tex'), mode: 'rb').force_encoding(Encoding::UTF_8).scrub
+    ENGINES.find { |pattern, _| source.match?(pattern) }&.last || %w[pdflatex p]
+  end
+
+  # TeX's first errors from one run of the document's engine in a scratch copy.
   def tex_errors(paper)
     ProjectTmp.mktmpdir('texse-compile') do |work|
       FileUtils.cp_r(File.join(paper, '.'), work)
-      Open3.capture2e('timeout', '60', 'pdflatex', '-interaction=nonstopmode', '-file-line-error', 'main.tex',
+      Open3.capture2e('timeout', '60', engine_for(paper).first, '-interaction=nonstopmode', '-file-line-error', 'main.tex',
                       chdir: work, stdin_data: '')
       log = File.join(work, 'main.log')
       next ['no log written'] unless File.file?(log)
@@ -205,7 +225,7 @@ module TexseCorpus
   end
 
   def leeni(work, cache, opts, flag)
-    MutateCorpus.leeni(work, 'main.tex', opts, cache, '-e', 'p', '--timeout', '60', flag)
+    MutateCorpus.leeni(work, 'main.tex', opts, cache, '-e', engine_for(work).last, '--timeout', '60', flag)
   end
 
   def run_document(root, id, opts)

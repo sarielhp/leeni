@@ -422,7 +422,15 @@ module LaTeXErrorCatalog
       pattern: /Package babel Error: Unknown (?:language|option) [`']([^`'.]+)['`]/i,
       title: 'Package babel Error: Unknown language',
       hint: lambda { |tok|
-        tok ? "Unknown babel language '#{tok}'; check spelling or texlive-lang" : 'Unknown babel language; check spelling or texlive-lang'
+        renamed = { 'francais' => 'french', 'frenchb' => 'french', 'germanb' => 'german', 'magyar' => 'hungarian',
+                    'brazilian' => 'brazil', 'bahasa' => 'indonesian', 'lowersorbian' => 'lsorbian' }[tok.to_s]
+        if renamed
+          "Babel no longer accepts '#{tok}'; use '#{renamed}'"
+        elsif tok
+          "Unknown babel language '#{tok}'; check spelling, or install its language pack (texlive-lang-*, tlmgr collection-lang*)"
+        else
+          'Unknown babel language; check spelling or texlive-lang'
+        end
       },
       why: 'The language option passed to babel is not defined or installed.',
       fix: 'Verify language spelling (e.g. english, french, german) and install language packs.',

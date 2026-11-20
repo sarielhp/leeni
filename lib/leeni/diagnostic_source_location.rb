@@ -179,8 +179,24 @@ module LaTeXDiagnostics
       probe = frame_body_probe(classification&.[](:id), err_text)
       return nil unless start && probe
 
-      found = ((start + 1)...(line.to_i - 1)).find { |idx| frame_text(lines[idx]).match?(probe) }
-      found && [file, found + 1]
+      found = frame_text_lines(lines, (start + 1)...(line.to_i - 1)).find { |_, text| text.match?(probe) }
+      found && [file, found.first + 1]
+    end
+
+    DISPLAY_MATH = 'align|equation|gather|multline|eqnarray|flalign|alignat|displaymath|math'
+    DISPLAY_BEGIN = /\\begin\{(?:#{DISPLAY_MATH})\*?\}|\\\[/
+    DISPLAY_END = /\\end\{(?:#{DISPLAY_MATH})\*?\}|\\\]/
+
+    # The text of each line outside math: display environments are skipped
+    # whole (a _ inside align is no fault) and inline math is removed.
+    def frame_text_lines(lines, range)
+      in_math = false
+      range.map do |idx|
+        text = LaTeXUtils.strip_latex_comments(lines[idx])
+        math_line = in_math || text.match?(DISPLAY_BEGIN)
+        in_math = math_line && !text.match?(DISPLAY_END)
+        [idx, math_line ? '' : frame_text(text)]
+      end
     end
 
     def frame_body_probe(category, err_text)

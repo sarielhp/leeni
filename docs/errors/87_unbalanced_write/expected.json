@@ -1,0 +1,11 @@
+{
+  "engine": "pdflatex",
+  "diagnostics": [
+    {
+      "file": "example.tex",
+      "line": 8,
+      "tier": "errors",
+      "category": "unbalanced_write"
+    }
+  ]
+}

@@ -48,6 +48,17 @@ module LaTeXErrorCatalog
       doc_slug: '86_verbatim_environment_unclosed'
     },
     {
+      id: :unbalanced_write,
+      pattern: /Unbalanced write command/,
+      title: 'Unbalanced write command',
+      hint: 'A moving argument (\\caption, \\section) written to the .aux or .toc expanded to unbalanced braces: ' \
+            'an active character (a babel shorthand such as french ; or :) or a fragile command; ' \
+            'protect it (\\string; or \\protect), or load listings and similar packages after babel',
+      why: 'Text that goes to the table of contents or the .aux is written at shipout. When it expands to unbalanced braces (an active character of a babel language redefined meanwhile, a fragile command), TeX cannot finish the \\write and stops with an Emergency stop at whatever line it was reading.',
+      fix: 'Protect the offending character or command in the moving argument (\\string;, \\protect\\cmd), give a short optional argument for the entry, or load the package that changes catcodes after babel.',
+      doc_slug: '87_unbalanced_write'
+    },
+    {
       id: :read_from_terminal,
       pattern: /\\read from a stream that is not open \(cannot \\read from terminal in nonstop modes\)/,
       title: 'cannot \\read from terminal in nonstop modes',

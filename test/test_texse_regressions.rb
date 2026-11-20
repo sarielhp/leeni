@@ -388,4 +388,185 @@ class TestTexseRegressions < Minitest::Test
     TEX
     assert_match(/\Amain\.tex:6: error: .*unexpected symbol/, errors.first.to_s)
   end
+
+  # TeX.SE 236751: french babel's active ';' in a \caption goes into the .toc
+  # write, which is unbalanced at shipout (a listing on the page): TeX stops
+  # with an Emergency stop that names no error. The fault is the \caption.
+  def test_unbalanced_write_is_reported_at_the_caption
+    _, errors = build(<<~'TEX')
+      \documentclass{article}
+      \usepackage{lipsum}
+      \usepackage{listings}
+      \usepackage[french]{babel}
+      \begin{document}
+      \begin{figure}
+        \caption{Foo ; bar}
+      \end{figure}
+      \lipsum[1-4]
+      \begin{lstlisting}
+      Foo 1
+      Foo 2
+      Foo 3
+      Foo 4
+      Foo 5
+      Foo 6
+      Foo 7
+      Foo 8
+      Foo 9
+      \end{lstlisting}
+      \end{document}
+    TEX
+    assert_equal 1, errors.size, errors.join
+    assert_match(/\Amain\.tex:7: error: .*Unbalanced write command/, errors.first.to_s)
+  end
+
+  # TeX.SE 202217: a LuaLaTeX-only package under pdflatex fails on an
+  # undefined Lua primitive (\luatexversion); the avalanche it leaves at the
+  # \usepackage line is one error naming the engine, not dozens of them.
+  def test_luatex_only_package_gives_one_engine_error
+    skip 'lua-check-hyphen.sty not installed' if Open3.capture2('kpsewhich', 'lua-check-hyphen.sty').first.strip.empty?
+
+    _, errors = build(<<~'TEX')
+      \documentclass{article}
+      \usepackage{lua-check-hyphen}
+      \begin{document}
+      Foo
+      \end{document}
+    TEX
+    assert_equal 1, errors.size, errors.join
+    assert_match(/\Amain\.tex:2: error: /, errors.first.to_s)
+    assert_match(/LuaTeX primitive.*-e lualatex/, errors.first.to_s)
+  end
+
+  # TeX.SE 394939: \text is undefined inside \newcommand*{\fnn}, but TeX
+  # reports the \fnn call, not the definition; \textsc on the next line must
+  # not be mistaken for the token.
+  def test_undefined_cs_in_a_macro_is_reported_at_its_call
+    _, errors = build(<<~'TEX')
+      \documentclass{article}
+      \newcommand*{\fnn}[1]{\text{\texttt{#1}}}
+      \newcommand*{\Ker}[1]{\textsc{ker}(\fnn{#1})}
+      \begin{document}
+      $\Ker{f}$
+      \end{document}
+    TEX
+    assert_equal 1, errors.size, errors.join
+    assert_match(/\Amain\.tex:2:23: error: .*undefined control sequence \\text/, errors.first.to_s)
+  end
+
+  # TeX.SE 289768: \numberwithin{ ends its line 5 with the body below and a
+  # blank line inside it; the paragraph it ends is at the { on line 5.
+  def test_paragraph_ended_before_numberwithin_is_at_its_brace
+    _, errors = build(<<~'TEX')
+      \documentclass{article}
+      \usepackage{amsmath}
+
+      \begin{document}
+      \numberwithin{
+      \[
+      \left( \begin{array}{c}
+      \textrm{$\;d\textprime\;$}\\
+      \end{array} \right)
+
+      \]
+      }
+      \end{document}
+    TEX
+    assert_match(/\Amain\.tex:5:14: error: .*paragraph ended before \\numberwithin/, errors.first.to_s)
+  end
+
+  # TeX.SE 373592: \usepackage{amsfonts] leaves amsmath unloaded, and the
+  # \text failures that follow are one diagnostic, not the same one twice.
+  def test_same_undefined_cs_at_one_place_is_listed_once
+    _, errors = build(<<~'TEX')
+      \documentclass{article}
+      \usepackage{amsfonts]
+
+      \begin{document}
+
+
+      \begin{equation}
+      c = 1 - \frac{\text{d} P_\text{out}}{\text{d} P_\text{in}}
+      \end{equation}
+
+      \end{document}
+    TEX
+    texts = errors.grep(/undefined control sequence.*\\text\b/)
+    assert_equal 1, texts.size, errors.join
+    assert_match(/\Amain\.tex:8:15: error: .*\\text/, texts.first.to_s)
+  end
+
+  # TeX.SE 401031: dropped nullfont text in a document without pictures is
+  # preamble text, not text outside the nodes of a picture.
+  def test_dropped_text_hint_names_the_preamble_without_pictures
+    _, errors = build(<<~'TEX')
+      \documentclass[a4paper,
+
+      11pt
+      ]{article}
+      \begin{document}
+      x
+      \end{document}
+    TEX
+    dropped = errors.grep(/dropped from the PDF/)
+    refute_empty dropped, errors.join
+    assert_match(/\Amain\.tex:3: error: .*'11pt\]article'/, dropped.first.to_s)
+    assert_match(/Text typeset before any font was set up/, dropped.first.to_s)
+    refute_match(/picture/, dropped.first.to_s)
+  end
+
+  # TeX.SE 78474: \z@ in the begin code of a \newenvironment is written in the
+  # document body without \makeatletter, so \z is undefined there; the error
+  # belongs at the \z@ in the definition, not at the \begin{document}.
+  def test_zat_in_newenvironment_begin_code_is_reported_at_its_column
+    _, errors = build(<<~'TEX')
+      \documentclass{article}
+      \newenvironment{test}{\vspace{\z@}Hello}{World}
+      \begin{document}
+      \begin{test}
+      x
+      \end{test}
+      \end{document}
+    TEX
+    zed = errors.grep(/undefined control sequence \\z\b/)
+    refute_empty zed, errors.join
+    assert_match(/\Amain\.tex:2:31: error: /, zed.first)
+  end
+
+  # TeX.SE 290592: \setmainfont naming a font the system does not have is a
+  # font that cannot be loaded, with the font's name, not a missing file
+  # named "or installed font".
+  def test_uninstalled_main_font_is_not_loadable_with_its_name
+    skip 'xelatex required' unless LaTeXUtils.command_available?('xelatex')
+
+    _, errors = build(<<~'TEX', 'x')
+      \documentclass{article}
+      \usepackage{fontspec}
+      \setmainfont{NoSuchFontXyz}
+      \begin{document}
+      Text.
+      \end{document}
+    TEX
+    font = errors.grep(/not loadable/)
+    refute_empty font, errors.join
+    assert_match(/\Amain\.tex:4: error: .*NoSuchFontXyz at 10\.0pt not loadable/, font.first)
+    assert_includes font.first, "Font 'NoSuchFontXyz' is not installed"
+    refute(errors.any? { |e| e.include?("File 'or installed font'") }, errors.join)
+  end
+
+  # TeX.SE 325991: the ] of language=[LaTeX]TeX ends the optional argument, so
+  # the value TeX keeps is [LaTeX; the hint braces it.
+  def test_bracketed_language_option_hint_braces_the_value
+    _, errors = build(<<~'TEX')
+      \documentclass{article}
+      \usepackage{listings}
+      \begin{document}
+      \lstinputlisting[language=[LaTeX]TeX]{myfile.tex}
+      \end{document}
+    TEX
+    assert_equal 1, errors.size, errors.join
+    assert_match(/\Amain\.tex:4: error: file ended while scanning use of \\lstKV@OptArg@@/, errors.first)
+    assert_includes errors.first, "The ] of '[LaTeX]TeX' ends the optional argument early"
+    assert_includes errors.first, 'brace the value ({[LaTeX]TeX})'
+  end
 end

@@ -364,6 +364,97 @@ module LaTeXDiagnostics
       end
     end
 
+    # An option value with brackets of its own (listings' language=[LaTeX]TeX)
+    # inside an optional argument: its ] ends the argument, and the rest is
+    # read as the next argument until the paragraph or file ends.
+    BRACKET_IN_OPTION = /\[[^\]\[]*=\s*(\[[^\]\[]*\][^,\]]*)/
+    RUNAWAY_IDS = %i[file_ended_while_scanning paragraph_ended_before_complete].freeze
+
+    # The hint names the value to brace (TeX.SE 325991, 69425).
+    def retag_bracket_runaways(errors)
+      lines = LaTeXUtils.safe_read(@filename).lines
+      errors.each do |error|
+        next unless RUNAWAY_IDS.include?(error[:catalog_id])
+
+        root = error.dig(:catalog, :root_line).to_i
+        value = bracket_option_value(lines, root.positive? ? root : error[:line].to_i)
+        next unless value
+
+        error[:catalog] = (error[:catalog] || {}).merge(
+          hint: "The ] of '#{value}' ends the optional argument early; brace the value ({#{value}})"
+        )
+      end
+    end
+
+    def bracket_option_value(lines, line)
+      return nil unless line.positive?
+
+      [line - 1, line].map { |no| lines[no - 1] }.compact.each do |text|
+        found = LaTeXUtils.strip_latex_comments(text)[BRACKET_IN_OPTION, 1]
+        return found.strip if found
+      end
+      nil
+    end
+
+    # Primitives of one engine: undefined, the document runs on another.
+    ENGINE_PRIMITIVES = {
+      'LuaTeX' => %w[\directlua \luatexversion \latelua \luaescapestring \luafunction \catcodetable
+                     \initcatcodetable \savecatcodetable \luatexbanner \luadef],
+      'XeTeX' => %w[\XeTeXversion \XeTeXrevision \XeTeXinterchartoks \XeTeXcharclass \XeTeXglyph \XeTeXpicfile]
+    }.freeze
+
+    # A package for LuaLaTeX (selnolig's companions, luasseq) loaded under
+    # another engine fails on the first LuaTeX primitive and leaves dozens of
+    # errors at its \usepackage: one fault, the engine (TeX.SE 202217, 233885).
+    def fold_engine_primitive_cascades(errors)
+      primaries = errors.filter_map { |error| [error, engine_of_primitive(error)] if engine_of_primitive(error) }
+      return errors if primaries.empty?
+
+      places = {}
+      primaries.each do |error, engine|
+        next if places.key?(error_place(error))
+
+        places[error_place(error)] = error
+        retag_engine_primitive(error, engine)
+      end
+      # Only what follows the primitive is its cascade: a font error fontspec
+      # gave before it at that line is a fault of its own (TeX.SE 290592).
+      seen = {}
+      errors.reject do |error|
+        primary = places[error_place(error)]
+        next false unless primary
+
+        seen[primary] ||= error.equal?(primary)
+        seen[primary] && !error.equal?(primary)
+      end
+    end
+
+    def engine_of_primitive(error)
+      return nil unless error[:catalog_id] == :undefined_control_sequence
+
+      ENGINE_PRIMITIVES.find { |_, names| names.include?(error[:token].to_s) }&.first
+    end
+
+    def error_place(error) = [format_display_path(error[:file]), error[:line].to_i]
+
+    def retag_engine_primitive(error, engine)
+      build = engine == 'LuaTeX' ? 'lualatex' : 'xelatex'
+      error[:catalog] = (error[:catalog] || {}).merge(
+        hint: "#{error[:token]} is a #{engine} primitive: a package loaded here needs #{engine} " \
+              "(build with -e #{build}), or remove that package"
+      )
+    end
+
+    # A group note TeX gives for a package file names a line of that file;
+    # past the end of the main file it is not a line of the document.
+    def suppress_foreign_group_notes(errors)
+      size = LaTeXUtils.safe_read(@filename).lines.size
+      errors.reject do |error|
+        error[:catalog_id] == :unclosed_group_at_end && error[:line].to_i > size &&
+          format_display_path(error[:file]) == format_display_path(@filename)
+      end
+    end
+
     # fontenc without the encoding's file (T5 without vntex): LaTeX then
     # reports "Encoding scheme `T5' unknown" at the \usepackage and at every
     # later font change; all of it is the one missing file.
@@ -546,6 +637,9 @@ module LaTeXDiagnostics
       compiler_errors = suppress_missing_encoding_cascades(compiler_errors)
       compiler_errors = suppress_runaway_group_notes(compiler_errors)
       retag_verbatim_runaways(compiler_errors)
+      retag_bracket_runaways(compiler_errors)
+      compiler_errors = fold_engine_primitive_cascades(compiler_errors)
+      compiler_errors = suppress_foreign_group_notes(compiler_errors)
       compiler_errors = suppress_ampersand_cascades(compiler_errors)
       compiler_errors = merge_repeated_faults(compiler_errors)
       compiler_errors = suppress_unlocated_dropped_text(compiler_errors, brace_errors)

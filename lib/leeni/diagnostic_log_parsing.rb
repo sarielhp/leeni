@@ -456,6 +456,7 @@ module LaTeXDiagnostics
     def silent_stop_error(content)
       if content.match?(ENGINE_REQUIRED) then engine_required_error(content)
       elsif content.match?(TERMINAL_READ) then terminal_read_error(content)
+      elsif content.match?(UNBALANCED_WRITE) then unbalanced_write_error(content)
       elsif content.match?(JOB_ABORTED) then job_aborted_error
       end
     end
@@ -487,6 +488,28 @@ module LaTeXDiagnostics
       match = content.match(TERMINAL_READ)
       fake = ["#{match[1]}:#{match[2]}: TeX Error: \\read from a stream that is not open (cannot \\read from terminal in nonstop modes).\n"]
       build_error_entry(fake, 0, match[1], [match[1]], bib_entry: nil).first
+    end
+
+    # A \write (to the .aux or .toc, at shipout) whose text has unbalanced
+    # braces: an Emergency stop, then "Unbalanced write command" as its help.
+    # TeX's line is wherever it was reading at shipout; the fault is the
+    # moving argument written, found by its text (TeX.SE 236751: french
+    # babel's active ; in a \caption).
+    # The terminal output shows only the inserted } before \endwrite.
+    UNBALANCED_WRITE = /^(.+?):(\d+): Emergency stop\.\n(?:.*\n){0,6}?(?:Unbalanced write command|<inserted text> \}\\endwrite)/
+
+    def unbalanced_write_error(content)
+      match = content.match(UNBALANCED_WRITE)
+      file = match[1]
+      line = match[2].to_i
+      written = match.pre_match.scan(/\\ignorespaces ([^{}\\]{3,}?)\}/).flatten.last
+      found = written && LaTeXUtils.safe_read(@filename).lines.index { |l| l.include?(written.strip) }
+      if found
+        file = @filename
+        line = found + 1
+      end
+      fake = ["#{file}:#{line}: TeX Error: Unbalanced write command.\n"]
+      build_error_entry(fake, 0, file, [file], bib_entry: nil).first
     end
 
     def innermost_open_package(text)
@@ -683,6 +706,10 @@ module LaTeXDiagnostics
         text = text.lines.grep_v(/\Al\.\d+ /).join.sub(/\A\S*?:\d+: /, '')
         line = root
       end
+      # One undefined command at one place is one fault, whatever context TeX
+      # showed with each report (TeX.SE 373592: \text listed twice).
+      token = error[:token] || error.dig(:catalog, :token)
+      text = "undefined #{token}" if error[:catalog_id] == :undefined_control_sequence && token
       [format_display_path(error[:file]), line, text.gsub(/\s+/, ' ').strip]
     end
 

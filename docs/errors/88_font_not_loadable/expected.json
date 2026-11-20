@@ -1,0 +1,23 @@
+{
+  "engine": "xelatex",
+  "diagnostics": [
+    {
+      "file": "example.tex",
+      "line": 5,
+      "tier": "errors",
+      "category": "generic"
+    },
+    {
+      "file": "example.tex",
+      "line": 5,
+      "tier": "errors",
+      "category": "font_not_loadable"
+    },
+    {
+      "file": "example.tex",
+      "line": 7,
+      "tier": "errors",
+      "category": "dropped_text"
+    }
+  ]
+}

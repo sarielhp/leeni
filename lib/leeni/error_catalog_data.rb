@@ -94,8 +94,20 @@ module LaTeXErrorCatalog
       doc_slug: '08_no_line_here_to_end'
     },
     {
+      id: :font_not_loadable,
+      pattern: %r{Font \S+?/([^/(]+)\(\d+\)/\S+ at [\d.]+pt not loadable|Font \\\S+=([^:\s]+)\S* at [\d.]+pt not loadable},
+      title: 'Font not loadable',
+      token_extractor: ->(match, _block) { match[1] || match[2] },
+      hint: lambda { |tok|
+        "Font '#{tok}' is not installed: install it, or give \\setmainfont (fontspec) a font this system has (fc-list)"
+      },
+      why: 'XeTeX and LuaTeX look fonts up by name in the system and TeX font directories; a name that is not installed (Helvetica, a commercial font) cannot be loaded, and fontspec then reports more errors for the same font.',
+      fix: 'Install the font, or name one that is installed (TeX Gyre Heros for Helvetica, TeX Gyre Termes for Times).',
+      doc_slug: '88_font_not_loadable'
+    },
+    {
       id: :file_not_found,
-      pattern: /File `?([^']+)'? not found/i,
+      pattern: /File (?!or installed font)`?([^']+)'? not found/i,
       title: 'File not found',
       hint: ->(tok) { LaTeXErrorCatalog.file_not_found_hint(tok) },
       why: 'An \\input{...}, \\include{...}, or \\usepackage{...} targeted a file that does not exist in TeX search path.',
@@ -685,7 +697,7 @@ module LaTeXErrorCatalog
       pattern: /Text typeset with no font \(nullfont\) was dropped from the PDF: '(.*)'/,
       title: 'Text dropped: no font active',
       token_extractor: ->(match, _block) { match[1] },
-      hint: 'Text inside a picture but outside any node is dropped; put it in a node or remove it (often a stray ; or a misplaced [options] list)',
+      hint: ->(_tok, file) { LaTeXErrorCatalog.dropped_text_hint(file) },
       why: 'Inside a tikzpicture (or another picture) no font is active outside nodes, so TeX typesets stray text in nullfont and drops it, noting each lost character in the log.',
       fix: 'Put the text in a node, attach an option list to the command it belongs to, or delete the stray characters.',
       doc_slug: '72_dropped_text'

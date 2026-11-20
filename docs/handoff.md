@@ -15,8 +15,8 @@ judged against TeX.
 
 - Released: 1.0.102, which includes all the TeX.SE work through batch 10
   (branch `texse-tool` merged into master). Installed locally.
-- Batches 11–13 are reviewed and fixed (after 1.0.102; error corpus cases
-  81–86). The full regression over all 490 documents run so far is the new
+- Batches 11–15 are reviewed and fixed (after 1.0.102; error corpus cases
+  81–88). The full regression over all 490 documents run so far is the new
   `datasets/texse/regression-baseline.json`.
 - 2026-11-20: questions fetched for `siunitx`, `pgfplots`, `math-mode`,
   `graphics`, `floats`, `fonts`, `xetex`, `luatex`, `babel`, `listings`,
@@ -51,6 +51,8 @@ each was built and what each batch found. Questions fetched so far: tag
 | 11 | 28 leftovers | 2 (fontenc encoding cascade, memoize hint) |
 | 12 | siunitx, pgfplots, math-mode | 3 (siunitx with units, number inside a longer number, dropped text beside a brace error) |
 | 13 | graphics, floats, fonts, xetex, luatex, babel, listings, amsmath | 8 (triaged by 15 parallel DeepSeek agents; see below) |
+| 14 | leftovers of the same tags (100 docs) | 8 (LuaTeX-only packages, unbalanced write, runaway brace line, \\text in \\textsc, duplicates, bracket in an option value) |
+| 15 | biber, fontspec, tikz-styles, cross-referencing, macros, expl3, chemistry, algorithms (100 docs) | 1 (dropped-text hint), plus a missing-font entry found in the regression |
 
 The rate is not clearly falling; what changes is the kind of bug. Early
 batches found faults hitting many documents (locations inside packages and
@@ -70,14 +72,20 @@ packages already covered.
   precise task file (what changed, exact files, tests to run, no lib/ or tools/
   edits, no commits). It wrote error corpus cases 81–83, the index counts and
   the regression tests well.
-- Triage (since batch 13): one opencode agent per flagged document, 8 at a
-  time (`xargs -P 8`), each given the flag line and a fixed prompt: copy the
+- Triage (since batch 13; `tools/texse_corpus triage -j 8 [-b run-batch-N.json]`
+  since batch 14, reports in datasets/texse/triage/batch-N/): one opencode
+  agent per flagged document, each given the flag line and a fixed prompt: copy the
   paper to scratch, run TeX and leeni, read both lines, write a report with a
   verdict (LEENI_RIGHT / LEENI_WRONG / HARNESS / UNSURE) and, if wrong, a
   minimal reproducer. On batch 13 every LEENI_WRONG verdict held, but one root
   cause was wrong (148271 blamed the brace checker; the trigger was an ignored
-  Emergency stop): check each before fixing. Verdicts and lib/ changes stay
-  with the main agent.
+  Emergency stop): check each before fixing. In batches 14-15 the agents also
+  miscounted columns twice and called right results wrong or unsure twice.
+  Verdicts and lib/ changes stay with the main agent.
+- The full regression after a fix round catches regressions from the fixes
+  themselves (batch 14: a word-boundary fix broke \z@ without \makeatletter;
+  a cascade fold dropped errors that came before the cascade). Diff every
+  changed document against the committed leeni in a git worktree.
 
 ## Resuming
 

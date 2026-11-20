@@ -25,7 +25,7 @@ Errors during compilation originate in one of three layers:
 
 ---
 
-## 3. Master Error Index (86 Errors)
+## 3. Master Error Index (88 Errors)
 
 | # | Error Message / Pattern | Layer | Cause & Summary | Support | Reproducer & Details |
 |---|:--- |:--- |:--- |:--- |:--- |
@@ -115,6 +115,8 @@ Errors during compilation originate in one of three layers:
 | **84** | `XeTeX is required to compile this document` + `Emergency stop` | LaTeX Package | A XeLaTeX-only package (`xltxtra`, `fontspec`) calls `\RequireXeTeX`; pdfTeX stops inside the package file, and the failing line in the document is not named. `leeni` reports it at the `\usepackage` line. | **Catalog Hint** | [`84_engine_required`](84_engine_required/) |
 | **85** | `Emergency stop` ... `cannot \read from terminal in nonstop modes` | TeX Primitive | `\openin` of a missing file reports nothing, and the following `\readline` reads from the terminal. The document itself is balanced. `leeni` reports the failed read at its line. | **Catalog Hint** | [`85_read_from_terminal`](85_read_from_terminal/) |
 | **86** | `Emergency stop` ... `no legal \end found` | listings Package | `\lstnewenvironment` opens an environment (`center`) in its begin code, so the body is read verbatim until `\end{center}` and the real `\end{codetext}` is swallowed. TeX gives no line; `leeni` reports the `\begin` left open. | **Catalog Hint** | [`86_verbatim_environment_unclosed`](86_verbatim_environment_unclosed/) |
+| **87** | `Emergency stop` ... `Unbalanced write command` | TeX Primitive | A moving argument written at shipout (french babel's active `;` in a `\caption` going to the `.toc`) expands to unbalanced braces; TeX names no error line. `leeni` finds the written caption text and reports the `\caption` line. | **Catalog Hint** | [`87_unbalanced_write`](87_unbalanced_write/) |
+| **88** | `Font ... at 10.0pt not loadable: Metric (TFM) file or installed font not found` | TeX (XeTeX/LuaTeX) | `\setmainfont` names a font the system does not have; fontspec reports it too, and the body is then set in `nullfont` and its characters dropped. `leeni` reports one `font_not_loadable` error naming the font, with an install-or-substitute hint. | **Catalog Hint** | [`88_font_not_loadable`](88_font_not_loadable/) |
 
 ---
 

@@ -169,7 +169,7 @@ module LaTeXErrorCatalog
     # Pass 1: Look for the undefined token itself on preceding lines
     if token && !token.empty?
       start_search.downto(min_search) do |i|
-        pos = lines[i].index(token)
+        pos = cs_index(lines[i], token)
         return [i + 1, pos + 1] if pos
       end
     end
@@ -177,7 +177,7 @@ module LaTeXErrorCatalog
     # Pass 2: If inside a macro expansion, look for the enclosing macro on preceding lines
     if macro && !macro.empty?
       start_search.downto(min_search) do |i|
-        pos = lines[i].index(macro)
+        pos = cs_index(lines[i], macro)
         return [i + 1, pos + 1] if pos
       end
     end
@@ -185,6 +185,16 @@ module LaTeXErrorCatalog
     [nil, nil]
   rescue StandardError
     [nil, nil]
+  end
+
+  # Where a control sequence is written: \text is not the start of \textsc
+  # (TeX.SE 394939). @ is a letter only where the name has one: \z undefined
+  # is the \z of a \z@ written without \makeatletter (78474).
+  def self.cs_index(line, name)
+    return line.index(name) unless name.match?(/[A-Za-z@]\z/)
+
+    letters = name.include?('@') ? '[A-Za-z@]' : '[A-Za-z]'
+    line =~ /#{Regexp.escape(name)}(?!#{letters})/
   end
 
   # TeX breaks the error context line immediately after the offending token.
@@ -544,10 +554,26 @@ module LaTeXErrorCatalog
     idx = runaway_line_index(lines, first, last, shown.gsub(/\\par\b|[\s{}]+/, ''))
     return nil unless idx
 
-    pos = lines[idx].index(shown)
+    # The column is where the text before the first blank line starts.
+    head = shown.split(/\s*\\par\b/).first.to_s.strip
+    brace = brace_opening_line(lines, idx, head)
+    return brace if brace
+
+    pos = head.empty? ? nil : lines[idx].index(head)
     [idx + 1, pos && (pos + 1)]
   rescue StandardError
     nil
+  end
+
+  # A runaway text that opens with { whose brace ends the line above the text
+  # (\numberwithin{ then the body on the next line): the brace's line and
+  # column are where the argument begins (TeX.SE 289768).
+  def self.brace_opening_line(lines, idx, head)
+    return nil unless head.start_with?('{') && idx.positive?
+    return nil if lines[idx].lstrip.start_with?('{')
+
+    above = LaTeXUtils.strip_latex_comments(lines[idx - 1]).rstrip
+    above.end_with?('{') ? [idx, above.length] : nil
   end
 
   # Index of the line where WANTED starts last within lines[first...last],
@@ -614,6 +640,18 @@ module LaTeXErrorCatalog
     return "File '#{tok}' not found; check file path or spelling" if found.empty?
 
     "Did you mean #{found.map { |path| "'#{path}'" }.join(' or ')}? File '#{tok}' not found"
+  end
+
+  # Text in nullfont is dropped inside a picture outside its nodes; in a
+  # document without pictures it is text read before a font was set up,
+  # in the preamble after an error there (TeX.SE 401031).
+  def self.dropped_text_hint(file)
+    source = file && LaTeXUtils.safe_read(file).to_s
+    if source.to_s.match?(/\\begin\s*\{(?:tikzpicture|pgfpicture|axis|picture)\}|\\tikz\b|\\pgfplot/)
+      return 'Text inside a picture but outside any node is dropped; put it in a node or remove it ' \
+             '(often a stray ; or a misplaced [options] list)'
+    end
+    'Text typeset before any font was set up (in the preamble, after an earlier error there) is dropped; fix the error above it'
   end
 
   # The file may have its \end{document} and still not reach it: something

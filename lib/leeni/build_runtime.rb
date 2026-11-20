@@ -147,18 +147,6 @@ module LatexBuildRuntime
     target_subdirs.each { |subdir| FileUtils.mkdir_p(File.join(dir, subdir), mode: 0o700) }
     mirror_project_subdirs_to_junk if @options && @options[:auto_mirror_subdirs] == true
     remove_stale_style_copies(dir)
-    seed_main_aux(dir)
-  end
-
-  # A preamble that does \let\@input\input turns LaTeX's quiet "No file x.aux"
-  # into "File `x.aux' not found" and an emergency stop, so a fresh build of
-  # such a document never gets past its first pass. latexmk avoids this by
-  # writing an empty .aux first; so does leeni. TeX overwrites it on the pass.
-  def seed_main_aux(dir)
-    return unless @bfilename
-
-    aux = File.join(dir, "#{@bfilename}.aux")
-    File.write(aux, "\\relax \n") unless File.exist?(aux)
   end
 
   # Older builds copied styles/, .bst and .bib files here for BibTeX. TeX
@@ -404,6 +392,8 @@ module LatexBuildRuntime
     write_pass_header(pass_log, command)
     pass_started_at = Time.now
     output, status = capture_pass_output(command)
+    return run_latex_pass(suffix) if !status.success? && seed_missing_aux(output)
+
     discard_truncated_outputs(pass_started_at) if killed_pass?(status)
     output = strip_draft_notice(output)
     exit_status = process_exit_status(status)
@@ -413,6 +403,23 @@ module LatexBuildRuntime
     File.open(@log, 'a') { |file| file.write(output) }
     print_pass_time(started) if @options[:time]
     status.success?
+  end
+
+  # A preamble that does \let\@input\input turns LaTeX's quiet "No file x.aux"
+  # into "File `x.aux' not found" and an emergency stop, so a fresh build of
+  # such a document never gets past \begin{document} (or an \include). latexmk
+  # writes an empty .aux before the first run; leeni writes the one the pass
+  # asked for and runs the pass again. Each file is written once, so this ends.
+  def seed_missing_aux(output)
+    name = output[/^! LaTeX Error: File `([^`']+\.aux)' not found\./, 1]
+    return false if name.nil? || name.start_with?('/') || name.split('/').include?('..')
+
+    aux = File.join(@junk_dir, name)
+    return false if File.exist?(aux)
+
+    FileUtils.mkdir_p(File.dirname(aux))
+    File.write(aux, "\\relax \n")
+    true
   end
 
   # A killed engine (a signal, typically SIGPIPE once xdvipdfmx died, or the

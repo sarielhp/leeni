@@ -399,13 +399,15 @@ class LaTeXBibManager
   # True when the document now asks for another \bibliographystyle than the
   # one the last BibTeX run used (its .blg names it). The hashes of the run's
   # inputs cannot tell: the new style is a different file, and neither file
-  # changed. Biber logs no style file, so this is BibTeX only.
-  def bibtex_style_changed?(aux_contents = nil)
+  # changed. Biber logs no style file, so this is BibTeX only. The .blg is the
+  # main .aux's run, so the main .aux is the one compared: bibunits and
+  # chapterbib give their own .aux files other styles.
+  def bibtex_style_changed?
     blg = File.join(junk_dir, "#{bfilename}.blg")
     return false unless File.file?(blg)
 
     used = LaTeXUtils.safe_read(blg)[BIBTEX_STYLE_USED, 1]
-    wanted = (aux_contents || compute_aux_hash)[AUX_BIBSTYLE, 1]
+    wanted = LaTeXUtils.safe_read(File.join(junk_dir, "#{bfilename}.aux"))[AUX_BIBSTYLE, 1]
     return false unless used && wanted
 
     File.basename(used.strip, '.bst') != File.basename(wanted.strip, '.bst')
@@ -527,7 +529,7 @@ class LaTeXBibManager
   def bib_database_changed?(aux_contents = nil)
     fnbbl = File.join(junk_dir, "#{bfilename}.bbl")
     return false unless File.file?(fnbbl)
-    return true if bibtex_style_changed?(aux_contents)
+    return true if bibtex_style_changed?
 
     verdict = recorded_bbl_verdict(fnbbl, aux_contents)
     return verdict unless verdict.nil?

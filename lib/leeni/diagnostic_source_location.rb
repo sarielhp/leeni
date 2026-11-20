@@ -303,17 +303,27 @@ module LaTeXDiagnostics
 
     # One or two characters match almost anywhere ('b' in \documentclass{beamer}):
     # they must stand alone, outside command names, in the document body.
+    # Punctuation alone (a ; after a failed \addplot) is on half the lines of a
+    # picture: it is placed only where it is the one such line.
     def locate_short_dropped_text(text)
       pattern = /(?<![[:alnum:]])#{Regexp.escape(text)}(?![[:alnum:]])/
+      punctuation = !text.match?(/[[:alnum:]]/)
       collect_source_candidates.each do |file|
-        lines = LaTeXUtils.safe_read(file).lines
-        body = lines.index { |line| line.match?(/\\begin\{document\}/) }.to_i
-        found = (body...lines.size).find do |idx|
-          LaTeXUtils.strip_latex_comments(lines[idx]).gsub(/\\(?:[A-Za-z@]+|.)/, ' ').match?(pattern)
-        end
-        return [file, found + 1] if found
+        found = short_text_lines(LaTeXUtils.safe_read(file).lines, pattern)
+        next if found.empty?
+        return nil if punctuation && found.size > 1
+
+        return [file, found.first + 1]
       end
       nil
+    end
+
+    # Indexes of the body lines where PATTERN matches outside command names.
+    def short_text_lines(lines, pattern)
+      body = lines.index { |line| line.match?(/\\begin\{document\}/) }.to_i
+      (body...lines.size).select do |idx|
+        LaTeXUtils.strip_latex_comments(lines[idx]).gsub(/\\(?:[A-Za-z@]+|.)/, ' ').match?(pattern)
+      end
     end
 
     def joined_source(file)

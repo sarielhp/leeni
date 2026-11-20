@@ -1,0 +1,11 @@
+{
+  "engine": "pdflatex",
+  "diagnostics": [
+    {
+      "file": "example.tex",
+      "line": 9,
+      "tier": "errors",
+      "category": "tikz_external_failed"
+    }
+  ]
+}

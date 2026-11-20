@@ -294,14 +294,27 @@ module LaTeXDiagnostics
       end
     end
 
+    # An error whose recovery TeX reports as more errors on the same line: an
+    # improper \hyphenation, a TikZ picture whose external build failed.
+    SAME_LINE_CASCADE_PRIMARIES = %i[improper_hyphenation tikz_external_failed].freeze
+
     def suppress_hyphenation_cascades(errors)
-      primary = errors.find { |error| error[:catalog_id] == :improper_hyphenation }
+      primary = errors.find { |error| SAME_LINE_CASCADE_PRIMARIES.include?(error[:catalog_id]) }
       return errors unless primary
 
       place = [format_display_path(primary[:file]), primary[:line]]
       errors.reject do |error|
-        !error.equal?(primary) && [format_display_path(error[:file]), error[:line]] == place
+        next false if error.equal?(primary)
+
+        [format_display_path(error[:file]), error[:line]] == place || external_cascade?(primary, error)
       end
+    end
+
+    # A failed external picture leaves its environment's body unread: the
+    # environment and the groups around it are reported as unclosed.
+    def external_cascade?(primary, error)
+      primary[:catalog_id] == :tikz_external_failed &&
+        %i[mismatched_environment unclosed_group_at_end].include?(error[:catalog_id])
     end
 
     def suppress_environment_mismatch_cascades(errors)

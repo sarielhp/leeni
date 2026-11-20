@@ -111,4 +111,15 @@ class TestTexseRegressions < Minitest::Test
     TEX
     assert_match(/\Amain\.tex:6: error: paragraph ended before \\align\* was complete/, errors.first.to_s)
   end
+
+  # TeX.SE 140531: dropped punctuation is placed only where it is the one
+  # standalone occurrence in the body; a ; after a failed \addplot was put on
+  # the first line of the picture ending in ;.
+  def test_dropped_punctuation_is_placed_only_when_unambiguous
+    picture = "\\begin{tikzpicture}\n\\draw (0,0) -- (1,1);\n\\node {a}; !\n\\end{tikzpicture}\n"
+    _, errors = build("\\documentclass{article}\n\\usepackage{tikz}\n\\begin{document}\n#{picture}\\end{document}\n")
+    assert_match(/\Amain\.tex:6: error: .*dropped from the PDF: '!'/, errors.first.to_s)
+    _, errors = build("\\documentclass{article}\n\\usepackage{tikz}\n\\begin{document}\nWow !\n\n#{picture}\\end{document}\n")
+    refute_match(/\Amain\.tex:4: /, errors.first.to_s, 'two lines hold a standalone !')
+  end
 end

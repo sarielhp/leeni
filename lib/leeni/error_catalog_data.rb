@@ -468,6 +468,16 @@ module LaTeXErrorCatalog
       doc_slug: '73_keyval_unknown_key'
     },
     {
+      id: :tikz_external_failed,
+      pattern: /Package tikz Error: Sorry, the system call '.*?' did NOT result in a usable output file/m,
+      title: 'Package tikz Error: externalization system call failed',
+      hint: 'TikZ externalization (\\tikzexternalize, forest\'s external option) runs TeX for each picture and needs ' \
+            'shell escape: build with LATEXOPTS="-shell-escape", or remove \\tikzexternalize',
+      why: 'With \\tikzexternalize each picture is compiled by a separate TeX run that the document starts through \\write18. Without shell escape that run is refused, no picture file is made, and the picture is reported as failed; the recovery adds more errors at the same line.',
+      fix: 'Allow shell escape for this build (LATEXOPTS="-shell-escape" l paper.tex), or remove \\tikzexternalize (and forest\'s external option) so pictures are drawn in the main run.',
+      doc_slug: '79_tikz_external_failed'
+    },
+    {
       id: :lua_directlua_error,
       pattern: /\[\\directlua\]:\d+: (.+)/,
       title: 'Lua error in \\directlua',

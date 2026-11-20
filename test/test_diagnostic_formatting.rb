@@ -190,6 +190,18 @@ class TestDiagnosticFormatting < Minitest::Test
     assert_includes unwrapped, "(./very/deeply/nested/directory/path/with/a/long/filename_that_crosses_col_79_xyz.tex\n"
   end
 
+  # TeX.SE 700427: a promoted note of exactly 79 characters was joined to the
+  # "Runaway argument?" after it when the log was unwrapped a second time, and
+  # the runaway error took the note's place, at line 0.
+  def test_unwrap_log_lines_keeps_promoted_lines_and_runaway_lead_ins_apart
+    promoted = "! [leeni] Text typeset with no font (nullfont) was dropped from the PDF: '=@@'."
+    assert_equal 79, promoted.length
+    log = "#{promoted}\nRunaway argument?\n{0,...,15}\n"
+    assert_equal log, LaTeXUtils.unwrap_log_lines(log, 79)
+    tex_line = 'x' * 79
+    assert_equal "#{tex_line}\nRunaway argument?\n", LaTeXUtils.unwrap_log_lines("#{tex_line}\nRunaway argument?\n", 79)
+  end
+
   def test_embedded_url_clean_osc8_by_default
     builder = LatexBuilder.new('main.tex', link: true, color: true)
     url = 'https://example.com/guide'

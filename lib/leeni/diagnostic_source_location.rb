@@ -101,6 +101,15 @@ module LaTeXDiagnostics
 
     DISTRIBUTION_STYLE = %r{/texmf-dist/.+\.(?:sty|cls)\z}
 
+    # A Lua error names its chunk ("[\directlua]:1:"), not a file: the TeX
+    # line that ran the code is the l.N context, in the file TeX is reading.
+    def locate_lua_chunk(file, err_text, file_stack)
+      return nil unless file.to_s.match?(/\A\[.*\]\z/)
+
+      tex_line = err_text[/^l\.(\d+)/, 1]
+      tex_line && [current_log_file(file_stack), tex_line.to_i]
+    end
+
     # TeX reports an error raised while a class or package of the TeX
     # distribution is being read inside that file (babel.sty:4481), which the
     # author cannot change; the \usepackage or \documentclass that loads it,

@@ -25,7 +25,7 @@ Errors during compilation originate in one of three layers:
 
 ---
 
-## 3. Master Error Index (77 Errors)
+## 3. Master Error Index (78 Errors)
 
 | # | Error Message / Pattern | Layer | Cause & Summary | Support | Reproducer & Details |
 |---|:--- |:--- |:--- |:--- |:--- |
@@ -106,6 +106,7 @@ Errors during compilation originate in one of three layers:
 | **75** | `Improper \hyphenation will be flushed.` | TeX Primitive | An accent macro or babel shorthand inside `\hyphenation`; TeX reports each non-letter token and the cascade it causes. `leeni` reports one error. | **Catalog Hint** | [`75_improper_hyphenation`](75_improper_hyphenation/) |
 | **76** | `Package pgf Error: Single ampersand used with wrong catcode` | Package (pgf) | The `&` of a TikZ matrix or `tikz-cd` was read inside an argument (`\only`, `\uncover`, a frame). The undefined internal macro and dropped cells it causes are one error, at the first `&`. | **Catalog Hint** | [`76_wrong_catcode_ampersand`](76_wrong_catcode_ampersand/) |
 | **77** | `Illegal parameter number in definition of \iterate` (in a frame) | TeX Primitive | A `#1` inside a beamer frame body (a TikZ style) must be written `##1`. TeX reports it at `\end{frame}` and names beamer's macros; `leeni` reports one error at the `#1`. | **Catalog Hint** | [`77_parameter_in_frame`](77_parameter_in_frame/) |
+| **78** | `[\directlua]:1: unexpected symbol near ...` | LuaTeX | Lua code in `\directlua` is expanded by TeX first; active characters (csquotes `"`) break it. LuaTeX names the Lua chunk, not the file; `leeni` reports the TeX line that ran it. | **Catalog Hint** | [`78_lua_directlua_error`](78_lua_directlua_error/) |
 
 ---
 

@@ -346,8 +346,12 @@ module LaTeXDiagnostics
     # message is joined to the error line, so it is neither lost nor read as a
     # second error.
     ERROR_CONTINUATION = /^(.+? Error:) *\n(?: => \S+?:\d+: | {2}(?=\S))/
+    # LuaTeX prints a Lua error right after the files it opened on that line
+    # ("(./main.aux)[\directlua]:1: ..."); the error gets a line of its own, or
+    # the files would be read as its file name.
+    LUA_ERROR_AFTER_TEXT = /(?<=[^\n])(?=\[\\directlua\]:\d+: |\[string "[^"\n]*"\]:\d+: )/
     def join_error_continuations(content)
-      content.gsub(ERROR_CONTINUATION) { "#{Regexp.last_match(1)} " }
+      content.gsub(ERROR_CONTINUATION) { "#{Regexp.last_match(1)} " }.gsub(LUA_ERROR_AFTER_TEXT, "\n")
     end
 
     def error_line_match(line)
@@ -481,11 +485,19 @@ module LaTeXDiagnostics
       end
     end
 
+    # amsmath display environments read their body as an argument: a blank
+    # line in it is the fault, at the line TeX reports, not where it began.
+    AMS_BODY_RUNAWAY = /Paragraph ended before \\(?:align|gather|multline|flalign|x?x?alignat|split|equation)\*? was complete/
+
     def root_runaway_error(err)
       return if err[:root_line].to_i.positive? && err[:root_line].to_i != err[:line].to_i
+      return if err[:text].to_s.match?(AMS_BODY_RUNAWAY)
 
       root_line, root_col = LaTeXErrorCatalog.runaway_start(err[:file], err[:line], err[:runaway_text])
-      return unless root_line && root_line < err[:line].to_i
+      return unless root_line
+      # A runaway the file ended in has no line of its own: it takes the start.
+      return err[:line] = root_line unless err[:line].to_i.positive?
+      return unless root_line < err[:line].to_i
 
       err[:root_line] = root_line
       err[:root_col] = root_col
@@ -501,7 +513,8 @@ module LaTeXDiagnostics
       classification = LaTeXErrorCatalog.classify(
         err_text, err_block, file: file_name, line: line_no, junk_dir: diagnostics_junk_dir
       )
-      source_location = locate_error_source(classification, err_text) || locate_package_load(file_name, file_stack) ||
+      source_location = locate_lua_chunk(file_name, err_text, file_stack) ||
+                        locate_error_source(classification, err_text) || locate_package_load(file_name, file_stack) ||
                         locate_frame_source(file_name, line_no) || locate_key_source(classification, file_name, line_no) ||
                         locate_frame_body(classification, err_text, file_name, line_no)
       source_location = locate_frame_parameter(err_text, *(source_location || [file_name, line_no])) || source_location

@@ -510,30 +510,44 @@ module LaTeXErrorCatalog
   RUNAWAY_SEARCH_LINES = 200
 
   # Where a runaway argument began: TeX's "Runaway argument?" shows the start
-  # of the argument ("{First line."), and the error that follows is reported
-  # where the paragraph or file ended. The nearest source line at or above the
-  # reported one holding that text is the unclosed brace to fix. Returns
-  # [line, col], col nil when spacing differs, or nil when the text is too
-  # short to be telling or is not found.
+  # of the argument ("{First line."), as tokens ("\end {axis}") that may span
+  # source lines, and the error that follows is reported where the paragraph
+  # or file ended (no line for the file). The last place at or above the
+  # reported line (or the end of the file) holding that text, compared without
+  # whitespace and braces (TeX's display can leave out a brace), is the
+  # unclosed brace to fix. Returns [line, col], col nil when
+  # spacing differs, or nil when the text is too short to be telling or is not
+  # found.
   def self.runaway_start(file, line, runaway_text)
-    shown = runaway_text.to_s.lines.first.to_s.strip.delete_suffix('...').strip
-    return nil if shown.delete('{}\\ ').length < 4 || !line.to_i.positive?
+    shown = runaway_text.to_s.lines.first.to_s.strip.delete_suffix('\\ETC.').delete_suffix('...').strip
+    return nil if shown.delete('{}\\ ').length < 4
 
     source_file = find_source_file(file)
     return nil unless source_file
 
     lines = File.readlines(source_file)
-    wanted = shown.gsub(/\s+/, ' ')
-    (line.to_i - 1).downto([line.to_i - RUNAWAY_SEARCH_LINES, 0].max) do |idx|
-      text = lines[idx].to_s
-      next unless text.gsub(/\s+/, ' ').include?(wanted)
+    last = line.to_i.positive? ? [line.to_i, lines.size].min : lines.size
+    first = [last - RUNAWAY_SEARCH_LINES, 0].max
+    idx = runaway_line_index(lines, first, last, shown.gsub(/[\s{}]+/, ''))
+    return nil unless idx
 
-      pos = text.index(shown)
-      return [idx + 1, pos && (pos + 1)]
-    end
-    nil
+    pos = lines[idx].index(shown)
+    [idx + 1, pos && (pos + 1)]
   rescue StandardError
     nil
+  end
+
+  # Index of the line where WANTED starts last within lines[first...last],
+  # each line compared without its whitespace and braces.
+  def self.runaway_line_index(lines, first, last, wanted)
+    joined = +''
+    starts = (first...last).map do |idx|
+      offset = joined.size
+      joined << lines[idx].to_s.gsub(/[\s{}]+/, '')
+      offset
+    end
+    at = joined.rindex(wanted)
+    at && (first + starts.rindex { |offset| offset <= at })
   end
 
   def self.extract_misplaced_tab_col(file, line)

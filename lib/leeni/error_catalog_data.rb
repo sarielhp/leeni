@@ -468,6 +468,19 @@ module LaTeXErrorCatalog
       doc_slug: '73_keyval_unknown_key'
     },
     {
+      id: :lua_directlua_error,
+      pattern: /\[\\directlua\]:\d+: (.+)/,
+      title: 'Lua error in \\directlua',
+      token_extractor: ->(match, _block) { match[1].to_s.sub(/\.\z/, '') },
+      hint: lambda { |_tok|
+        'Lua error in \\directlua code: TeX expands the code before Lua reads it, so macros and active characters ' \
+          '(csquotes ", babel shorthands) change it; use the luacode environment or a separate .lua file'
+      },
+      why: '\\directlua passes its argument through TeX first: macros are expanded and active characters, such as the " that csquotes makes into a quote, are replaced before Lua parses the code.',
+      fix: 'Put the code in a luacode environment (\\usepackage{luacode}) or a .lua file loaded with dofile(), or switch the active characters off around it.',
+      doc_slug: '78_lua_directlua_error'
+    },
+    {
       id: :wrong_catcode_ampersand,
       pattern: /Package pgf Error: Single ampersand used with wrong catcode/,
       title: 'Package pgf Error: Single ampersand used with wrong catcode',

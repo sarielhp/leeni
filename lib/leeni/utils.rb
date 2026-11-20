@@ -291,7 +291,9 @@ module LaTeXUtils
     i = 0
     while i < lines.size
       line = lines[i].chomp
-      while line.length == wrap_col && i + 1 < lines.size && !log_boundary_start?(lines[i + 1])
+      # A line leeni promoted (text already unwrapped once) is never TeX's wrap.
+      while line.length == wrap_col && !line.start_with?('! [leeni]') && i + 1 < lines.size &&
+            !log_boundary_start?(lines[i + 1])
         i += 1
         line += lines[i].chomp
       end
@@ -309,6 +311,7 @@ module LaTeXUtils
     return true if str =~ /^(?:BIB_ENTRY|LIT_LBL):/
     return true if str =~ /^.+?:\d+:/
     return true if str =~ /^l\.\d+\b/
+    return true if str.start_with?('Runaway argument?')
 
     false
   end

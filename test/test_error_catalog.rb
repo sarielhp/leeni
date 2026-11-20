@@ -788,7 +788,7 @@ class TestErrorCatalog < Minitest::Test
       assert_equal [1, 8], LaTeXErrorCatalog.runaway_start(path, 3, '{First line.')
       assert_nil LaTeXErrorCatalog.runaway_start(path, 6, '{ab}'), 'too short to be telling'
       assert_nil LaTeXErrorCatalog.runaway_start(path, 6, '{Nowhere in the file.')
-      assert_nil LaTeXErrorCatalog.runaway_start(path, 0, '{First line.'), 'no reported line'
+      assert_equal [4, 6], LaTeXErrorCatalog.runaway_start(path, 0, '{First line.'), 'no line: searched from the end'
     end
   end
 end

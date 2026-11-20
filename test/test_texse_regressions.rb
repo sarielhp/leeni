@@ -7,6 +7,8 @@ require 'tmpdir'
 require 'open3'
 
 require_relative '../lib/leeni/utils'
+require_relative '../lib/leeni/error_catalog'
+load File.expand_path('../leeni', __dir__)
 
 # Real pdflatex builds of faults found in TeX Stack Exchange documents whose
 # diagnostics leeni got wrong.
@@ -71,5 +73,42 @@ class TestTexseRegressions < Minitest::Test
     dropped = errors.grep(/dropped from the PDF: 'b'/)
     refute_empty dropped, errors.join
     assert_match(/\Amain\.tex:6: /, dropped.first)
+  end
+
+  # TeX.SE 754837: "File ended while scanning use of ..." has no line, and TeX
+  # shows the runaway text as tokens across source lines, without a brace the
+  # source has.
+  def test_runaway_start_matches_tokens_across_lines_when_the_file_ended
+    Dir.mktmpdir do |dir|
+      path = File.join(dir, 'p.tex')
+      File.write(path, "\\begin{axis}\n  \\addplot {x^2+4};\n\\end{axis}\n\\end{center}\n}\n\\end{overlayarea}\n")
+      shown = '; \\end {axis} \\end {center}  \\end {overlayarea} \\ETC.'
+      assert_equal [2, nil], LaTeXErrorCatalog.runaway_start(path, 0, shown)
+    end
+  end
+
+  # TeX.SE 367913: with main.aux already there, LuaTeX prints the Lua error on
+  # the line of the files it opened, which were read as its file name.
+  def test_lua_error_after_opened_files_gets_a_line_of_its_own
+    builder = LatexBuilder.new('main.tex', junk_dir: 'junk')
+    log = "(./main.aux)[\\directlua]:1: unexpected symbol near '\\'.\nl.6 \\directlua{print(\"hello\")}\n"
+    assert_equal "(./main.aux)\n[\\directlua]:1: unexpected symbol near '\\'.\nl.6 \\directlua{print(\"hello\")}\n",
+                 builder.send(:join_error_continuations, log)
+  end
+
+  # TeX.SE 30012: a blank line inside align* is the fault, at the line TeX
+  # reports, not the line where the environment's body began.
+  def test_blank_line_in_align_is_reported_where_it_is
+    _, errors = build(<<~'TEX')
+      \documentclass{article}
+      \usepackage{amsmath}
+      \begin{document}
+      \begin{align*}
+      a & = b + c \\
+
+      \end{align*}
+      \end{document}
+    TEX
+    assert_match(/\Amain\.tex:6: error: paragraph ended before \\align\* was complete/, errors.first.to_s)
   end
 end

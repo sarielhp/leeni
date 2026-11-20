@@ -18,7 +18,7 @@ require_relative 'bbl_provenance'
 require_relative 'key_suggester'
 
 class LaTeXBibManager
-  attr_reader :builder, :bib_fatal
+  attr_reader :builder, :bib_fatal, :bib_fatal_detail
   attr_accessor :last_bib_citations, :last_bib_sources, :last_bcf_sha
 
   def initialize(builder)
@@ -43,22 +43,16 @@ class LaTeXBibManager
     Dir[*bib_globs].select { |f| File.file?(f) }
   end
 
+  # Whether a failing pass read a .bbl its inputs have since outdated. The
+  # verdict is bib_database_changed?'s, so the rerun decision and the
+  # stale-.bbl recovery cannot disagree; it used to keep its own copy of that
+  # logic, which had drifted (no style check, timestamps only).
   def bib_files_newer_than_bbl?
     fnbbl = File.join(junk_dir, "#{bfilename}.bbl")
     return false unless File.exist?(fnbbl) && File.size(fnbbl).positive?
     return false unless File.exist?(File.join(junk_dir, "#{bfilename}.aux")) || File.exist?(File.join(junk_dir, "#{bfilename}.bcf"))
 
-    verdict = recorded_bbl_verdict(fnbbl)
-    return verdict unless verdict.nil?
-
-    bbl_mtime = File.mtime(fnbbl)
-    discover_bib_files.any? do |b|
-      begin
-        File.mtime(b)
-      rescue StandardError
-        0
-      end > bbl_mtime
-    end
+    bib_database_changed?
   end
 
   def detect_bib_tool(aux_contents = nil)
@@ -173,7 +167,10 @@ class LaTeXBibManager
     has_entries = LaTeXUtils.bbl_has_entries?(fnbbl)
     if LaTeXUtils.bib_fatal_error?(tool, bib_out, status_ok)
       restore_bibliography(fnbbl, previous)
-      warn "\nBibliography process failed or produced no valid entries.#{bibliography_failure_detail(bib_out)} See #{biberr}."
+      detail = bibliography_failure_detail(bib_out)
+      @bib_fatal_detail = detail.strip
+      # -cc, -llm and --json report it as an error at the end of the build instead.
+      warn "\nBibliography process failed or produced no valid entries.#{detail} See #{biberr}." unless options[:compile]
       @bib_fatal = true
       return false
     end
@@ -383,6 +380,24 @@ class LaTeXBibManager
     (dirs + [current]).join(File::PATH_SEPARATOR)
   end
 
+  BIBTEX_STYLE_USED = /^The style file: (\S+)$/
+  AUX_BIBSTYLE = /\\bibstyle\{([^}]+)\}/
+
+  # True when the document now asks for another \bibliographystyle than the
+  # one the last BibTeX run used (its .blg names it). The hashes of the run's
+  # inputs cannot tell: the new style is a different file, and neither file
+  # changed. Biber logs no style file, so this is BibTeX only.
+  def bibtex_style_changed?(aux_contents = nil)
+    blg = File.join(junk_dir, "#{bfilename}.blg")
+    return false unless File.file?(blg)
+
+    used = LaTeXUtils.safe_read(blg)[BIBTEX_STYLE_USED, 1]
+    wanted = (aux_contents || compute_aux_hash)[AUX_BIBSTYLE, 1]
+    return false unless used && wanted
+
+    File.basename(used.strip, '.bst') != File.basename(wanted.strip, '.bst')
+  end
+
   def compute_aux_hash
     current_aux_files.map { |f| "#{f}:#{LaTeXUtils.safe_read(f)}" }.join("\n")
   end
@@ -499,6 +514,7 @@ class LaTeXBibManager
   def bib_database_changed?(aux_contents = nil)
     fnbbl = File.join(junk_dir, "#{bfilename}.bbl")
     return false unless File.file?(fnbbl)
+    return true if bibtex_style_changed?(aux_contents)
 
     verdict = recorded_bbl_verdict(fnbbl, aux_contents)
     return verdict unless verdict.nil?

@@ -295,19 +295,44 @@ module LaTeXDiagnostics
       presenter.render_diagnostics(**records, log_tail: log_tail, file: @filename, io: io)
     end
 
+    # A failed pass reports its errors and, as -llm does, its alerts: a silent
+    # corruption found on the way is still worth knowing while fixing the error.
     def report_json_mode_errors(analysis, content, io: $stdout)
-      records = diagnostic_records(analysis, %i[errors])[:errors]
+      records = diagnostic_records(analysis, %i[errors alerts])
+      alerts = tier_suppressed?(:alerts) ? [] : records[:alerts]
       result = LaTeXDiagnosticResult.new(
         build: json_build_report,
         success: false,
         exit_code: 1,
         pdf_path: nil,
-        records: records,
-        summary: { errors: records.size, alerts: 0, warnings: 0, whatevers: 0 },
+        records: records[:errors] + alerts,
+        summary: { errors: records[:errors].size, alerts: alerts.size, warnings: 0, whatevers: 0 },
         log_tail: analysis.errors.empty? ? content.to_s.lines.last(10).join : nil
       )
       presenter = LaTeXJsonPresenter.new(@options)
       presenter.render_result(result, io: io)
+    end
+
+    BIBLIOGRAPHY_FAILED_HINT = 'The bibliography tool stopped; fix the database it names, or the name given to ' \
+                               '\bibliography or \addbibresource'
+
+    # A fatal bibliography run ends the build with no failed LaTeX pass to read,
+    # and printed only a line of text: -cc and -llm had no file:line: error and
+    # --json no JSON at all. It is reported like a failed pass instead, at the
+    # line naming the database when the tool says which one it could not open.
+    def report_bibliography_failure(detail)
+      return unless compile_mode?
+
+      match = detail.match(LaTeXBibManager::MISSING_DATABASE)
+      database = (match ? match.captures.compact.first : '').to_s.sub(/[.,;:]+\z/, '')
+      file, line = (locate_missing_resource_request(database) unless database.empty?) || [@filename, 0]
+      text = "Bibliography run failed: #{detail.empty? ? 'see the bibliography log' : detail}"
+      item = { file: file, line: line, line_str: line.positive? ? line.to_s : '', text: text, err_block: [text],
+               category: :bibliography_failed, catalog: { hint: BIBLIOGRAPHY_FAILED_HINT },
+               base_color: :red, tier: 'errors', source: :leeni, synthetic: true }
+      analysis = Leeni::DiagnosticAnalysis.new(errors: [item], alerts: [], warnings: [], whatevers: [],
+                                               error_count: 1, brace_errors: [])
+      report_compile_mode_errors(analysis, '', io: $stderr)
     end
 
     def report_errors(loga, io: $stderr)

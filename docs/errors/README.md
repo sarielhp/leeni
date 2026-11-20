@@ -25,7 +25,7 @@ Errors during compilation originate in one of three layers:
 
 ---
 
-## 3. Master Error Index (60 Errors)
+## 3. Master Error Index (63 Errors)
 
 | # | Error Message / Pattern | Layer | Cause & Summary | Support | Reproducer & Details |
 |---|:--- |:--- |:--- |:--- |:--- |
@@ -91,6 +91,7 @@ Errors during compilation originate in one of three layers:
 | **60** | `Command \foo invalid in math mode` | LaTeX Kernel | Text font declaration or size switch inside math; declarations error, `\em` and size switches are silently ignored (promoted to an alert). Hint names the `\math...` equivalent. | **Catalog Hint** | [`60_invalid_in_math_mode`](60_invalid_in_math_mode/) |
 | **61** | `xdvipdfmx:fatal: Image inclusion failed for "x.pdf" (page=N).` | Driver (XeTeX) | `\includegraphics[page=N]` past the last page; printed only to the terminal, and a long document is killed by SIGPIPE with cut-off `.aux` files. `leeni` promotes it to an error at the `\includegraphics` and discards the cut-off files. | **Catalog Hint** | [`61_pdf_driver_image_failed`](61_pdf_driver_image_failed/) |
 | **62** | `xdvipdfmx:fatal: ...` | Driver (XeTeX) | Any other fatal driver error; terminal-only, no PDF written. `leeni` promotes it to an error. | **Catalog Hint** | [`62_pdf_driver_fatal`](62_pdf_driver_fatal/) |
+| **63** | `I couldn't open database file ...` | BibTeX / Biber | A database named by `\bibliography` or `\addbibresource` cannot be read; TeX reports nothing. `leeni` reports an error at that line. | **Standard** | [`63_bibliography_database_missing`](63_bibliography_database_missing/) |
 
 ---
 

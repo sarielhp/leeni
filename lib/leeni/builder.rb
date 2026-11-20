@@ -168,6 +168,7 @@ class LatexBuilder
     unless run_convergence_loop_with_recovery
       sync_bbl_to_root if @options[:trace]
       LaTeXIndicator.stop(clear: true, enabled: interactive_tty?)
+      report_bibliography_failure(bib_manager.bib_fatal_detail.to_s) if bib_fatal?
       return 'failed'
     end
 

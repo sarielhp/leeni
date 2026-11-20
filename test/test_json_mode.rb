@@ -76,6 +76,31 @@ class TestJsonMode < Minitest::Test
     end
   end
 
+  # A failed pass lists its alerts after the errors, as -llm does; the summary
+  # counts them.
+  def test_failed_build_in_json_mode_keeps_alerts
+    Dir.mktmpdir('json_err_alert') do |dir|
+      File.write(File.join(dir, 'dup.tex'), <<~TEX)
+        \\documentclass{article}
+        \\begin{document}
+        \\section{A}\\label{x}
+        \\section{B}\\label{x}
+        \\undefinedcommandjson
+        \\end{document}
+      TEX
+
+      data = nil
+      2.times do # the second run reads the labels of the first pass
+        out, = Open3.capture3(@bin_path, '--json', 'dup.tex', chdir: dir)
+        data = JSON.parse(out.strip)
+      end
+      tiers = data['diagnostics'].map { |d| [d['tier'], d['line'], d['category']] }
+      assert_equal ['errors', 5, 'undefined_control_sequence'], tiers.first
+      assert_equal [['alerts', 3, 'multiply_defined_label'], ['alerts', 4, 'multiply_defined_label']], tiers.drop(1)
+      assert_equal 2, data['summary']['alerts']
+    end
+  end
+
   def test_warnings_in_json_mode
     Dir.mktmpdir('json_warn') do |dir|
       tex = File.join(dir, 'cites.tex')

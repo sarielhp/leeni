@@ -47,6 +47,13 @@ class LatexBuilder
     /Package rerunfilecheck Warning: File .* has changed/i, /Package ocgx2 Warning: Rerun/i
   ].freeze
 
+  # Errors the next pass may resolve by itself: a TikZ node that the document
+  # draws only once the .aux holds data (a balloon over a listing line) is
+  # unknown in the first pass. A pass with no other errors is run again,
+  # once, before its errors are reported.
+  TRANSIENT_ERRORS = /\APackage pgf Error: No shape named .* is known/
+  TEX_ERROR_LINE = /^(?:! |\S+:\d+: )(.*)/
+
   MAX_BIB_RUNS = 2
   # TeX error context ("l.12 ...") and the trace header echo document text, which
   # can contain rerun phrases without TeX asking for a rerun.
@@ -393,7 +400,9 @@ class LatexBuilder
 
     loop do
       pass += 1
-      return false unless run_convergence_pass(pass, max_passes, first: pass == 1)
+      passed, pass = run_deferrable_pass(pass, max_passes)
+      return false unless passed
+
       break if @options[:single_pass]
 
       curr_aux = compute_aux_hash
@@ -612,6 +621,28 @@ class LatexBuilder
   def needs_bib_pass?(tool, loga, aux_contents = nil) = bib_manager.needs_bib_pass?(tool, loga, aux_contents)
   def collect_bib_candidates(bibdata_str, files) = bib_manager.collect_bib_candidates(bibdata_str, files)
   def extract_aux_bib_files(aux_contents = nil) = bib_manager.extract_aux_bib_files(aux_contents)
+
+  # Runs pass PASS; when its only errors are ones the next pass resolves
+  # (transient_pass_failure?), runs that next pass in its place. Returns
+  # [success, number of the last pass run].
+  def run_deferrable_pass(pass, max_passes)
+    @may_defer = pass < max_passes && !@options[:single_pass]
+    passed = run_convergence_pass(pass, max_passes, first: pass == 1)
+    @may_defer = false
+    return [passed, pass] if passed || !@transient_deferred
+
+    @transient_deferred = false
+    [run_convergence_pass(pass + 1, max_passes, first: false), pass + 1]
+  end
+
+  # Called with a failed pass's log before its errors are reported; true
+  # defers them to the next pass of the convergence loop.
+  def transient_pass_failure?(pass_log)
+    return false if @transient_retried || !@may_defer
+
+    errors = LaTeXUtils.safe_read(pass_log).scan(TEX_ERROR_LINE).flatten
+    @transient_deferred = @transient_retried = errors.any? && errors.all? { |error| error.match?(TRANSIENT_ERRORS) }
+  end
 
   def needs_latex_rerun?(loga, prev_aux_hash = nil, curr_aux_hash = nil, side_changed: false)
     return true if side_changed

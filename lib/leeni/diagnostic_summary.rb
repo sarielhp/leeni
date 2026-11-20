@@ -267,6 +267,33 @@ module LaTeXDiagnostics
       unlocated.size == errors.size ? errors : errors - unlocated
     end
 
+    # A matrix & read with the wrong catcode makes pgf look for its internal
+    # cell macros and typeset the cells as loose text; with the ampersand error
+    # reported, those are not shown as faults of their own.
+    # One # in a frame body is reported for each macro that reads it
+    # (\iterate, \beamer@doifinframe); at one place it is one fault.
+    def merge_parameter_errors(errors)
+      seen = {}
+      errors.reject do |error|
+        next false unless error[:catalog_id] == :illegal_parameter_number
+
+        place = [format_display_path(error[:file]), error[:line]]
+        seen.key?(place).tap { seen[place] = true }
+      end
+    end
+
+    def suppress_ampersand_cascades(errors)
+      primary = errors.select { |error| error[:catalog_id] == :wrong_catcode_ampersand }
+      return errors if primary.empty?
+
+      last = primary.map { |error| error[:line].to_i }.max
+      errors.reject do |error|
+        next true if error[:catalog_id] == :undefined_control_sequence && error[:token].to_s.start_with?('\pgf@matrix@')
+
+        error[:catalog_id] == :dropped_text && error[:line].to_i.between?(last - 20, last)
+      end
+    end
+
     def suppress_hyphenation_cascades(errors)
       primary = errors.find { |error| error[:catalog_id] == :improper_hyphenation }
       return errors unless primary
@@ -434,6 +461,8 @@ module LaTeXDiagnostics
       compiler_errors = suppress_compiler_brace_cascades(compiler_errors, brace_errors)
       compiler_errors = suppress_environment_mismatch_cascades(compiler_errors)
       compiler_errors = suppress_hyphenation_cascades(compiler_errors)
+      compiler_errors = suppress_ampersand_cascades(compiler_errors)
+      compiler_errors = merge_parameter_errors(compiler_errors)
       compiler_errors = suppress_unlocated_dropped_text(compiler_errors)
       errors = place_merged_brace_errors(prepare_error_items(compiler_errors), brace_errors)
       alerts, warnings, whatevers = partition_diagnostics(content, extract_warnings(content, verbose: false))

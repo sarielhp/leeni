@@ -1,0 +1,11 @@
+{
+  "engine": "pdflatex",
+  "diagnostics": [
+    {
+      "file": "example.tex",
+      "line": 7,
+      "tier": "errors",
+      "category": "illegal_parameter_number"
+    }
+  ]
+}

@@ -167,6 +167,43 @@ module LaTeXDiagnostics
       best&.first(2)
     end
 
+    # Inside a beamer frame TeX reports some faults at the end of the group the
+    # text was read in (an \only{...}, \uncover{...}, the frame) and names
+    # beamer's or pgf's internal macros. The fault is the nearest line above,
+    # within the frame, holding what the error is about: a #1 that must be
+    # written ##1, or the & of a matrix read with the wrong catcode.
+    def locate_frame_parameter(err_text, file, line)
+      probe = frame_backward_probe(err_text)
+      return nil unless probe && line.to_i.positive?
+
+      lines = LaTeXUtils.safe_read(file).lines
+      return nil if probe == :param && !param_error_in_frame?(err_text, lines[line.to_i - 1])
+
+      nearest_in_frame(lines, line.to_i - 1, probe == :param ? /(?<!#)#[1-9]/ : /(?<!\\)&/)&.then { |idx| [file, idx + 1] }
+    end
+
+    def frame_backward_probe(err_text)
+      if err_text.include?('Illegal parameter number') then :param
+      elsif err_text.include?('Single ampersand used with wrong catcode') then :ampersand
+      end
+    end
+
+    def param_error_in_frame?(err_text, reported_line)
+      reported_line.to_s.match?(/\A\s*\\end\{frame\}/) || err_text.include?('\\beamer@doifinframe')
+    end
+
+    # The index of the nearest line at or above FROM matching PATTERN, when
+    # the search meets the frame's \begin{frame}; nil outside a frame.
+    def nearest_in_frame(lines, from, pattern)
+      found = nil
+      from.downto(0) do |idx|
+        text = LaTeXUtils.strip_latex_comments(lines[idx].to_s)
+        found ||= idx if text.match?(pattern)
+        return found if text.match?(/\\begin\{frame\}/)
+      end
+      nil
+    end
+
     # A beamer frame reads its body whole before typesetting it, so TeX reports
     # an error inside it at the \end{frame}, often with no context. What the
     # error names is looked for in the frame's body instead: the \end{...}
@@ -179,7 +216,14 @@ module LaTeXDiagnostics
       probe = frame_body_probe(classification&.[](:id), err_text)
       return nil unless start && probe
 
-      found = frame_text_lines(lines, (start + 1)...(line.to_i - 1)).find { |_, text| text.match?(probe) }
+      # Only a missing $ skips display math: there _ and ^ are no fault.
+      range = (start + 1)...(line.to_i - 1)
+      texts = if classification&.[](:id) == :missing_dollar
+                frame_text_lines(lines, range)
+              else
+                range.map { |idx| [idx, frame_text(lines[idx])] }
+              end
+      found = texts.find { |_, text| text.match?(probe) }
       found && [file, found.first + 1]
     end
 
@@ -206,6 +250,8 @@ module LaTeXDiagnostics
         name && /\\end\s*\{#{Regexp.escape(name)}\}/
       when :missing_dollar
         /(?<!\\)[_^]/
+      when :wrong_catcode_ampersand
+        /(?<!\\)&/
       end
     end
 
@@ -232,8 +278,9 @@ module LaTeXDiagnostics
     # up in the source with whitespace removed; a run of one or two characters
     # (a stray ';' or two) falls back to its first character.
     def locate_dropped_text(text)
+      return locate_short_dropped_text(text) if text.size <= 2
+
       probes = [text, text[0, 8]]
-      probes << text[0] if text.size <= 2
       collect_source_candidates.each do |file|
         joined, starts = joined_source(file)
         probes.uniq.each do |probe|
@@ -241,6 +288,21 @@ module LaTeXDiagnostics
           at = !probe.empty? && joined.index(/(?<!\\)#{Regexp.escape(probe)}/)
           return [file, starts.rindex { |offset| offset <= at } + 1] if at
         end
+      end
+      nil
+    end
+
+    # One or two characters match almost anywhere ('b' in \documentclass{beamer}):
+    # they must stand alone, outside command names, in the document body.
+    def locate_short_dropped_text(text)
+      pattern = /(?<![[:alnum:]])#{Regexp.escape(text)}(?![[:alnum:]])/
+      collect_source_candidates.each do |file|
+        lines = LaTeXUtils.safe_read(file).lines
+        body = lines.index { |line| line.match?(/\\begin\{document\}/) }.to_i
+        found = (body...lines.size).find do |idx|
+          LaTeXUtils.strip_latex_comments(lines[idx]).gsub(/\\(?:[A-Za-z@]+|.)/, ' ').match?(pattern)
+        end
+        return [file, found + 1] if found
       end
       nil
     end

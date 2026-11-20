@@ -25,7 +25,7 @@ Errors during compilation originate in one of three layers:
 
 ---
 
-## 3. Master Error Index (75 Errors)
+## 3. Master Error Index (77 Errors)
 
 | # | Error Message / Pattern | Layer | Cause & Summary | Support | Reproducer & Details |
 |---|:--- |:--- |:--- |:--- |:--- |
@@ -104,6 +104,8 @@ Errors during compilation originate in one of three layers:
 | **73** | `Package keyval Error: widht undefined.` | keyval / graphicx | An unknown `key=value` option, reported where the command was read to its end (a frame's `\end{frame}`). `leeni` finds the key; a key reported with its value points at an active `=` (babel shorthand). | **Catalog Hint** | [`73_keyval_unknown_key`](73_keyval_unknown_key/) |
 | **74** | `./example.tex:13: ...` at `\end{frame}` | beamer | Errors inside a frame are all reported at its `\end{frame}`. `leeni` places them in the frame body by the command, `_`/`^` or `\end{...}` they name. | **Standard** | [`74_error_inside_frame`](74_error_inside_frame/) |
 | **75** | `Improper \hyphenation will be flushed.` | TeX Primitive | An accent macro or babel shorthand inside `\hyphenation`; TeX reports each non-letter token and the cascade it causes. `leeni` reports one error. | **Catalog Hint** | [`75_improper_hyphenation`](75_improper_hyphenation/) |
+| **76** | `Package pgf Error: Single ampersand used with wrong catcode` | Package (pgf) | The `&` of a TikZ matrix or `tikz-cd` was read inside an argument (`\only`, `\uncover`, a frame). The undefined internal macro and dropped cells it causes are one error, at the first `&`. | **Catalog Hint** | [`76_wrong_catcode_ampersand`](76_wrong_catcode_ampersand/) |
+| **77** | `Illegal parameter number in definition of \iterate` (in a frame) | TeX Primitive | A `#1` inside a beamer frame body (a TikZ style) must be written `##1`. TeX reports it at `\end{frame}` and names beamer's macros; `leeni` reports one error at the `#1`. | **Catalog Hint** | [`77_parameter_in_frame`](77_parameter_in_frame/) |
 
 ---
 

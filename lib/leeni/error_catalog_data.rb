@@ -352,10 +352,16 @@ module LaTeXErrorCatalog
     },
     {
       id: :illegal_parameter_number,
-      pattern: /Illegal parameter number in definition of (\S+)/i,
+      pattern: /Illegal parameter number in definition of (\S+?)\.?(?=\s|\z)/i,
       title: 'Illegal parameter number in definition',
       hint: lambda { |tok|
-        tok ? "Macro '#{tok}' uses parameters (#1) without declaring argument count [n]" : 'Macro uses parameters without declaring argument count'
+        if tok.to_s.match?(/beamer@doifinframe|\A\\iterate\z/)
+          'A # inside a beamer frame body (a TikZ style or macro defined there) must be doubled: write ##1 for #1 (the same in a \\loop body)'
+        elsif tok
+          "Macro '#{tok}' uses parameters (#1) without declaring argument count [n]"
+        else
+          'Macro uses parameters without declaring argument count'
+        end
       },
       why: 'A macro definition referenced #1 or #2 but omitted the parameter count declaration.',
       fix: 'Declare the number of arguments: \\newcommand{\\cmd}[1]{...}.',
@@ -460,6 +466,15 @@ module LaTeXErrorCatalog
       why: 'A command that takes key=value options (\\includegraphics, \\usepackage options, tikz) was given a key it does not define, usually a misspelling. A key that still carries its value means = was not read as a plain character.',
       fix: 'Correct the key name, or remove the option the command does not support.',
       doc_slug: '73_keyval_unknown_key'
+    },
+    {
+      id: :wrong_catcode_ampersand,
+      pattern: /Package pgf Error: Single ampersand used with wrong catcode/,
+      title: 'Package pgf Error: Single ampersand used with wrong catcode',
+      hint: '& of a TikZ matrix (matrix of nodes, tikz-cd) was read inside an argument (\\only, \\uncover, a non-fragile frame, a macro); add ampersand replacement=\\& and write \\& between cells',
+      why: 'A matrix of nodes (and tikz-cd) makes & active to separate cells. Text read as an argument, such as the body of \\only{...}, \\uncover{...}, a beamer frame or a macro, has its catcodes fixed before TikZ can change them, so & arrives as an ordinary alignment character.',
+      fix: 'Add the option ampersand replacement=\\& to the matrix or tikzcd and write \\& instead of & between cells; or move the matrix out of the argument (\\only<1>{} around it instead of inside, or \\begin{onlyenv}<1> ... \\end{onlyenv}).',
+      doc_slug: '76_wrong_catcode_ampersand'
     },
     {
       id: :bad_register_code,

@@ -1,0 +1,12 @@
+% !TEX program = pdflatex
+\documentclass{beamer}
+\usepackage{tikz}
+\begin{document}
+\begin{frame}{Arrows}
+\only<1>{
+\begin{tikzpicture}[long/.style={shorten >=-#1}]
+\draw[->, long=2pt] (0,0) -- (1,0);
+\end{tikzpicture}
+}
+\end{frame}
+\end{document}

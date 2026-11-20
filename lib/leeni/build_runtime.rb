@@ -497,6 +497,7 @@ module LatexBuildRuntime
   def handle_pass_errors(exit_status, pass_log)
     error_count = count_errors_in_log(exit_status, pass_log)
     return unless error_count.positive?
+    return if transient_pass_failure?(pass_log)
 
     raise StaleBibliography if stale_bbl_failure?(pass_log)
 

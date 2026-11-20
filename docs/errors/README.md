@@ -25,7 +25,7 @@ Errors during compilation originate in one of three layers:
 
 ---
 
-## 3. Master Error Index (65 Errors)
+## 3. Master Error Index (68 Errors)
 
 | # | Error Message / Pattern | Layer | Cause & Summary | Support | Reproducer & Details |
 |---|:--- |:--- |:--- |:--- |:--- |
@@ -94,6 +94,9 @@ Errors during compilation originate in one of three layers:
 | **63** | `I couldn't open database file ...` | BibTeX / Biber | A database named by `\bibliography` or `\addbibresource` cannot be read; TeX reports nothing. `leeni` reports an error at that line. | **Standard** | [`63_bibliography_database_missing`](63_bibliography_database_missing/) |
 | **64** | `LaTeX Error: File '....cls' not found` | LaTeX Kernel | `\documentclass` names a class that is not installed (a journal class missing from the sources). `leeni` reports it at the `\documentclass` line. | **Standard** | [`64_class_not_found`](64_class_not_found/) |
 | **65** | `I found no \bibstyle command` | BibTeX | No active `\bibliographystyle` (or no `\bibliography`): BibTeX writes no bibliography; TeX reports nothing. `leeni` reports an error at the `\bibliography` line. | **Standard** | [`65_bibliography_style_missing`](65_bibliography_style_missing/) |
+| **66** | `! Emergency stop. <*> ... (job aborted, no legal \end found)` | TeX Engine | The main file ends without `\end{document}` (truncated file, stray `\endinput`). `leeni` reports it at the last line of the main file. | **Catalog Hint** | [`66_missing_end_document`](66_missing_end_document/) |
+| **67** | `Paragraph ended before \new@command was complete` | LaTeX Kernel | A brace missing in a preamble `\newcommand`; TeX names the blank line after it and every swallowed macro is undefined. `leeni` reports the open brace first. | **Catalog Hint** | [`67_broken_newcommand`](67_broken_newcommand/) |
+| **68** | `Paragraph ended before \begin was complete` | LaTeX Kernel | `\begin{proof` without its closing brace; TeX names the blank line, then an environment mismatch. `leeni` reports the open brace first. | **Catalog Hint** | [`68_begin_missing_brace`](68_begin_missing_brace/) |
 
 ---
 
@@ -111,7 +114,7 @@ The corpus runs in the medium test tier (`test/test_error_corpus.rb`, also `tool
 # Run the corpus expectations
 tools/test_error_corpus
 # Draft expected.json for a new case (check every location by hand before saving)
-tools/test_error_corpus --draft docs/errors/66_new_case
+tools/test_error_corpus --draft docs/errors/69_new_case
 ```
 
 ### Comparing Real Papers with latexmk
@@ -125,3 +128,13 @@ tools/compare_corpus -j 4 -b /tmp/arxiv-summary.json -o /tmp/arxiv-new.json exam
 ```
 
 `stricter` is expected where leeni deliberately makes an error of what TeX only logs (a missing glyph, a duplicate label); read those before treating them as bugs.
+
+### Breaking Real Papers on Purpose
+Well-behaved papers rarely show how leeni copes with a badly broken one. `tools/mutate_corpus` takes papers that build clean and injects one realistic fault at a known line: a dropped brace, `$`, `\)` or `\end{...}`, a misspelled macro or environment, a stray `&` or `_`, an argument left open, a double superscript, a file cut short, a broken `\newcommand`. For each mutant it checks that leeni does not crash or hang, that `--json` is valid and agrees with `-llm`, that every error TeX reports is reported by leeni with a line, and that leeni's first error is no further from the injected line than TeX's. Then the fault is reverted and the same build directory must rebuild the original PDF.
+
+```bash
+# 20 mutants per paper; the seed makes every mutant replayable
+tools/mutate_corpus -n 20 -j 4 -o /tmp/mutate-summary.json CORPUS_DIR
+```
+
+The papers stay outside the repository, and so do the summaries, which quote source lines. A real bug found this way becomes a synthetic case here.

@@ -224,6 +224,18 @@ module LaTeXErrorCatalog
       doc_slug: '22_extra_right'
     },
     {
+      id: :missing_end_document,
+      pattern: /ended before \\end\{document\}|no legal \\end found/i,
+      title: 'File ended before \\end{document}',
+      hint: 'The main file ends without \\end{document}; add it, or look for a truncated file or a stray \\endinput',
+      why: 'TeX read to the end of the main file without meeting \\end{document}, so it stopped the job ' \
+           '("*** (job aborted, no legal \\end found)"). The file was cut short, \\end{document} was deleted, ' \
+           'or an \\endinput or an unclosed conditional skipped it.',
+      fix: 'Restore \\end{document} at the end of the main file; if it is there, look for \\endinput, an unclosed ' \
+           '\\iffalse or comment environment, or a file truncated by an editor or a merge.',
+      doc_slug: '66_missing_end_document'
+    },
+    {
       id: :missing_begin_document,
       pattern: /Missing \\begin\{document\}/i,
       title: 'Missing \\begin{document}',

@@ -135,9 +135,17 @@ module CorpusCompare
     end
     errors = Array(data['diagnostics']).select { |d| d['tier'] == 'errors' }
     { exit: run[:status], timed_out: run[:timed_out], elapsed: run[:elapsed], engine: data.dig('build', 'engine'),
+      build_dir: data.dig('build', 'build_dir'),
       summary: data['summary'], error_categories: errors.map { |d| d['category'] }.tally,
       first_errors: errors.first(3).map { |d| "#{d['file']}:#{d['line']}: #{d['category']}" },
       pdf: pdf_facts(File.join(dir, main.sub(/\.tex\z/i, '.pdf'))) }
+  end
+
+  # A project under the temporary area gets its build directory in
+  # <temporary root>/builds, not in XDG_CACHE_HOME; it goes with the copy.
+  def self.remove_build_dir(path)
+    builds = File.join(ProjectTmp.root, 'builds') + File::SEPARATOR
+    FileUtils.rm_rf(path) if path.is_a?(String) && File.expand_path(path).start_with?(builds)
   end
 
   def self.reference_build(dir, main, engine, opts)
@@ -178,8 +186,12 @@ module CorpusCompare
       theirs = File.join(tmp, 'reference')
       prepare(entry, theirs)
       leeni = leeni_build(File.dirname(File.join(mine, main)), File.basename(main), opts, File.join(tmp, 'cache'))
-      ref = reference_build(File.dirname(File.join(theirs, main)), File.basename(main), leeni[:engine], opts)
-      summarize(entry, leeni, ref)
+      begin
+        ref = reference_build(File.dirname(File.join(theirs, main)), File.basename(main), leeni[:engine], opts)
+        summarize(entry, leeni, ref)
+      ensure
+        remove_build_dir(leeni[:build_dir])
+      end
     end
   rescue StandardError => e
     { 'name' => File.basename(entry), 'flags' => ['harness_error'], 'error' => "#{e.class}: #{e.message}" }
@@ -190,7 +202,7 @@ module CorpusCompare
     strip = ->(pdf) { pdf&.except(:words) }
     { 'name' => File.basename(entry), 'corpus' => File.basename(File.dirname(entry)), 'flags' => flags(leeni, ref),
       'text_agreement' => agreement,
-      'leeni' => JSON.parse(JSON.generate(leeni.merge(pdf: strip.call(leeni[:pdf])))),
+      'leeni' => JSON.parse(JSON.generate(leeni.except(:build_dir).merge(pdf: strip.call(leeni[:pdf])))),
       'reference' => JSON.parse(JSON.generate(ref.merge(errors: ref[:errors].first(3), error_count: ref[:errors].size,
                                                         pdf: strip.call(ref[:pdf])))) }
   end

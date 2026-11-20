@@ -227,7 +227,22 @@ module LaTeXDiagnostics
       # away); the hint already names it, and it would mark the wrong span here.
       brace[:catalog] = (error[:catalog] || {}).merge(root_line: brace[:line], root_col: brace[:col], token: nil)
       brace[:catalog_id] = error[:catalog_id]
+      brace[:log_index] = error[:log_index]
       true
+    end
+
+    # A brace error that took over a compiler error goes where that error was
+    # in TeX's order, ahead of the errors it caused; appended after them, the
+    # root of a broken \newcommand or \begin{proof came last, after its
+    # cascade. Brace errors TeX did not report keep their place at the end.
+    def place_merged_brace_errors(prepared, brace_errors)
+      merged, rest = brace_errors.partition { |brace| brace[:log_index] }
+      queue = merged.sort_by { |brace| brace[:log_index] }
+      placed = prepared.each_with_object([]) do |item, out|
+        out << queue.shift while item[:log_index] && queue.any? && queue.first[:log_index] < item[:log_index]
+        out << item
+      end
+      placed + queue + rest
     end
 
     def brace_fault_kind(brace)
@@ -300,17 +315,28 @@ module LaTeXDiagnostics
     def report_json_mode_errors(analysis, content, io: $stdout)
       records = diagnostic_records(analysis, %i[errors alerts])
       alerts = tier_suppressed?(:alerts) ? [] : records[:alerts]
+      errors = records[:errors].empty? ? [unclassified_failure_record] : records[:errors]
       result = LaTeXDiagnosticResult.new(
         build: json_build_report,
         success: false,
         exit_code: 1,
         pdf_path: nil,
-        records: records[:errors] + alerts,
-        summary: { errors: records[:errors].size, alerts: alerts.size, warnings: 0, whatevers: 0 },
+        records: errors + alerts,
+        summary: { errors: errors.size, alerts: alerts.size, warnings: 0, whatevers: 0 },
         log_tail: analysis.errors.empty? ? content.to_s.lines.last(10).join : nil
       )
       presenter = LaTeXJsonPresenter.new(@options)
       presenter.render_result(result, io: io)
+    end
+
+    # A failed pass whose log names no error leeni recognises. -llm reports it
+    # as an error with the log tail; --json reported success: false with no
+    # error at all, which a caller counting errors read as a clean build.
+    def unclassified_failure_record
+      text = 'Compilation failed with an error leeni could not classify; see log_tail'
+      item = { file: @filename, line: 0, line_str: '', text: text, err_block: [text], category: :unclassified_failure,
+               catalog: {}, base_color: :red, tier: 'errors', source: :leeni, synthetic: true }
+      normalize_diagnostic(item, 'errors')
     end
 
     BIBLIOGRAPHY_FAILED_HINT = 'The bibliography tool stopped without writing a bibliography; fix what its message names'
@@ -382,9 +408,10 @@ module LaTeXDiagnostics
                      else
                        []
                      end
+      compiler_errors.each_with_index { |error, index| error[:log_index] = index }
       compiler_errors = suppress_compiler_brace_cascades(compiler_errors, brace_errors)
       compiler_errors = suppress_environment_mismatch_cascades(compiler_errors)
-      errors = prepare_error_items(compiler_errors) + brace_errors
+      errors = place_merged_brace_errors(prepare_error_items(compiler_errors), brace_errors)
       alerts, warnings, whatevers = partition_diagnostics(content, extract_warnings(content, verbose: false))
       Leeni::DiagnosticAnalysis.new(errors: errors, alerts: alerts, warnings: warnings, whatevers: whatevers,
                                     error_count: errors.size, brace_errors: brace_errors)

@@ -1,0 +1,24 @@
+{
+  "engine": "xelatex",
+  "diagnostics": [
+    {
+      "file": "example.tex",
+      "line": 4,
+      "col": 7,
+      "tier": "errors",
+      "category": "paragraph_ended_before_complete"
+    },
+    {
+      "file": "example.tex",
+      "line": 8,
+      "tier": "errors",
+      "category": "mismatched_environment"
+    },
+    {
+      "file": "example.tex",
+      "line": 8,
+      "tier": "errors",
+      "category": "generic"
+    }
+  ]
+}

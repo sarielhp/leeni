@@ -1,0 +1,403 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Fault injection on real papers. A paper that builds clean is broken on
+# purpose, one realistic fault at a known line (a dropped brace, $ or \end, a
+# misspelled macro, a truncated file, a broken macro definition, ...), and
+# leeni's report is checked against that line and against what TeX itself
+# says. Then the fault is reverted and the warm build directory must rebuild
+# the original PDF. Papers and summaries stay outside the repository.
+require 'json'
+require 'fileutils'
+require 'optparse'
+load File.expand_path('compare_corpus', __dir__) unless defined?(CorpusCompare)
+
+module MutateCorpus
+  LEENI = CorpusCompare::LEENI
+  CRASH = /\.rb:\d+:in [`']|\(NoMethodError\)|\(TypeError\)|\(ArgumentError\)|stack level too deep/
+  TEX_LOCATED = %r{^(?:\./)?([^\s:]+\.(?:tex|sty|cls|ltx|bbl)):(\d+): (.*)}
+  PROSE = /\A(?:[A-Za-z,.;()'-]+\s+){6,}/
+
+  HELP = <<~TEXT
+    Usage: tools/mutate_corpus [options] CORPUS_DIR...
+
+    Each paper (entry.json + paper/, as for tools/compare_corpus) that leeni
+    builds without errors gets N mutants, each with faults injected at known
+    lines. Per mutant: leeni --json (and -llm), TeX's own first error from the
+    pass log, then the fault is reverted and the same build directory must
+    rebuild the original PDF.
+
+    Hard failures: crash, bad_json, timeout, bad_exit, silent (TeX reported an
+    error, leeni none), lineless (leeni gave no line where TeX did),
+    llm_disagree, not_recovered. Location: leeni's first error against TeX's
+    first error, both measured from the injected line (worse_than_tex,
+    other_file). leeni_only and not_a_fault are listed, not failures.
+
+    Options:
+      -n, --mutants N      mutants per paper (default 20)
+      -s, --seed N         random seed (default 1)
+      -j, --jobs N         papers in parallel (default 3)
+      -t, --timeout SEC    per build (default 300)
+      -o, --output FILE    summary JSON (default: CORPUS_DIR/mutate-summary.json)
+          --ops A,B        only these operators
+          --no-llm         skip the -llm comparison
+          --only NAME      only the paper NAME (repeatable)
+      -h, --help           show this help; nothing is run
+  TEXT
+
+  # Each operator gets the lines of one source file, the index range it may
+  # touch and a Random; it returns [new_lines, line_index] or nil when no line
+  # of the file fits.
+  module Ops
+    module_function
+
+    def code(line) = line.sub(/(?<!\\)%.*/, '')
+
+    def pick(lines, range, rng, pattern)
+      candidates = range.select { |i| code(lines[i]).match?(pattern) }
+      candidates.empty? ? nil : candidates[rng.rand(candidates.size)]
+    end
+
+    def edit(lines, range, rng, pattern)
+      idx = pick(lines, range, rng, pattern)
+      return nil unless idx
+
+      out = lines.dup
+      out[idx] = yield(out[idx].dup)
+      out[idx] == lines[idx] ? nil : [out, idx]
+    end
+
+    def remove_one(line, rng, token)
+      text = code(line)
+      spots = (0...text.size).select { |i| text[i, token.size] == token && (i.zero? || text[i - 1] != '\\') }
+      return line if spots.empty?
+
+      at = spots[rng.rand(spots.size)]
+      line[0, at] + line[(at + token.size)..]
+    end
+
+    def insert_in_prose(line, rng, insert)
+      words = line.enum_for(:scan, /\s+/).map { Regexp.last_match.begin(0) }
+      return line if words.size < 4
+
+      at = words[1 + rng.rand(words.size - 2)]
+      "#{line[0, at]} #{insert}#{line[at..]}"
+    end
+
+    def delete_line(lines, range, rng, pattern)
+      idx = pick(lines, range, rng, pattern)
+      idx && [lines[0...idx] + lines[(idx + 1)..], idx]
+    end
+  end
+
+  MACRO = /\\(?!begin|end|item|label|ref|cite|eqref|input|include|usepackage|documentclass|section|subsection|newcommand|renewcommand|def\b|let\b|providecommand|par\b|noindent)[A-Za-z]{3,}/
+
+  OPERATORS = {
+    'drop_close_brace' => ->(l, r, g) { Ops.edit(l, r, g, /(?<!\\)\}/) { |x| Ops.remove_one(x, g, '}') } },
+    'drop_open_brace' => ->(l, r, g) { Ops.edit(l, r, g, /(?<!\\)\{/) { |x| Ops.remove_one(x, g, '{') } },
+    'drop_dollar' => ->(l, r, g) { Ops.edit(l, r, g, /(?<!\\)\$/) { |x| Ops.remove_one(x, g, '$') } },
+    'drop_math_close' => ->(l, r, g) { Ops.edit(l, r, g, /\\[)\]]/) { |x| x.sub(/\\[)\]]/, '') } },
+    'drop_end' => ->(l, r, g) { Ops.delete_line(l, r, g, /^\s*\\end\{(?!document)/) },
+    'drop_begin' => ->(l, r, g) { Ops.delete_line(l, r, g, /^\s*\\begin\{(?!document)/) },
+    'typo_env' => ->(l, r, g) { Ops.edit(l, r, g, /\\end\{(?!document)\w+/) { |x| x.sub(/\\end\{(\w+)/, '\end{\1x') } },
+    'typo_macro' => lambda do |l, r, g|
+      Ops.edit(l, r, g, MACRO) do |x|
+        names = Ops.code(x).scan(MACRO)
+        x.sub(names[g.rand(names.size)]) { |m| "#{m}q" }
+      end
+    end,
+    'stray_ampersand' => ->(l, r, g) { Ops.edit(l, r, g, PROSE) { |x| Ops.insert_in_prose(x, g, '&') } },
+    'stray_underscore' => ->(l, r, g) { Ops.edit(l, r, g, PROSE) { |x| Ops.insert_in_prose(x, g, 'a_b') } },
+    'unclosed_argument' => ->(l, r, g) { Ops.edit(l, r, g, PROSE) { |x| Ops.insert_in_prose(x, g, '\textbf{') } },
+    'double_superscript' => ->(l, r, g) { Ops.edit(l, r, g, /\^(?:\{[^{}]*\}|\w)/) { |x| x.sub(/\^(\{[^{}]*\}|\w)/, '^\1^2') } },
+    'truncate' => lambda do |l, r, _g|
+      return nil if r.size < 10
+
+      idx = r.first + (r.size * 0.6).floor
+      [l[0...idx], idx]
+    end,
+    'break_definition' => lambda do |l, _r, g|
+      range = 0...(l.index { |x| x.match?(/\\begin\{document\}/) } || l.size)
+      Ops.edit(l, range, g, /\\(?:re)?newcommand|\\def\\|\\DeclareMathOperator|\\newenvironment/) do |x|
+        Ops.remove_one(x, g, '}')
+      end
+    end
+  }.freeze
+
+  module_function
+
+  def parse(argv)
+    opts = { mutants: 20, seed: 1, jobs: 3, timeout: 300, output: nil, ops: OPERATORS.keys, llm: true, only: [] }
+    OptionParser.new do |o|
+      o.on('-n', '--mutants N', Integer) { |v| opts[:mutants] = v }
+      o.on('-s', '--seed N', Integer) { |v| opts[:seed] = v }
+      o.on('-j', '--jobs N', Integer) { |v| opts[:jobs] = v }
+      o.on('-t', '--timeout SEC', Integer) { |v| opts[:timeout] = v }
+      o.on('-o', '--output FILE') { |v| opts[:output] = v }
+      o.on('--ops LIST') { |v| opts[:ops] = v.split(',') & OPERATORS.keys }
+      o.on('--no-llm') { opts[:llm] = false }
+      o.on('--only NAME') { |v| opts[:only] << v }
+      o.on('-h', '--help') do
+        puts HELP
+        exit
+      end
+    end.parse!(argv)
+    opts
+  end
+
+  # --- building --------------------------------------------------------------
+
+  def leeni(dir, main, opts, cache, *flags)
+    CorpusCompare.run([LEENI, '--no-lock', *flags, main], chdir: dir, timeout: opts[:timeout],
+                                                          env: { 'XDG_CACHE_HOME' => cache })
+  end
+
+  def json_build(dir, main, opts, cache)
+    run = leeni(dir, main, opts, cache, '--json')
+    data = begin
+      JSON.parse(run[:output][/\{.*\}/m].to_s)
+    rescue JSON::ParserError
+      nil
+    end
+    run.merge(data: data, crash: run[:output].match?(CRASH))
+  end
+
+  def errors_of(build)
+    Array(build.dig(:data, 'diagnostics')).select { |d| d['tier'] == 'errors' }
+  end
+
+  # TeX's own first located error, from the pass logs of the failed build.
+  # An error TeX gives no location (an Emergency stop at the end of the main
+  # file) counts as an error at line 0.
+  def tex_first_error(dir)
+    logs = Dir.glob(File.join(dir, 'err_*_*')).sort_by { |f| f[/_(\d+)\z/, 1].to_i }
+    text = logs.map { |log| File.read(log, mode: 'rb').scrub }.join
+    located = text.each_line.lazy.map { |line| line.match(TEX_LOCATED) }.find { |m| m && !m[3].match?(/warning/i) }
+    return { file: File.basename(located[1]), line: located[2].to_i, message: located[3].strip[0, 100] } if located
+
+    bare = text[/^! (.+)$/, 1]
+    bare && { file: nil, line: 0, message: bare.strip[0, 100] }
+  end
+
+  def pdf_words(dir, main)
+    CorpusCompare.pdf_facts(File.join(dir, main.sub(/\.tex\z/i, '.pdf')))
+  end
+
+  # Project files TeX read (from the .fls), relative to the work directory.
+  def source_files(work, dir, main)
+    fls = Dir.glob(File.join(dir, '*.fls')).first
+    root = File.realpath(work)
+    read = fls ? File.read(fls).scan(/^INPUT (.+)$/).flatten : []
+    files = read.map { |p| File.expand_path(p, dir) }.select { |p| p.start_with?("#{root}/") || p.start_with?(work) }
+    files = files.map { |p| p.sub(%r{\A(?:#{Regexp.escape(root)}|#{Regexp.escape(work)})/}, '') }
+    ([main] + files.grep(/\.(?:tex|sty|cls)\z/)).uniq.select { |f| File.file?(File.join(work, f)) }
+  end
+
+  # --- mutants ---------------------------------------------------------------
+
+  def body_range(lines, file, main)
+    return 0...lines.size unless file == main
+
+    start = lines.index { |l| l.match?(/\\begin\{document\}/) } || 0
+    finish = lines.rindex { |l| l.match?(/\\end\{document\}/) } || lines.size
+    (start + 1)...finish
+  end
+
+  # Picks an operator and a file it applies to; returns the mutation or nil.
+  def make_mutant(work, files, main, opts, rng)
+    8.times do
+      op = opts[:ops][rng.rand(opts[:ops].size)]
+      file = files[rng.rand(files.size)]
+      lines = File.read(File.join(work, file), mode: 'rb').scrub.lines
+      result = OPERATORS.fetch(op).call(lines, body_range(lines, file, main), rng)
+      next unless result
+
+      new_lines, idx = result
+      return { op: op, file: file, line: idx + 1, before: lines[idx].to_s.strip[0, 160],
+               after: new_lines[idx].to_s.strip[0, 160], original: lines.join, mutated: new_lines.join }
+    end
+    nil
+  end
+
+  def llm_locations(output)
+    output.scan(/^([^\s:]+):(\d+)(?::\d+)?: error:/).map { |f, l| [File.basename(f), l.to_i] }
+  end
+
+  def json_locations(errors)
+    errors.map { |d| [File.basename(d['file'].to_s), [d['line'].to_i, 1].max] }
+  end
+
+  def llm_disagrees?(llm_run, errors)
+    return false unless llm_run
+
+    llm = llm_locations(llm_run[:output])
+    json = json_locations(errors)
+    truncated = llm_run[:output].match?(/errors? in \S+ truncated/)
+    truncated ? llm != json.first(llm.size) : llm.sort != json.sort
+  end
+
+  def distance(loc, mutant)
+    loc && File.basename(loc[:file].to_s) == File.basename(mutant[:file]) ? loc[:line] - mutant[:line] : nil
+  end
+
+  def judge(mutant, build, tex, llm_run, recovered)
+    errors = errors_of(build)
+    first = errors.first && { file: errors.first['file'], line: errors.first['line'].to_i }
+    d_leeni = distance(first, mutant)
+    d_tex = distance(tex, mutant)
+    flags = run_flags(build, llm_run, recovered) + fault_flags(tex, errors, first) + location_flags(d_leeni, d_tex, first, tex)
+    llm_flag = llm_disagrees?(llm_run, errors) ? ['llm_disagree'] : []
+    { flags: flags + llm_flag, d_leeni: d_leeni, d_tex: d_tex, leeni_errors: errors.size, tex: tex, first: first,
+      categories: errors.map { |d| d['category'] }.uniq.first(4) }
+  end
+
+  # Failures of leeni itself, whatever the fault was.
+  def run_flags(build, llm_run, recovered)
+    flags = []
+    flags << 'crash' if build[:crash] || llm_run&.dig(:output).to_s.match?(CRASH)
+    flags << 'timeout' if build[:timed_out]
+    flags << 'bad_json' if build[:data].nil? && !build[:timed_out]
+    flags << 'bad_exit' unless build[:timed_out] || [0, 1].include?(build[:status])
+    flags << 'not_recovered' unless recovered
+    flags
+  end
+
+  # Whether TeX and leeni agree that there is an error at all.
+  def fault_flags(tex, errors, first)
+    return [errors.empty? ? 'not_a_fault' : 'leeni_only'] unless tex
+    return ['silent'] if errors.empty?
+
+    tex[:line].positive? && first[:line].zero? ? ['lineless'] : []
+  end
+
+  def location_flags(d_leeni, d_tex, first, tex)
+    return ['other_file'] if first && tex && d_leeni.nil? && !d_tex.nil?
+    return ['worse_than_tex'] if d_leeni && d_tex && d_leeni.abs > d_tex.abs
+
+    []
+  end
+
+  # ctx: work, main, cache, build_dir, opts and the baseline's PDF facts.
+  def run_mutant(ctx, mutant)
+    work, main, cache, opts = ctx.values_at(:work, :main, :cache, :opts)
+    path = File.join(work, mutant[:file])
+    File.write(path, mutant[:mutated])
+    FileUtils.rm_f(Dir.glob(File.join(ctx[:build_dir], 'err_*')))
+    build = json_build(work, main, opts, cache)
+    tex = tex_first_error(ctx[:build_dir])
+    llm_run = opts[:llm] && !build[:timed_out] ? leeni(work, main, opts, cache, '-llm') : nil
+    File.write(path, mutant[:original])
+    back = json_build(work, main, opts, cache)
+    words = back[:status]&.zero? ? pdf_words(work, main) : nil
+    recovered = words && CorpusCompare.word_agreement(ctx[:words][:words], words[:words]) >= 1.0
+    judge(mutant, build, tex, llm_run, recovered)
+  end
+
+  def paper_seed(name, seed) = (name.bytes.sum * 7919) + seed
+
+  def mutate_paper(entry, opts)
+    name = File.basename(entry)
+    ProjectTmp.mktmpdir('mutate') do |tmp|
+      work = File.join(tmp, 'w')
+      cache = File.join(tmp, 'cache')
+      main = CorpusCompare.prepare(entry, work)
+      base = json_build(work, main, opts, cache)
+      ctx = { work: work, main: main, cache: cache, opts: opts, build_dir: base.dig(:data, 'build', 'build_dir') }
+      begin
+        mutate_clean_paper(name, base, ctx)
+      ensure
+        CorpusCompare.remove_build_dir(ctx[:build_dir])
+      end
+    end
+  end
+
+  def mutate_clean_paper(name, base, ctx)
+    work, main, opts = ctx.values_at(:work, :main, :opts)
+    ctx[:words] = base[:status]&.zero? && errors_of(base).empty? && ctx[:build_dir] ? pdf_words(work, main) : nil
+    return [{ paper: name, skipped: 'baseline not clean' }] unless ctx[:words]
+
+    files = source_files(work, ctx[:build_dir], main)
+    rng = Random.new(paper_seed(name, opts[:seed]))
+    Array.new(opts[:mutants]) do |i|
+      mutant = make_mutant(work, files, main, opts, rng)
+      next nil unless mutant
+
+      mutant.slice(:op, :file, :line, :before, :after).merge(paper: name, id: i).merge(run_mutant(ctx, mutant))
+    end.compact
+  end
+
+  # --- driver ----------------------------------------------------------------
+
+  def mutate_all(entries, opts)
+    queue = Queue.new
+    entries.each { |entry| queue << entry }
+    results = []
+    lock = Mutex.new
+    Array.new([opts[:jobs], entries.size].min) do
+      Thread.new do
+        while (entry = CorpusCompare.next_entry(queue))
+          rows = mutate_paper(entry, opts)
+          lock.synchronize do
+            results.concat(rows)
+            print_paper(rows)
+          end
+        end
+      end
+    end.each(&:join)
+    results
+  end
+
+  def print_paper(rows)
+    return puts("#{rows.first[:paper]}: skipped (#{rows.first[:skipped]})") if rows.first&.key?(:skipped)
+    return if rows.empty?
+
+    bad = rows.count { |r| r[:flags].intersect?(REPORTED) }
+    puts "#{rows.first[:paper].ljust(6)} #{rows.size.to_s.rjust(3)} mutants  #{bad} flagged"
+  end
+
+  HARD = %w[crash timeout bad_json bad_exit silent lineless llm_disagree not_recovered other_file].freeze
+  REPORTED = (HARD + ['worse_than_tex']).freeze
+
+  def report(results)
+    rows = results.reject { |r| r.key?(:skipped) }
+    puts "\n#{rows.size} mutants on #{rows.map { |r| r[:paper] }.uniq.size} papers " \
+         "(#{results.count { |r| r.key?(:skipped) }} papers skipped: not clean)"
+    puts "flags: #{rows.flat_map { |r| r[:flags] }.tally.sort_by { |_, n| -n }.map { |f, n| "#{f}=#{n}" }.join(' ')}"
+    report_distances(rows)
+    rows.select { |r| r[:flags].intersect?(REPORTED) }.each { |r| puts flagged_row(r) }
+  end
+
+  def flagged_row(row)
+    tex = row[:tex] ? "#{row[:tex][:file]}:#{row[:tex][:line]}" : '-'
+    leeni = row[:first] ? "#{File.basename(row[:first][:file].to_s)}:#{row[:first][:line]}" : '-'
+    "  #{row[:paper].ljust(6)} ##{row[:id].to_s.ljust(3)} #{row[:op].ljust(18)} #{row[:file]}:#{row[:line]}  " \
+      "tex=#{tex} leeni=#{leeni}  #{(row[:flags] & REPORTED).join(',')}"
+  end
+
+  def report_distances(rows)
+    located = rows.select { |r| r[:d_leeni] && r[:d_tex] }
+    return if located.empty?
+
+    exact = located.count { |r| r[:d_leeni].zero? }
+    better = located.count { |r| r[:d_leeni].abs < r[:d_tex].abs }
+    puts "located: #{located.size}; leeni at the injected line: #{exact}; closer than TeX: #{better}; " \
+         "worse: #{located.count { |r| r[:d_leeni].abs > r[:d_tex].abs }}"
+  end
+
+  def main(argv)
+    opts = parse(argv)
+    abort HELP if argv.empty?
+    ProjectTmp.project = ToolSettings::PROJECT_NAME
+    entries = CorpusCompare.entries(argv, opts[:only])
+    abort 'mutate_corpus: no papers found' if entries.empty?
+
+    results = mutate_all(entries, opts)
+    report(results)
+    output = opts[:output] || File.join(argv.first, 'mutate-summary.json')
+    File.write(output, JSON.pretty_generate(results))
+    puts "Summary: #{output}"
+    0
+  end
+end
+
+exit MutateCorpus.main(ARGV) if __FILE__ == $PROGRAM_NAME

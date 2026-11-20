@@ -46,6 +46,7 @@ This document provides architectural guidelines, core invariants, development wo
   - [`tools/release`](tools/release): Commits checked changes, runs `tools/bump`, and installs after publication unless `--no-install`; steps already done are skipped.
   - [`tools/test_error_corpus`](tools/test_error_corpus): Runs the error-corpus expectations (`docs/errors/*/expected.json`, also in the medium test tier); `--draft` prints the current diagnostics of a new case.
   - [`tools/compare_corpus`](tools/compare_corpus): Builds real papers (arXiv samples, or entry.json + paper/ directories) with leeni and with latexmk and flags disagreements (missed errors, stricter failures, page count, PDF text, unresolved references); `-b` compares with an earlier summary.
+  - [`tools/mutate_corpus`](tools/mutate_corpus): Injects realistic faults into papers that build clean and checks leeni against the injected line and against TeX (crashes, hangs, invalid JSON, `-llm`/`--json` disagreement, missed or line-less errors, worse locations than TeX, recovery after the fault is reverted).
 - **Automated Test Suite** (`test/`):
   - `test/test_*.rb`: Fast regression and end-to-end tests using `minitest`.
   - `test/fixups/`: ArXiv test repair records and schema.

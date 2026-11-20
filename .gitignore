@@ -70,6 +70,9 @@ tools/rtk
 !/examples/horror/
 !/examples/gallaery
 examples/**/*.pdf
+
+# Downloaded test corpora (third-party datasets); large, never committed
+/datasets/
 /AGENTS.md
 arxiv_*.zip
 arxiv_*_meta.txt

@@ -1,0 +1,26 @@
+{
+  "engine": "xelatex",
+  "diagnostics": [
+    {
+      "file": "example.tex",
+      "line": 3,
+      "col": 12,
+      "tier": "errors",
+      "category": "paragraph_ended_before_complete"
+    },
+    {
+      "file": "example.tex",
+      "line": 8,
+      "col": 7,
+      "tier": "errors",
+      "category": "undefined_control_sequence"
+    },
+    {
+      "file": "example.tex",
+      "line": 8,
+      "col": 22,
+      "tier": "errors",
+      "category": "undefined_control_sequence"
+    }
+  ]
+}

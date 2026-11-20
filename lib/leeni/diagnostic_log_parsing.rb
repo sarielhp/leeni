@@ -433,7 +433,22 @@ module LaTeXDiagnostics
           i += 1
         end
       end
+      errors << job_aborted_error if errors.empty? && clean_content.match?(JOB_ABORTED)
       fold_runaway_lead_ins(errors)
+    end
+
+    # The .log says "*** (job aborted, no legal \end found)"; the terminal output
+    # leeni reads only has the Emergency stop with TeX back at the command line.
+    JOB_ABORTED = /^! Emergency stop\.\n<\*>|\(job aborted, no legal \\end found\)/
+
+    # TeX reached the end of the main file without \end{document}. Its only
+    # message, an Emergency stop on the command line, names no file or line,
+    # and left the build failed with no error at all. The fault is where the
+    # file ends, so the error is placed at its last line.
+    def job_aborted_error
+      last = LaTeXUtils.safe_read(@filename).lines.rindex { |l| !l.strip.empty? }.to_i + 1
+      fake = ["./#{@filename}:#{last}: LaTeX Error: The file ended before \\end{document}.\n"]
+      build_error_entry(fake, 0, @filename, [@filename], bib_entry: nil).first
     end
 
     RUNAWAY_LEAD_IN = /\ARunaway argument\?/

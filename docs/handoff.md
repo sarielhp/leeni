@@ -133,3 +133,13 @@ document whose result changed.
 - The corpus tools stop a timed-out leeni with TERM before KILL so it stops its
   TeX run; a KILL leaves a looping pdflatex behind.
 - Run long corpus jobs under `nice -n 19`.
+- A TeX.SE result depends on the machine's TeX Live, not only on leeni: a
+  different package revision moves TeX's line inside a `.sty` or fixes the
+  question's bug outright. Keep TeX Live updated (`tlmgr update --self --all`)
+  on every machine that runs the corpus, and compare a new machine's full run
+  with `datasets/texse/regression-baseline.json` before trusting its flags.
+- leeni builds with `-no-mktex=tfm`, so a font metric Metafont would generate
+  (the Cyrillic `lh` fonts of a `T2A` document) is missing on a new machine
+  until it is made once outside leeni, for example `mktextfm lass1095`
+  (TeX.SE 676135 needs 18 of them; the list is in `~/.texlive/texmf-var/fonts/tfm`
+  on a machine that has them).

@@ -1,0 +1,106 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Installs, for the current user, the system fonts XeLaTeX finds by name on the
+# main machine and that the corpus machine (tqed) lacks after
+# datasets/migrate/migrate_texlive:
+#   - Open Sans SemiBold and ExtraBold (with italics), downloaded from Google's
+#     Open Sans repository; the older Open Sans package there has no such
+#     families;
+#   - Courier and Utopia, Adobe's Type 1 fonts, copied from TeX Live (the files
+#     Debian's texlive-fonts-recommended registers with fontconfig here).
+# Helvetica, Palatino and Palatino Linotype are left out: they are commercial
+# fonts, and the names are only fontconfig aliases here, which XeLaTeX does not
+# find either (\setmainfont{Helvetica} fails on both machines).
+# Run it on the machine that lacks the fonts, as yourself (no sudo). Files go to
+# ~/.local/share/fonts/extra. Safe to run again: present files are kept.
+
+require 'fileutils'
+require 'open3'
+require 'tmpdir'
+
+DEST = File.join(Dir.home, '.local/share/fonts/extra')
+OPEN_SANS_URL = 'https://raw.githubusercontent.com/googlefonts/opensans/main/fonts/ttf/OpenSans-%s.ttf'
+OPEN_SANS = %w[SemiBold SemiBoldItalic ExtraBold ExtraBoldItalic].freeze
+TEXLIVE_FONTS = %w[pcrr8a pcrb8a pcrro8a pcrbo8a putr8a putb8a putri8a putbi8a].freeze
+FAMILIES = ['Open Sans SemiBold', 'Open Sans ExtraBold', 'Courier', 'Utopia'].freeze
+TL_BIN = File.join(Dir.home, '.texlive/bin/x86_64-linux')
+
+def info(msg) = puts("    #{msg}")
+
+def download_open_sans
+  OPEN_SANS.each do |weight|
+    target = File.join(DEST, "OpenSans-#{weight}.ttf")
+    next info("#{File.basename(target)}: present") if File.size?(target)
+
+    _, err, status = Open3.capture3('curl', '-fsSL', '--retry', '2', '-o', "#{target}.part", format(OPEN_SANS_URL, weight))
+    abort "error: downloading OpenSans-#{weight}.ttf failed: #{err.strip}" unless status.success?
+    File.rename("#{target}.part", target)
+    info "#{File.basename(target)}: downloaded"
+  end
+end
+
+def kpsewhich(name)
+  out, = Open3.capture2(File.join(TL_BIN, 'kpsewhich'), name)
+  out.strip
+end
+
+# Each font's .pfb (the outlines) and, when TeX Live has it, its .afm (metrics).
+def copy_texlive_fonts
+  TEXLIVE_FONTS.product(%w[pfb afm]).each do |base, ext|
+    target = File.join(DEST, "#{base}.#{ext}")
+    next if File.size?(target)
+
+    source = kpsewhich("#{base}.#{ext}")
+    next if source.empty? && ext == 'afm'
+
+    abort "error: TeX Live has no #{base}.pfb; run: tlmgr install courier utopia" if source.empty?
+
+    FileUtils.cp(source, target)
+  end
+  info "Courier and Utopia: #{Dir[File.join(DEST, 'p{cr,ut}*.pfb')].size} Type 1 fonts from TeX Live"
+end
+
+def rebuild_caches
+  system('fc-cache', '-f', DEST) || abort('error: fc-cache failed')
+  luaotfload = File.join(TL_BIN, 'luaotfload-tool')
+  system(luaotfload, '--update', out: File::NULL, err: File::NULL) if File.executable?(luaotfload)
+  info 'fontconfig and luaotfload caches updated'
+end
+
+def fontconfig_has?(family)
+  out, = Open3.capture2('fc-list', ':', 'family')
+  out.lines.any? { |line| line.strip.split(',').map(&:strip).include?(family) }
+end
+
+# Compiles \setmainfont{FAMILY} with XeLaTeX, as a corpus document would.
+def xelatex_finds?(family, dir)
+  File.write(File.join(dir, 't.tex'),
+             "\\documentclass{article}\\usepackage{fontspec}\\setmainfont{#{family}}\\begin{document}Hello\\end{document}\n")
+  _, status = Open3.capture2e(File.join(TL_BIN, 'xelatex'), '-interaction=nonstopmode', '-halt-on-error', 't.tex',
+                              chdir: dir)
+  status.success?
+end
+
+def verify
+  Dir.mktmpdir('extra-fonts') do |dir| # tmp-exempt: standalone; copied to the remote host without the repo
+    results = FAMILIES.map do |family|
+      ok = fontconfig_has?(family) && xelatex_finds?(family, dir)
+      info "#{family}: #{ok ? 'found by fontconfig and XeLaTeX' : 'NOT FOUND'}"
+      ok
+    end
+    abort 'error: some fonts are still not found (see above)' unless results.all?
+  end
+end
+
+abort "Usage: #{File.basename($PROGRAM_NAME)}   (no arguments; run it on the machine that lacks the fonts)" unless ARGV.empty?
+FileUtils.mkdir_p(DEST)
+puts "==> Open Sans SemiBold and ExtraBold into #{DEST}"
+download_open_sans
+puts '==> Courier and Utopia from TeX Live'
+copy_texlive_fonts
+puts '==> Font caches'
+rebuild_caches
+puts '==> Check'
+verify
+puts '==> Done'

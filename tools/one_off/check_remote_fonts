@@ -1,0 +1,116 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Explains why font families fontconfig knows here are missing on a remote
+# host (default tqed) after datasets/migrate/migrate_texlive. For each missing
+# family it lists the files that provide it here and, for each such file, what
+# the remote host has under the same name: the families fontconfig reads from
+# it there, or that it is absent, a broken link, or present but not indexed.
+# Read-only on both machines; it needs ssh to log in without a password.
+
+require 'open3'
+
+FROM_SYSTEM = '.local/share/fonts/from-system'
+# rubocop:disable-next Style/FormatStringToken -- fontconfig format, not Ruby
+REMOTE_SCRIPT = <<~SH.freeze
+  echo '== fc-list'
+  fc-list -f '%{family}\\t%{file}\\n'
+  echo '== files'
+  find ~/#{FROM_SYSTEM} -type f 2>/dev/null
+  echo '== broken'
+  find ~/#{FROM_SYSTEM} -xtype l 2>/dev/null
+  echo '== version'
+  fc-cache --version 2>&1
+SH
+
+# [families, file] pairs from `fc-list -f '%{family}\t%{file}\n'`.
+def font_rows(text)
+  text.lines.filter_map do |line|
+    families, file = line.chomp.split("\t", 2)
+    [families.split(',').map(&:strip), file] if file
+  end
+end
+
+def remote_sections(host)
+  out, err, status = Open3.capture3('ssh', '-o', 'BatchMode=yes', host, 'bash -s', stdin_data: REMOTE_SCRIPT)
+  abort "error: ssh #{host} failed (exit #{status.exitstatus}):\n#{err}" unless status.success?
+
+  out.split(/^== ([\w-]+)\n/).drop(1).each_slice(2).to_h { |name, body| [name, body.to_s] }
+end
+
+def local_rows
+  out, = Open3.capture2('fc-list', '-f', "%{family}\t%{file}\n") # rubocop:disable Style/FormatStringToken
+  font_rows(out)
+end
+
+# Looks at each PATH on HOST (the same path as here): its size and the families
+# fontconfig reads from the file itself, cache or not. Returns {path => [size, families]}.
+def probe_paths(host, paths)
+  return {} if paths.empty?
+
+  list = paths.join("\n")
+  # rubocop:disable-next Style/FormatStringToken -- shell printf and fontconfig formats
+  script = "while IFS= read -r p; do\n  if [ -e \"$p\" ]; then\n    " \
+           "printf '%s\\t%s\\t%s\\n' \"$p\" \"$(stat -L -c %s \"$p\")\" \"$(fc-scan -f '%{family}|' \"$p\" 2>/dev/null)\"\n  " \
+           "else printf '%s\\t-\\t\\n' \"$p\"; fi\ndone <<'PATHS'\n#{list}\nPATHS\n"
+  out, err, status = Open3.capture3('ssh', '-o', 'BatchMode=yes', host, 'bash -s', stdin_data: script)
+  abort "error: probing files on #{host} failed:\n#{err}" unless status.success?
+
+  out.lines.to_h do |line|
+    file, size, families = line.chomp.split("\t", 3)
+    [file, [size, families.to_s.split('|').reject(&:empty?)]]
+  end
+end
+
+# What the remote host has for a local font file: fontconfig's entry for a
+# file of that name, else what is at the same path.
+def remote_status(file, there)
+  name = File.basename(file)
+  indexed = there[:rows].select { |_, path| File.basename(path) == name }
+  return indexed.map { |families, path| "#{families.join(', ')}  (#{path})" } unless indexed.empty?
+  return ['a broken link in from-system'] if there[:broken].any? { |path| File.basename(path) == name }
+
+  path_status(file, there[:probe][file])
+end
+
+def path_status(file, probe)
+  size, families = probe
+  return ['no file at this path, and no file of this name known to fontconfig'] if probe.nil? || size == '-'
+
+  here_size = File.size(file)
+  return ["file at this path is #{size} bytes, here #{here_size}: an incomplete copy"] unless size.to_i == here_size
+  return ['file at this path, but fontconfig cannot read it'] if families.empty?
+
+  ["file at this path; fontconfig reads #{families.uniq.join(', ')} from it but has not indexed it " \
+   '(stale cache: run fc-cache -f there)']
+end
+
+# The files providing FAMILY here, once each (~/.fonts links to ~/.local/share/fonts).
+def files_for(here, family)
+  here.select { |families, _| families.include?(family) }.map(&:last).uniq { |file| File.realpath(file) }
+end
+
+def report(family, here, there)
+  puts "\n#{family}"
+  files_for(here, family).first(4).each do |file|
+    link = File.symlink?(file) ? " -> #{File.readlink(file)}" : ''
+    puts "  here:  #{file}#{link}"
+    remote_status(file, there).first(3).each { |line| puts "  there: #{line}" }
+  end
+end
+
+abort "Usage: #{File.basename($PROGRAM_NAME)} [HOST]   (default tqed)" if ARGV.size > 1 || ARGV.first.to_s.start_with?('-')
+host = ARGV.first || 'tqed'
+sections = remote_sections(host)
+there = {
+  rows: font_rows(sections.fetch('fc-list', '')),
+  files: sections.fetch('files', '').lines.map(&:chomp),
+  broken: sections.fetch('broken', '').lines.map(&:chomp)
+}
+here = local_rows
+missing = here.flat_map(&:first).uniq - there[:rows].flat_map(&:first)
+there[:probe] = probe_paths(host, missing.flat_map { |family| files_for(here, family).first(4) }.uniq)
+puts "fontconfig here: #{`fc-cache --version 2>&1`.strip}; there: #{sections.fetch('version', '').strip}"
+puts "#{FROM_SYSTEM} there: #{there[:files].size} files, #{there[:broken].size} broken links"
+puts "font families here and not there: #{missing.size}"
+missing.sort.each { |family| report(family, here, there) }

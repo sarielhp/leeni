@@ -1,0 +1,100 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Moves the personal TeX tree (TEXMFHOME) from ~/texmf, TeX Live's visible
+# default, to a hidden directory (default ~/.local/share/texmf), and points
+# every setting that names it to the new place:
+#   ~/.texlive/texmf.cnf and ~/.texlive/tlpkg/texlive.profile (TEXMFHOME),
+#   ~/.profile, ~/.bashrc, ~/.config/fish/conf.d/*.fish (exports of it).
+# Each edited file is first saved as FILE.bak-texmfhome. Safe to run again:
+# a finished move is detected and only the settings still naming the old path
+# are changed. Works on any machine with TeX Live in ~/.texlive (here, tqed).
+# Afterwards open a new shell: the current one still exports the old path.
+
+require 'fileutils'
+require 'open3'
+require 'optparse'
+
+HOME = Dir.home
+OLD = File.join(HOME, 'texmf')
+SETTING_FILES = [
+  '.texlive/texmf.cnf', '.texlive/tlpkg/texlive.profile', '.profile', '.bashrc'
+].map { |path| File.join(HOME, path) } + Dir[File.join(HOME, '.config/fish/conf.d/*.fish')]
+# The old path as these files spell it: $HOME/texmf, ~/texmf or /home/USER/texmf,
+# not followed by more of a name (texmf-dist, texmf.cnf, texmf-var).
+OLD_PATH = %r{(\$HOME|\$\{HOME\}|~|#{Regexp.escape(HOME)})/texmf(?![\w.-])}
+
+def parse_options
+  opts = { to: File.join(HOME, '.local/share/texmf'), dry_run: false }
+  OptionParser.new do |o|
+    o.banner = "Usage: #{File.basename($PROGRAM_NAME)} [options]"
+    o.on('--to DIR', "New TEXMFHOME (default #{opts[:to]})") { |dir| opts[:to] = File.expand_path(dir) }
+    o.on('-n', '--dry-run', 'Report what would change; change nothing') { opts[:dry_run] = true }
+  end.parse!
+  opts
+end
+
+def info(msg) = puts("    #{msg}")
+
+def move_tree(new, dry_run)
+  return info("#{OLD} does not exist; nothing to move") unless File.exist?(OLD)
+
+  abort "error: #{OLD} is a link; move it by hand" if File.symlink?(OLD)
+  abort "error: both #{OLD} and #{new} exist; merge them by hand, then rerun" if File.exist?(new)
+
+  info "moving #{OLD} to #{new}"
+  return if dry_run
+
+  FileUtils.mkdir_p(File.dirname(new))
+  FileUtils.mv(OLD, new)
+end
+
+# NEW as FILE should spell it: shell files keep $HOME, TeX Live's files an
+# absolute path.
+def new_spelling(match, new)
+  prefix = match[1]
+  return new unless prefix.start_with?('$', '~')
+
+  new.sub(HOME, prefix)
+end
+
+def fix_file(path, new, dry_run)
+  return unless File.file?(path)
+
+  text = File.read(path)
+  changed = text.gsub(OLD_PATH) { new_spelling(Regexp.last_match, new) }
+  return if changed == text
+
+  lines = text.lines.each_index.select { |idx| text.lines[idx].match?(OLD_PATH) }.map { |idx| idx + 1 }
+  info "#{path}: line #{lines.join(', ')}"
+  return if dry_run
+
+  FileUtils.cp(path, "#{path}.bak-texmfhome")
+  File.write(path, changed)
+end
+
+# What a new shell will see: TEXMFHOME from the edited settings, and where
+# kpathsea finds a file of the tree.
+def verify(new)
+  kpsewhich = File.join(HOME, '.texlive/bin/x86_64-linux/kpsewhich')
+  return info("no #{kpsewhich}; TeX Live not checked") unless File.executable?(kpsewhich)
+
+  env = ENV.to_h.except('TEXMFHOME')
+  home, = Open3.capture2(env, kpsewhich, '-var-value', 'TEXMFHOME')
+  info "TeX Live's TEXMFHOME: #{home.strip}#{'  (expected the new path)' unless home.strip == new}"
+  sample = Dir[File.join(new, '**/*')].find { |path| File.file?(path) }
+  return unless sample
+
+  found, = Open3.capture2(env.merge('TEXMFHOME' => new), kpsewhich, File.basename(sample))
+  info "kpsewhich #{File.basename(sample)}: #{found.strip.empty? ? 'NOT FOUND' : found.strip}"
+end
+
+opts = parse_options
+new = opts[:to]
+puts "==> TEXMFHOME: #{OLD} -> #{new}#{' (dry run)' if opts[:dry_run]}"
+move_tree(new, opts[:dry_run])
+puts '==> Settings naming the old path'
+SETTING_FILES.each { |path| fix_file(path, new, opts[:dry_run]) }
+puts '==> Check'
+verify(new) unless opts[:dry_run]
+puts(opts[:dry_run] ? '==> Dry run; nothing changed' : '==> Done; open a new shell (this one still exports the old TEXMFHOME)')

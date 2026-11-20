@@ -12,6 +12,16 @@ require_relative 'macro_harvester'
 require_relative 'key_suggester'
 
 module LaTeXErrorCatalog
+  # TikZ defines its path commands only inside a picture: \draw in a \caption
+  # (a moving argument, expanded outside the picture even after \protect\tikz)
+  # is undefined although tikz is loaded.
+  TIKZ_PATH_COMMANDS = %w[draw fill filldraw path node coordinate shade shadedraw clip pic].freeze
+
+  def self.tikz_path_command_hint(cmd)
+    "'\\#{cmd}' needs \\usepackage{tikz} and exists only inside a tikzpicture or \\tikz{...}; " \
+      "in a \\caption, \\section or other moving argument protect it too (\\protect\\#{cmd}) or give a short [caption]"
+  end
+
   def self.suggest_command(raw_tok, file: nil, macro: nil, junk_dir: nil)
     return 'Undefined command; check spelling or \\usepackage' if raw_tok.nil? || raw_tok.empty?
 
@@ -19,6 +29,8 @@ module LaTeXErrorCatalog
     return "Undefined command '\\#{cmd}'; check spelling or \\usepackage" if cmd.empty?
 
     macro_ctx = macro ? " (in expansion of '#{macro}')" : ''
+
+    return tikz_path_command_hint(cmd) if TIKZ_PATH_COMMANDS.include?(cmd)
 
     pkg = PACKAGE_COMMANDS[cmd]
     return "Command '\\#{cmd}'#{macro_ctx} requires \\usepackage{#{pkg}}" if pkg

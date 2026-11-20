@@ -122,4 +122,12 @@ class TestTexseRegressions < Minitest::Test
     _, errors = build("\\documentclass{article}\n\\usepackage{tikz}\n\\begin{document}\nWow !\n\n#{picture}\\end{document}\n")
     refute_match(/\Amain\.tex:4: /, errors.first.to_s, 'two lines hold a standalone !')
   end
+
+  # TeX.SE 351795: \draw in a \caption is undefined although tikz is loaded
+  # (\protect\tikz does not protect it); "check \usepackage" sent users astray.
+  def test_undefined_tikz_path_command_explains_the_picture_scope
+    hint = LaTeXErrorCatalog.suggest_command('\\draw')
+    assert_includes hint, 'exists only inside a tikzpicture'
+    assert_includes hint, '\\protect\\draw'
+  end
 end

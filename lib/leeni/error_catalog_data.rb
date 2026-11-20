@@ -227,7 +227,7 @@ module LaTeXErrorCatalog
       id: :missing_end_document,
       pattern: /ended before \\end\{document\}|no legal \\end found/i,
       title: 'File ended before \\end{document}',
-      hint: 'The main file ends without \\end{document}; add it, or look for a truncated file or a stray \\endinput',
+      hint: ->(_tok, file) { LaTeXErrorCatalog.missing_end_document_hint(file) },
       why: 'TeX read to the end of the main file without meeting \\end{document}, so it stopped the job ' \
            '("*** (job aborted, no legal \\end found)"). The file was cut short, \\end{document} was deleted, ' \
            'or an \\endinput or an unclosed conditional skipped it.',
@@ -456,14 +456,8 @@ module LaTeXErrorCatalog
       pattern: /Package keyval Error: (\S+) undefined/,
       title: 'Package keyval Error: unknown key',
       token_extractor: ->(match, _block) { match[1] },
-      hint: lambda { |tok|
-        if tok.to_s.include?('=')
-          "'#{tok}' was read as one key: '=' is active here (a babel shorthand, e.g. turkish); add \\shorthandoff{=} or load babel with shorthands=off"
-        else
-          "Unknown option key '#{tok}'; check its spelling and the command's documented options"
-        end
-      },
-      why: 'A command that takes key=value options (\\includegraphics, \\usepackage options, tikz) was given a key it does not define, usually a misspelling. A key that still carries its value means = was not read as a plain character.',
+      hint: ->(tok, file) { LaTeXErrorCatalog.keyval_key_hint(tok, file) },
+      why: 'A command that takes key=value options (\\includegraphics, \\usepackage options, tikz) was given a key it does not define, usually a misspelling. A key that still carries its value means the list was not split at =: it came unexpanded from a macro, or = was not read as a plain character.',
       fix: 'Correct the key name, or remove the option the command does not support.',
       doc_slug: '73_keyval_unknown_key'
     },
@@ -489,32 +483,7 @@ module LaTeXErrorCatalog
       fix: 'Allow shell escape for this build (LATEXOPTS="-shell-escape" l paper.tex), or remove \\tikzexternalize (and forest\'s external option) so pictures are drawn in the main run.',
       doc_slug: '79_tikz_external_failed'
     },
-    {
-      id: :siunitx_incompatible_package,
-      pattern: /Package siunitx Error: Package [`']([^']+)' incompatible/,
-      title: 'Package siunitx Error: Package incompatible',
-      token_extractor: ->(match, _block) { match[1] },
-      hint: lambda { |tok|
-        "siunitx cannot be used with the #{tok} package (both define the same commands, e.g. \\unit); " \
-          "remove \\usepackage{#{tok}} and use siunitx's \\unit and \\qty instead"
-      },
-      why: 'siunitx refuses to load next to a package that defines the commands it provides (units and its \\unit, \\unitfrac). ' \
-           'The clash also shows as "Command \\unit already defined" at the same \\usepackage, and siunitx repeats its error at \\begin{document}.',
-      fix: 'Remove the other package and write its commands with siunitx (\\unit{\\metre\\per\\second}, \\qty{3}{\\metre}).',
-      doc_slug: '83_siunitx_incompatible_package'
-    },
-    {
-      id: :memoize_no_perl_pdf_module,
-      pattern: /Package memoize \(perl-based extraction\) Error: No suitable Perl module for PDF processing/,
-      title: 'Package memoize Error: No suitable Perl module for PDF processing',
-      hint: 'memoize extracts externs with a Perl script that needs PDF::API2 or PDF::Builder: install one ' \
-            '(libpdf-api2-perl, or cpan PDF::API2), or load memoize with [extract=python] (needs pypdf)',
-      why: 'memoize writes each memoized picture to the PDF and cuts it out afterwards with an extraction script. ' \
-           'The default script is in Perl and reads the PDF through PDF::API2 or PDF::Builder; with neither ' \
-           'installed nothing is extracted, and the error is reported from the .mmz.log at the \\usepackage of memoize.',
-      fix: 'Install the Perl module PDF::API2 (Debian/Ubuntu: libpdf-api2-perl), or use \\usepackage[extract=python]{memoize} with the Python module pypdf installed.',
-      doc_slug: '82_memoize_no_perl_pdf_module'
-    },
+    *SILENT_AND_PACKAGE_CATALOG,
     {
       id: :lua_directlua_error,
       pattern: /\[\\directlua\]:\d+: (.+)/,

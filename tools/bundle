@@ -47,6 +47,7 @@ module LatexBundler
     macro_harvester.rb
     diagnostic_record.rb
     error_catalog.rb
+    error_catalog_package_data.rb
     error_catalog_data.rb
     error_catalog_lookup.rb
     box_context.rb

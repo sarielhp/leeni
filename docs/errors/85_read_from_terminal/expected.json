@@ -1,0 +1,11 @@
+{
+  "engine": "pdflatex",
+  "diagnostics": [
+    {
+      "file": "example.tex",
+      "line": 5,
+      "tier": "errors",
+      "category": "read_from_terminal"
+    }
+  ]
+}

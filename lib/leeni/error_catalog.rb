@@ -616,6 +616,36 @@ module LaTeXErrorCatalog
     "Did you mean #{found.map { |path| "'#{path}'" }.join(' or ')}? File '#{tok}' not found"
   end
 
+  # The file may have its \end{document} and still not reach it: something
+  # read it as text (TeX.SE 135737, a \lstnewenvironment opening mdframed).
+  def self.missing_end_document_hint(file)
+    source = file && LaTeXUtils.safe_read(file).to_s
+    if source.to_s.match?(/^[^%\n]*\\end\s*\{document\}/)
+      return '\\end{document} is in the file but was read as text: look for an environment reading its body verbatim ' \
+             '(listings, \\lstnewenvironment, verbatim, comment) whose \\end was not recognised, an unclosed \\iffalse, or \\endinput'
+    end
+    'The main file ends without \\end{document}; add it, or look for a truncated file or a stray \\endinput'
+  end
+
+  # A macro defined as a key list: \def\foo{...}, \newcommand{\foo}{...}.
+  KEY_MACRO_DEFINITION = /\\(?:[gex]?def|(?:re)?newcommand\*?|providecommand\*?)\s*\{?\s*(\\[A-Za-z@]+)/
+
+  # A key read whole with its value ('scale=0.1 undefined'): either the key
+  # list came unexpanded from a macro, or = is active (a babel shorthand).
+  def self.keyval_key_hint(tok, file)
+    return "Unknown option key '#{tok}'; check its spelling and the command's documented options" unless tok.to_s.include?('=')
+
+    source = file && LaTeXUtils.safe_read(file).to_s
+    macro = source.to_s.each_line.find { |l| l.include?(tok) && l.match?(KEY_MACRO_DEFINITION) }
+    if macro
+      name = macro[KEY_MACRO_DEFINITION, 1]
+      return "'#{tok}' was read as one key: keyval does not expand #{name} given as the options; " \
+             "write the keys out, or use \\expandafter (\\expandafter\\includegraphics\\expandafter[#{name}]{...})"
+    end
+    "'#{tok}' was read as one key: '=' is active here (a babel shorthand, e.g. turkish); " \
+      'add \\shorthandoff{=} or load babel with shorthands=off'
+  end
+
   # fontenc's file for an encoding: t5enc.def for T5.
   FONT_ENCODING_FILE = /\A([a-z0-9]+)enc\.def\z/i
 
@@ -644,5 +674,6 @@ module LaTeXErrorCatalog
   end
 end
 
+require_relative 'error_catalog_package_data'
 require_relative 'error_catalog_data'
 require_relative 'error_catalog_lookup'

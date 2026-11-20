@@ -54,8 +54,15 @@ class LaTeXBraceChecker
     return [] unless File.file?(path)
 
     content = LaTeXUtils.safe_read(path)
+    return [] if content.match?(ESCAPE_OR_BRACE_CATCODE)
+
     new(path, content).scan
   end
+
+  # A file that changes the category of \, { or } (\catcode`\\=12 with ^ as
+  # the escape, TeX.SE 148271) cannot be read lexically: \} there is a
+  # character and a closing brace. Its braces are left to TeX.
+  ESCAPE_OR_BRACE_CATCODE = /\\catcode\s*`\\?[\\{}]/
 
   def self.check_inverted_labels(path)
     return [] unless File.file?(path)

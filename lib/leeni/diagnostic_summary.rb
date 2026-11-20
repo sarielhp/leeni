@@ -322,6 +322,48 @@ module LaTeXDiagnostics
       end
     end
 
+    # A runaway argument abandons the macro that read it, leaving its groups
+    # and conditionals open: TeX notes them at \end{document}, at the line the
+    # argument began on. Opened in the paragraph whose end stopped the argument,
+    # they are that one fault (TeX.SE 69425).
+    def suppress_runaway_group_notes(errors)
+      ends = errors.select { |error| error[:catalog_id] == :paragraph_ended_before_complete }
+      return errors if ends.empty?
+
+      errors.reject do |error|
+        error[:catalog_id] == :unclosed_group_at_end && ends.any? { |stop| opened_in_paragraph?(error, stop) }
+      end
+    end
+
+    def opened_in_paragraph?(note, stop)
+      return false unless format_display_path(note[:file]) == format_display_path(stop[:file])
+
+      opened = note[:line].to_i
+      ended = stop[:line].to_i
+      return false unless opened.positive? && opened <= ended
+
+      lines = LaTeXUtils.safe_read(stop[:file]).lines
+      ((opened + 1)...ended).none? { |no| lines[no - 1].to_s.strip.empty? }
+    end
+
+    # "File ended while scanning use of \next" from the comment package: the
+    # body of an excluded environment is read to the end of the file when its
+    # \end is not recognised (indented, TeX.SE 77920). The \begin it is placed
+    # at is that environment; the brace hint does not apply.
+    def retag_verbatim_runaways(errors)
+      errors.each do |error|
+        next unless error[:catalog_id] == :file_ended_while_scanning
+
+        verbatim = scan_environments(LaTeXUtils.safe_read(@filename))[:verbatim]
+        next unless verbatim && verbatim[:line] == error[:line].to_i
+
+        entry = LaTeXErrorCatalog.find_by_id(:verbatim_environment_unclosed)
+        error[:catalog] = (error[:catalog] || {}).merge(
+          hint: LaTeXErrorCatalog.resolve_hint(entry[:hint], "{#{verbatim[:name]}}, \\end{#{verbatim[:end]}}")
+        )
+      end
+    end
+
     # fontenc without the encoding's file (T5 without vntex): LaTeX then
     # reports "Encoding scheme `T5' unknown" at the \usepackage and at every
     # later font change; all of it is the one missing file.
@@ -502,6 +544,8 @@ module LaTeXDiagnostics
       compiler_errors = suppress_environment_mismatch_cascades(compiler_errors)
       compiler_errors = suppress_hyphenation_cascades(compiler_errors)
       compiler_errors = suppress_missing_encoding_cascades(compiler_errors)
+      compiler_errors = suppress_runaway_group_notes(compiler_errors)
+      retag_verbatim_runaways(compiler_errors)
       compiler_errors = suppress_ampersand_cascades(compiler_errors)
       compiler_errors = merge_repeated_faults(compiler_errors)
       compiler_errors = suppress_unlocated_dropped_text(compiler_errors, brace_errors)

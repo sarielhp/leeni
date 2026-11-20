@@ -25,7 +25,7 @@ Errors during compilation originate in one of three layers:
 
 ---
 
-## 3. Master Error Index (83 Errors)
+## 3. Master Error Index (86 Errors)
 
 | # | Error Message / Pattern | Layer | Cause & Summary | Support | Reproducer & Details |
 |---|:--- |:--- |:--- |:--- |:--- |
@@ -112,6 +112,9 @@ Errors during compilation originate in one of three layers:
 | **81** | `Package fontenc Error: Encoding file ... not found` | LaTeX Package | An encoding passed to `fontenc` whose `...enc.def` is not installed; every later `Encoding scheme ... unknown` is the same fault. | **Catalog Hint** | [`81_missing_font_encoding`](81_missing_font_encoding/) |
 | **82** | `Package memoize Error: No suitable Perl module for PDF processing` | LaTeX Package | memoize's Perl extraction needs `PDF::API2` or `PDF::Builder`; TeX reports it from `main.mmz.log`, `leeni` at the `\usepackage` line. | **Catalog Hint** | [`82_memoize_no_perl_pdf_module`](82_memoize_no_perl_pdf_module/) |
 | **83** | `Package siunitx Error: Package 'units' incompatible` | LaTeX Package | `units` defines the commands siunitx provides (`\unit`). The "Command `\unit` already defined" clash and siunitx's repeat at `\begin{document}` are one error, at the `\usepackage{siunitx}` line. | **Catalog Hint** | [`83_siunitx_incompatible_package`](83_siunitx_incompatible_package/) |
+| **84** | `XeTeX is required to compile this document` + `Emergency stop` | LaTeX Package | A XeLaTeX-only package (`xltxtra`, `fontspec`) calls `\RequireXeTeX`; pdfTeX stops inside the package file, and the failing line in the document is not named. `leeni` reports it at the `\usepackage` line. | **Catalog Hint** | [`84_engine_required`](84_engine_required/) |
+| **85** | `Emergency stop` ... `cannot \read from terminal in nonstop modes` | TeX Primitive | `\openin` of a missing file reports nothing, and the following `\readline` reads from the terminal. The document itself is balanced. `leeni` reports the failed read at its line. | **Catalog Hint** | [`85_read_from_terminal`](85_read_from_terminal/) |
+| **86** | `Emergency stop` ... `no legal \end found` | listings Package | `\lstnewenvironment` opens an environment (`center`) in its begin code, so the body is read verbatim until `\end{center}` and the real `\end{codetext}` is swallowed. TeX gives no line; `leeni` reports the `\begin` left open. | **Catalog Hint** | [`86_verbatim_environment_unclosed`](86_verbatim_environment_unclosed/) |
 
 ---
 

@@ -64,25 +64,61 @@ module LaTeXDiagnostics
     # the \begin that is never closed: the first one still open when an outer
     # environment (or the document) ends, or at the end of the main file.
     def locate_unclosed_environment
-      state = { stack: [], verbatim: nil }
-      LaTeXUtils.safe_read(@filename).each_line.with_index(1) do |line, line_no|
-        LaTeXUtils.strip_latex_comments(line).scan(ENVIRONMENT_MARK) do |kind, name|
-          found = environment_mark(state, kind, name, line_no)
-          return [@filename, found] if found
-        end
-      end
+      state = scan_environments(LaTeXUtils.safe_read(@filename))
+      return [@filename, state[:found]] if state[:found]
+      return [@filename, state[:verbatim][:line]] if state[:verbatim]
+
       open = state[:stack].find { |name, _| name != 'document' }
       open && [@filename, open[1]]
     end
 
-    # One \begin or \end; inside a verbatim body only its own \end counts.
-    def environment_mark(state, kind, name, line_no)
-      if state[:verbatim]
-        state[:verbatim] = nil if kind == 'end' && name == state[:verbatim]
+    def scan_environments(source)
+      state = { stack: [], verbatim: nil, declared: declared_verbatim_environments(source) }
+      source.each_line.with_index(1) do |line, line_no|
+        LaTeXUtils.strip_latex_comments(line).scan(ENVIRONMENT_MARK) do |kind, name|
+          state[:found] = environment_mark(state, kind, name, line_no, line)
+          return state if state[:found]
+        end
+      end
+      state
+    end
+
+    # One \begin or \end; inside a verbatim body only its own \end counts
+    # (for the comment package, only at the start of a line).
+    def environment_mark(state, kind, name, line_no, line)
+      if (verbatim = state[:verbatim])
+        closes = kind == 'end' && name == verbatim[:end] && (!verbatim[:line_start] || line.start_with?('\\end'))
+        state[:verbatim] = nil if closes
         return nil
       end
-      state[:verbatim] = name if kind == 'begin' && VERBATIM_ENVIRONMENTS.include?(name)
+      if kind == 'begin' && (verbatim = verbatim_environment(state[:declared], name))
+        state[:verbatim] = verbatim.merge(name: name, line: line_no)
+        return nil
+      end
       track_environment(state[:stack], kind, name, line_no)
+    end
+
+    def verbatim_environment(declared, name)
+      declared[name] || (VERBATIM_ENVIRONMENTS.include?(name) && { end: name, line_start: name == 'comment' })
+    end
+
+    COMMENT_DECLARATION = /\\(?:excludecomment|specialcomment|processcomment)\s*\{([^}]+)\}/
+    VERBATIM_DECLARATION = /\\(?:DefineVerbatimEnvironment|newtcblisting|newminted)\s*\{([^}]+)\}/
+    LISTING_DECLARATION = /\\lstnewenvironment\s*\{([^}]+)\}\s*(?:\[[^\]]*\]\s*)*\{([^\n]*)/
+
+    # Environments the document declares that read their body verbatim. The
+    # comment package ends one only at an \end at the start of a line; a
+    # \lstnewenvironment whose begin code opens another environment makes
+    # listings look for that one's \end (TeX.SE 77920, 135737).
+    def declared_verbatim_environments(source)
+      text = source.each_line.map { |line| LaTeXUtils.strip_latex_comments(line) }.join
+      declared = {}
+      text.scan(COMMENT_DECLARATION) { |(name)| declared[name] = { end: name, line_start: true } }
+      text.scan(VERBATIM_DECLARATION) { |(name)| declared[name] = { end: name, line_start: false } }
+      text.scan(LISTING_DECLARATION) do |name, code|
+        declared[name] = { end: code[/\A[^}]*?\\begin\s*\{([^}]+)\}/, 1] || name, line_start: false }
+      end
+      declared
     end
 
     # Pushes or pops one \begin/\end; returns the line of a \begin left open
@@ -107,7 +143,30 @@ module LaTeXDiagnostics
       return nil unless file.to_s.match?(/\A\[.*\]\z/)
 
       tex_line = err_text[/^l\.(\d+)/, 1]
-      tex_line && [current_log_file(file_stack), tex_line.to_i]
+      return nil unless tex_line
+
+      source = current_log_file(file_stack)
+      chunk_line = file.to_s[/\]:(\d+)/, 1] || err_text[/\[\\directlua\]:(\d+):/, 1]
+      [source, lua_source_line(source, tex_line.to_i, chunk_line.to_i) || tex_line.to_i]
+    end
+
+    LUA_CHUNK_START = /\\begin\s*\{luacode\*?\}|\\directlua\s*\{|\\luaexec\s*\{/
+
+    # The chunk's line number counts from where the code starts: the line
+    # after \begin{luacode}, the line of \directlua{. TeX's l.N is where the
+    # chunk ended (TeX.SE 129183).
+    def lua_source_line(source, tex_line, chunk_line)
+      return nil unless chunk_line.positive?
+
+      lines = LaTeXUtils.safe_read(source).lines
+      start = (tex_line - 1).downto([tex_line - 200, 0].max).find do |idx|
+        lines[idx] && LaTeXUtils.strip_latex_comments(lines[idx]).match?(LUA_CHUNK_START)
+      end
+      return nil unless start
+
+      environment = lines[start].match?(/\\begin\s*\{luacode/)
+      found = start + chunk_line + (environment ? 1 : 0) # start is 0-based
+      found if found.between?(start + 1, tex_line)
     end
 
     # TeX reports an error raised while a class or package of the TeX
@@ -278,9 +337,23 @@ module LaTeXDiagnostics
       key = /(?<![\w@])#{Regexp.escape(classification[:token].to_s)}(?![\w@])/
       lines = LaTeXUtils.safe_read(file).lines
       (line.to_i - 1).downto([line.to_i - 50, 0].max) do |idx|
-        return [file, idx + 1] if lines[idx] && LaTeXUtils.strip_latex_comments(lines[idx]).match?(key)
+        text = lines[idx] && LaTeXUtils.strip_latex_comments(lines[idx])
+        next unless text&.match?(key)
+
+        return [file, key_macro_use(lines, idx, line.to_i, text) || (idx + 1)]
       end
       nil
+    end
+
+    # The key list stored in a macro (\def\foo{scale=0.1}, used as
+    # \includegraphics[\foo]): the fault is where the macro is given as the
+    # options, which keyval reads unexpanded (TeX.SE 188192).
+    def key_macro_use(lines, def_idx, tex_line, text)
+      name = text[LaTeXErrorCatalog::KEY_MACRO_DEFINITION, 1]
+      return nil unless name
+
+      use = /\[\s*#{Regexp.escape(name)}\s*\]/
+      ((def_idx + 1)...tex_line).find { |idx| lines[idx] && LaTeXUtils.strip_latex_comments(lines[idx]).match?(use) }&.+(1)
     end
 
     # The dropped text has lost its spaces and braces and may span lines, so it is looked
@@ -353,12 +426,14 @@ module LaTeXDiagnostics
     end
 
     def locate_missing_resource_request(resource)
-      # epstopdf asks for x-eps-converted-to.pdf where the source names x.eps.
-      stem = resource.to_s.sub(/-eps-converted-to\.pdf\z/i, '').sub(/\.(?:tex|sty|cls|bib)\z/i, '')
+      # epstopdf asks for x-eps-converted-to.pdf where the source names x.eps;
+      # listings names a missing file name(.ext).
+      stem = resource.to_s.sub(/\(\.\w+\)\z/, '').sub(/-eps-converted-to\.pdf\z/i, '').sub(/\.(?:tex|sty|cls|bib)\z/i, '')
       return nil if stem.empty?
 
       pattern = /
-        \\(?:input|include|documentclass|LoadClass|usepackage|RequirePackage|includegraphics|bibliography|addbibresource)\s*
+        \\(?:input|include|documentclass|LoadClass|usepackage|RequirePackage|includegraphics|bibliography|addbibresource|
+          lstinputlisting|inputminted|verbatiminput)\s*
         (?:\[[^\]]*\])?\s*\{[^}]*#{Regexp.escape(stem)}[^}]*\}
       /x
       collect_source_candidates.each do |file|

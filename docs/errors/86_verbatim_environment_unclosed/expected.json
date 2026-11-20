@@ -1,0 +1,11 @@
+{
+  "engine": "pdflatex",
+  "diagnostics": [
+    {
+      "file": "example.tex",
+      "line": 6,
+      "tier": "errors",
+      "category": "verbatim_environment_unclosed"
+    }
+  ]
+}

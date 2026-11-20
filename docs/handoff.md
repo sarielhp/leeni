@@ -15,8 +15,8 @@ judged against TeX.
 
 - Released: 1.0.102, which includes all the TeX.SE work through batch 10
   (branch `texse-tool` merged into master). Installed locally.
-- Batches 11 and 12 are reviewed and fixed (after 1.0.102; error corpus cases
-  81–83). The full regression over all 490 documents run so far is the new
+- Batches 11–13 are reviewed and fixed (after 1.0.102; error corpus cases
+  81–86). The full regression over all 490 documents run so far is the new
   `datasets/texse/regression-baseline.json`.
 - 2026-11-20: questions fetched for `siunitx`, `pgfplots`, `math-mode`,
   `graphics`, `floats`, `fonts`, `xetex`, `luatex`, `babel`, `listings`,
@@ -50,6 +50,7 @@ each was built and what each batch found. Questions fetched so far: tag
 | 10 | same | 2 |
 | 11 | 28 leftovers | 2 (fontenc encoding cascade, memoize hint) |
 | 12 | siunitx, pgfplots, math-mode | 3 (siunitx with units, number inside a longer number, dropped text beside a brace error) |
+| 13 | graphics, floats, fonts, xetex, luatex, babel, listings, amsmath | 8 (triaged by 15 parallel DeepSeek agents; see below) |
 
 The rate is not clearly falling; what changes is the kind of bug. Early
 batches found faults hitting many documents (locations inside packages and
@@ -68,10 +69,15 @@ packages already covered.
   `opencode run -m litellm/lumen/deepseek-v4.1-flash-1017 "<task>"`, given a
   precise task file (what changed, exact files, tests to run, no lib/ or tools/
   edits, no commits). It wrote error corpus cases 81–83, the index counts and
-  the regression tests well. Planned next: one opencode agent per flagged
-  document to triage (reproduce, read both lines, propose a verdict and a
-  minimal reproducer) in parallel; verdicts and lib/ changes stay with the
-  main agent.
+  the regression tests well.
+- Triage (since batch 13): one opencode agent per flagged document, 8 at a
+  time (`xargs -P 8`), each given the flag line and a fixed prompt: copy the
+  paper to scratch, run TeX and leeni, read both lines, write a report with a
+  verdict (LEENI_RIGHT / LEENI_WRONG / HARNESS / UNSURE) and, if wrong, a
+  minimal reproducer. On batch 13 every LEENI_WRONG verdict held, but one root
+  cause was wrong (148271 blamed the brace checker; the trigger was an ignored
+  Emergency stop): check each before fixing. Verdicts and lib/ changes stay
+  with the main agent.
 
 ## Resuming
 
@@ -141,6 +147,9 @@ document whose result changed.
 - The corpus tools stop a timed-out leeni with TERM before KILL so it stops its
   TeX run; a KILL leaves a looping pdflatex behind.
 - Run long corpus jobs under `nice -n 19`.
+- Never edit lib/ while a corpus run is going: every document builds with the
+  current working tree, and a half-made edit turns hundreds of results into
+  crashes (2026-11-20; the run had to be repeated).
 - A TeX.SE result depends on the machine's TeX Live, not only on leeni: a
   different package revision moves TeX's line inside a `.sty` or fixes the
   question's bug outright. Keep TeX Live updated (`tlmgr update --self --all`)

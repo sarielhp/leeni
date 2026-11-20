@@ -446,8 +446,58 @@ module LaTeXDiagnostics
           i += 1
         end
       end
-      errors << job_aborted_error if errors.empty? && clean_content.match?(JOB_ABORTED)
+      errors << silent_stop_error(clean_content) if errors.empty?
+      errors.compact!
       fold_runaway_lead_ins(errors)
+    end
+
+    # A run that stopped with no error message: the package that required
+    # another engine, a \read from the terminal, a file that ended early.
+    def silent_stop_error(content)
+      if content.match?(ENGINE_REQUIRED) then engine_required_error(content)
+      elsif content.match?(TERMINAL_READ) then terminal_read_error(content)
+      elsif content.match?(JOB_ABORTED) then job_aborted_error
+      end
+    end
+
+    # \RequireXeTeX (xltxtra, xunicode) and \RequireLuaTeX print a banner and
+    # stop with an Emergency stop inside the package: no error message at all.
+    # The terminal output ends at the banner, before the Emergency stop.
+    ENGINE_REQUIRED = /^\s*\* (XeTeX|LuaTeX) is required to compile this document\./
+
+    # The error is placed at the \usepackage of the package that stopped
+    # (TeX.SE 83773: xltxtra under pdflatex), the innermost .sty still open
+    # where the banner is printed.
+    def engine_required_error(content)
+      match = content.match(ENGINE_REQUIRED)
+      package = File.basename(innermost_open_package(match.pre_match).to_s, '.sty')
+      load = /\\(?:usepackage|RequirePackage)\s*(?:\[[^\]]*\])?\s*\{[^}]*\b#{Regexp.escape(package)}\b/
+      line = LaTeXUtils.safe_read(@filename).lines.index { |l| LaTeXUtils.strip_latex_comments(l).match?(load) }.to_i + 1
+      fake = ["./#{@filename}:#{line}: Package #{package} Error: #{match[1]} is required to compile this document.\n"]
+      build_error_entry(fake, 0, @filename, [@filename], bib_entry: nil).first
+    end
+
+    # \read or \readline from a stream that is not open (\openin of a missing
+    # file) reads the terminal; in nonstop mode that is an Emergency stop with
+    # no error message, at the line that read (TeX.SE 148271).
+    # The terminal output shows the stream (<read 2>); the .log adds the reason.
+    TERMINAL_READ = /^(.+?):(\d+): Emergency stop\.\n<read \d+>/
+
+    def terminal_read_error(content)
+      match = content.match(TERMINAL_READ)
+      fake = ["#{match[1]}:#{match[2]}: TeX Error: \\read from a stream that is not open (cannot \\read from terminal in nonstop modes).\n"]
+      build_error_entry(fake, 0, match[1], [match[1]], bib_entry: nil).first
+    end
+
+    def innermost_open_package(text)
+      open = text.scan(/\((?=[^\s()]+\.\w+)|\)|(?<=\()[^\s()]+\.\w+/).each_with_object([]) do |token, stack|
+        case token
+        when '(' then stack.push(nil)
+        when ')' then stack.pop
+        else stack[-1] = token
+        end
+      end
+      open.reverse.find { |file| file.to_s.end_with?('.sty') }
     end
 
     # The .log says "*** (job aborted, no legal \end found)"; the terminal output
@@ -458,9 +508,18 @@ module LaTeXDiagnostics
     # message, an Emergency stop on the command line, names no file or line,
     # and left the build failed with no error at all. The fault is where the
     # file ends, so the error is placed at its last line.
+    # A file that has its \end{document} lost it to an environment reading its
+    # body verbatim that never saw its own \end: that \begin is the fault.
     def job_aborted_error
-      last = LaTeXUtils.safe_read(@filename).lines.rindex { |l| !l.strip.empty? }.to_i + 1
-      fake = ["./#{@filename}:#{last}: LaTeX Error: The file ended before \\end{document}.\n"]
+      source = LaTeXUtils.safe_read(@filename)
+      last = source.lines.rindex { |l| !l.strip.empty? }.to_i + 1
+      verbatim = source.match?(/^[^%]*\\end\s*\{document\}/) && scan_environments(source)[:verbatim]
+      fake = if verbatim
+               ["./#{@filename}:#{verbatim[:line]}: LaTeX Error: The file ended inside environment " \
+                "{#{verbatim[:name]}}, which reads its body verbatim until \\end{#{verbatim[:end]}}.\n"]
+             else
+               ["./#{@filename}:#{last}: LaTeX Error: The file ended before \\end{document}.\n"]
+             end
       build_error_entry(fake, 0, @filename, [@filename], bib_entry: nil).first
     end
 

@@ -25,6 +25,7 @@ Metrics/BlockLength:
     - 'Rakefile'
     - '*.gemspec'
     - 'lib/leeni/error_catalog_data.rb' # Static diagnostic definitions.
+    - 'lib/leeni/error_catalog_package_data.rb' # Static diagnostic definitions.
 
 Metrics/CyclomaticComplexity:
   Enabled: false
@@ -48,6 +49,7 @@ Metrics/ParameterLists:
 Metrics/CollectionLiteralLength:
   Exclude:
     - 'lib/leeni/error_catalog_data.rb'
+    - 'lib/leeni/error_catalog_package_data.rb'
     - 'lib/leeni/error_catalog_lookup.rb'
 
 # String allocation hygiene
@@ -108,6 +110,7 @@ Layout/LineLength:
     - '^\s*[A-Z_]+\s*=\s*/' # Dense static regular-expression declarations.
   Exclude:
     - 'lib/leeni/error_catalog_data.rb' # Static diagnostic prose and lookup data.
+    - 'lib/leeni/error_catalog_package_data.rb' # Static diagnostic prose and lookup data.
     - 'lib/leeni/error_catalog_lookup.rb' # Static diagnostic prose and lookup data.
     - 'tools/generate_gallery' # Published example copy.
 

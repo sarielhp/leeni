@@ -19,11 +19,13 @@ class TestTexseRegressions < Minitest::Test
     skip 'pdflatex required' unless LaTeXUtils.command_available?('pdflatex')
   end
 
-  # Builds TEX fresh; returns [success, error lines of -llm].
-  def build(tex)
+  # Builds TEX fresh; returns [success, error lines of -llm]. ENGINE is the
+  # one-letter engine code of -e ('p' pdflatex, 'l' lualatex).
+  def build(tex, engine = 'p')
     Dir.mktmpdir('leeni_texse_it') do |dir|
       File.write(File.join(dir, 'main.tex'), tex)
-      out, status = Open3.capture2e(LEENI, '--no-lock', '-e', 'p', '--junk-dir', 'junk', '-llm', 'main.tex', chdir: dir)
+      out, status = Open3.capture2e(LEENI, '--no-lock', '-e', engine, '--junk-dir', 'junk', '-llm', 'main.tex',
+                                    chdir: dir)
       [status.success?, out.lines.grep(/: error: /)]
     end
   end
@@ -243,5 +245,147 @@ class TestTexseRegressions < Minitest::Test
     TEX
     assert_equal 1, errors.size
     assert_match(/\Amain\.tex:6:16: error: unclosed open brace/, errors.first.to_s)
+  end
+
+  # TeX.SE 83773: xltxtra under pdflatex stops with "XeTeX is required to
+  # compile this document" and an Emergency stop in xltxtra.sty; the error
+  # is reported at the \usepackage line that loaded it.
+  def test_engine_required_package_is_reported_at_its_usepackage
+    _, errors = build(<<~'TEX')
+      \documentclass{article}
+      \usepackage{xltxtra}
+      \begin{document}
+      Hi
+      \end{document}
+    TEX
+    assert_equal 1, errors.size
+    assert_match(/\Amain\.tex:2: error: .*XeTeX is required to compile this document/, errors.first.to_s)
+  end
+
+  # TeX.SE 148271: \openin of a missing file then \readline: TeX only gives
+  # the Emergency stop "cannot \read from terminal in nonstop modes". One
+  # error at the \readline line, and no spurious "unclosed open brace".
+  def test_read_from_unopened_stream_is_reported_once
+    _, errors = build(<<~'TEX')
+      \documentclass{article}
+      \newread\reader
+      \openin\reader=no_such_list.txt
+      \readline\reader to \data
+      \begin{document}
+      Hello
+      \end{document}
+    TEX
+    assert_equal 1, errors.size
+    assert_match(/\Amain\.tex:4: error: .*\\read from a stream that is not open/, errors.first.to_s)
+    assert(errors.none? { |e| e.include?('unclosed open brace') }, errors.join)
+  end
+
+  # TeX.SE 135737: \lstnewenvironment whose begin code opens center; the
+  # body is read verbatim until \end{center}, so the environment never ends
+  # and TeX only says "no legal \end found". Reported at its \begin.
+  def test_verbatim_environment_opened_by_lstnewenvironment
+    _, errors = build(<<~'TEX')
+      \documentclass{article}
+      \usepackage{listings}
+      \lstnewenvironment{codetext}[1]{\begin{center}#1}{\end{center}}
+      \begin{document}
+      \begin{codetext}{cap}
+      Some code.
+      \end{codetext}
+      \end{document}
+    TEX
+    assert_equal 1, errors.size
+    assert_match(/\Amain\.tex:5: error: .*ended inside environment \{codetext\}/, errors.first.to_s)
+    assert_match(/\\lstnewenvironment\{codetext\}/, errors.first.to_s)
+  end
+
+  # TeX.SE 77920: the comment package's \excludecomment makes an indented
+  # \end{wrapfigure} end "the file" for \next. Reported at the \begin.
+  def test_comment_environment_end_needs_no_indentation
+    _, errors = build(<<~'TEX')
+      \documentclass{article}
+      \usepackage{comment}
+      \excludecomment{wrapfigure}
+      \begin{document}
+      X.
+
+      \begin{wrapfigure}{r}{0.5\textwidth}
+      inside
+          \end{wrapfigure}
+      \end{document}
+    TEX
+    assert_equal 1, errors.size
+    assert_match(/\Amain\.tex:7: error: .*scanning use of \\next/, errors.first.to_s)
+    assert_match(/\\end\{wrapfigure\} alone at the start of a line/, errors.first.to_s)
+  end
+
+  # TeX.SE 22943: a missing file in \lstinputlisting is reported by listings
+  # without a line; the error belongs at the \lstinputlisting line.
+  def test_lstinputlisting_missing_file_is_reported_at_its_line
+    _, errors = build(<<~'TEX')
+      \documentclass{article}
+      \usepackage{listings}
+      \begin{document}
+      Text before.
+
+      \lstinputlisting{no_such_file.txt}
+
+      \end{document}
+    TEX
+    assert_match(/\Amain\.tex:6: error: .*not found/, errors.first.to_s)
+  end
+
+  # TeX.SE 188192: keyval does not expand the \foo that holds the options,
+  # so 'scale=0.1' is read as one key. The error belongs at the
+  # \includegraphics line, not at the \def.
+  def test_keyval_error_is_reported_at_the_command_not_the_def
+    _, errors = build(<<~'TEX')
+      \documentclass{article}
+      \usepackage{graphicx}
+      \begin{document}
+      \def\foo{scale=0.1}
+      \includegraphics[\foo]{fig1}
+      \end{document}
+    TEX
+    assert_match(/\Amain\.tex:5:.*error: .*keyval Error/, errors.first.to_s)
+    assert_match(/'scale=0\.1' was read as one key/, errors.first.to_s)
+  end
+
+  # TeX.SE 69425: \lstinline with a bracketed language inside a \newcommand
+  # breaks at the paragraph end; the groups and \ifx it leaves open are
+  # folded into that one error.
+  def test_listing_options_in_newcommand_give_one_error
+    _, errors = build(<<~'TEX')
+      \documentclass{scrreprt}
+      \usepackage{listings}
+      \newcommand{\lstcs}[1]{\lstinline[language=[Sharp]C,breaklines=false]#1}
+
+      \begin{document}
+
+      This is \lstcs{CSharpCode()}.
+
+      \end{document}
+    TEX
+    assert_equal 1, errors.size
+    assert_match(/\Amain\.tex:7: error: .*paragraph ended before .*\\lstKV@OptArg@@ was complete/, errors.first.to_s)
+  end
+
+  # TeX.SE 129183: a Lua syntax error in a luacode* environment is reported
+  # at the line of the chunk, not at \end{luacode*}.
+  def test_lua_error_in_luacode_is_reported_at_the_chunk_line
+    skip 'lualatex required' unless LaTeXUtils.command_available?('lualatex')
+
+    _, errors = build(<<~'TEX', 'l')
+      \documentclass{article}
+      \usepackage{luacode}
+      \begin{document}
+      \begin{luacode*}
+      for i=-1,5,1.0 do
+        tex.print(..i "&" ..-i^2 + 5*i - 8 "\\hline")
+      end
+      \end{luacode*}
+      \end{document}
+    TEX
+    assert_match(/\Amain\.tex:6: error: .*unexpected symbol/, errors.first.to_s)
   end
 end

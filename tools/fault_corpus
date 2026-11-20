@@ -1,0 +1,175 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Runs leeni on a corpus of known faults: each task holds a broken document
+# (paper/), its fix (fixed/) and entry.json naming the fault and the line the
+# fix goes on (the TeXFix-Bench layout prepared in datasets/texfix/corpus).
+# The broken build is judged as tools/mutate_corpus judges a mutant: against
+# the fix line and against TeX's own first error. The fixed build must be
+# clean. Corpora and summaries stay outside the repository.
+require 'json'
+require 'fileutils'
+require 'optparse'
+load File.expand_path('mutate_corpus', __dir__) unless defined?(MutateCorpus)
+
+module FaultCorpus
+  # minted under TeX Live's restricted shell escape compiles these "faults".
+  SKIP_OPS = %w[TEX-SHL-ESC].freeze
+
+  HELP = <<~TEXT.freeze
+    Usage: tools/fault_corpus [options] CORPUS_DIR
+
+    Builds each task's broken document with leeni (--json, and -llm), reads
+    TeX's first error from the pass log, and builds the fixed document, which
+    must have no errors. Flags are those of tools/mutate_corpus measured from
+    the fix line, plus fixed_not_clean. Soft-track tasks (which may compile
+    by design), tasks referring to files the corpus lacks, and the operators
+    #{SKIP_OPS.join(', ')} are left out unless asked for.
+
+    Options:
+      -p, --per-op N       sample N tasks per fault operator (default: all)
+      -s, --seed N         sample seed (default 1)
+      -j, --jobs N         tasks in parallel (default 4)
+      -t, --timeout SEC    per build (default 120)
+      -o, --output FILE    summary JSON (default: CORPUS_DIR/fault-summary.json)
+          --ops A,B        only these operators
+          --all            include soft-track, skipped-operator and incomplete tasks
+          --no-llm         skip the -llm comparison
+          --only TASK      only this task (repeatable)
+      -h, --help           show this help; nothing is run
+  TEXT
+
+  module_function
+
+  def parse(argv)
+    opts = { per_op: nil, seed: 1, jobs: 4, timeout: 120, output: nil, ops: nil, all: false, llm: true, only: [] }
+    OptionParser.new do |o|
+      o.on('-p', '--per-op N', Integer) { |v| opts[:per_op] = v }
+      o.on('-s', '--seed N', Integer) { |v| opts[:seed] = v }
+      o.on('-j', '--jobs N', Integer) { |v| opts[:jobs] = v }
+      o.on('-t', '--timeout SEC', Integer) { |v| opts[:timeout] = v }
+      o.on('-o', '--output FILE') { |v| opts[:output] = v }
+      o.on('--ops LIST') { |v| opts[:ops] = v.split(',') }
+      o.on('--all') { opts[:all] = true }
+      o.on('--no-llm') { opts[:llm] = false }
+      o.on('--only TASK') { |v| opts[:only] << v }
+      o.on('-h', '--help') do
+        puts HELP
+        exit
+      end
+    end.parse!(argv)
+    opts
+  end
+
+  def wanted?(entry, opts)
+    op = entry.dig('fault', 'operator_code')
+    return false if opts[:ops] && !opts[:ops].include?(op)
+    return false unless opts[:only].empty? || opts[:only].include?(entry['task_id'])
+    return true if opts[:all]
+
+    entry.dig('fault', 'track') != 'soft' && !SKIP_OPS.include?(op) && Array(entry['missing_external']).empty?
+  end
+
+  def tasks(corpus, opts)
+    dirs = Dir.children(corpus).sort.map { |name| File.join(corpus, name) }
+    found = dirs.filter_map do |dir|
+      spec = File.join(dir, 'entry.json')
+      next unless File.file?(spec)
+
+      entry = JSON.parse(File.read(spec))
+      [dir, entry] if wanted?(entry, opts)
+    end
+    return found unless opts[:per_op]
+
+    rng = Random.new(opts[:seed])
+    found.group_by { |_, e| e.dig('fault', 'operator_code') }.sort.flat_map { |_, list| list.sample(opts[:per_op], random: rng) }
+  end
+
+  def build_in(tmp, label, source, entry, opts)
+    work = File.join(tmp, label)
+    FileUtils.mkdir_p(work)
+    FileUtils.cp_r(File.join(source, '.'), work)
+    build = MutateCorpus.json_build(work, entry['main'], opts, File.join(tmp, "#{label}-cache"))
+    [work, build]
+  end
+
+  def run_task(dir, entry, opts)
+    ProjectTmp.mktmpdir('fault-corpus') do |tmp|
+      work, build = build_in(tmp, 'broken', File.join(dir, 'paper'), entry, opts)
+      build_dir = build.dig(:data, 'build', 'build_dir')
+      tex = build_dir && MutateCorpus.tex_first_error(build_dir)
+      cache = File.join(tmp, 'broken-cache')
+      llm_run = opts[:llm] && !build[:timed_out] ? MutateCorpus.leeni(work, entry['main'], opts, cache, '-llm') : nil
+      _, fixed = build_in(tmp, 'fixed', File.join(dir, 'fixed'), entry, opts)
+      [build_dir, fixed.dig(:data, 'build', 'build_dir')].each { |d| CorpusCompare.remove_build_dir(d) }
+      task_result(entry, build, tex, llm_run, fixed)
+    end
+  end
+
+  def task_result(entry, build, tex, llm_run, fixed)
+    location = entry.dig('fault', 'location')
+    mutant = { file: location['file'], line: location['line'].to_i }
+    verdict = MutateCorpus.judge(mutant, build, tex, llm_run, true)
+    fixed_errors = MutateCorpus.errors_of(fixed)
+    unless fixed[:status]&.zero? && fixed_errors.empty?
+      # The task does not build here even when fixed (a file or package the
+      # corpus lacks): only failures of leeni itself still count.
+      verdict[:flags] = (verdict[:flags] & MutateCorpus::HARD) - %w[silent lineless other_file] + ['fixed_not_clean']
+      verdict[:d_leeni] = verdict[:d_tex] = nil
+    end
+    { task: entry['task_id'], op: entry.dig('fault', 'operator_code'), file: mutant[:file], line: mutant[:line],
+      fixed_categories: fixed_errors.map { |d| d['category'] }.uniq.first(3) }.merge(verdict)
+  end
+
+  def run_all(tasks, opts)
+    queue = Queue.new
+    tasks.each { |task| queue << task }
+    results = []
+    lock = Mutex.new
+    Array.new([opts[:jobs], tasks.size].min) do
+      Thread.new do
+        while (task = CorpusCompare.next_entry(queue))
+          row = run_task(*task, opts)
+          lock.synchronize { results << row }
+        end
+      end
+    end.each(&:join)
+    results.sort_by { |r| [r[:op], r[:task]] }
+  end
+
+  REPORTED = (MutateCorpus::REPORTED + ['fixed_not_clean']).freeze
+
+  def operator_row(operator, rows)
+    located = rows.select { |r| r[:d_leeni] && r[:d_tex] }
+    exact = located.count { |r| r[:d_leeni].zero? }
+    tex_exact = located.count { |r| r[:d_tex].zero? }
+    worse = rows.count { |r| r[:flags].include?('worse_than_tex') }
+    other = rows.flat_map { |r| r[:flags] & (REPORTED - ['worse_than_tex']) }.tally.map { |f, n| "#{f}=#{n}" }.join(' ')
+    "  #{operator.ljust(12)} #{rows.size.to_s.rjust(4)}  located #{located.size.to_s.rjust(4)}  " \
+      "at fix line: leeni #{exact.to_s.rjust(4)} tex #{tex_exact.to_s.rjust(4)}  worse #{worse.to_s.rjust(3)}  #{other}"
+  end
+
+  def report(results)
+    puts "#{results.size} tasks"
+    results.group_by { |r| r[:op] }.sort.each { |op, rows| puts operator_row(op, rows) }
+    puts "flags: #{results.flat_map { |r| r[:flags] }.tally.sort_by { |_, n| -n }.map { |f, n| "#{f}=#{n}" }.join(' ')}"
+  end
+
+  def main(argv)
+    opts = parse(argv)
+    abort HELP if argv.size != 1
+    ProjectTmp.project = ToolSettings::PROJECT_NAME
+    list = tasks(argv.first, opts)
+    abort 'fault_corpus: no tasks selected' if list.empty?
+
+    puts "#{list.size} tasks selected"
+    results = run_all(list, opts)
+    report(results)
+    output = opts[:output] || File.join(argv.first, 'fault-summary.json')
+    File.write(output, JSON.pretty_generate(results))
+    puts "Summary: #{output}"
+    0
+  end
+end
+
+exit FaultCorpus.main(ARGV) if __FILE__ == $PROGRAM_NAME

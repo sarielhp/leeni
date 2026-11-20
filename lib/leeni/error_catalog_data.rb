@@ -66,7 +66,7 @@ module LaTeXErrorCatalog
     },
     {
       id: :paragraph_ended_before_complete,
-      pattern: /(?:Paragraph ended before \S+ was complete|Runaway argument\?)/i,
+      pattern: /(?:Paragraph ended before \S+ +was complete|Runaway argument\?)/i,
       title: 'Paragraph ended before macro was complete / Runaway argument',
       hint: 'Unclosed brace across paragraph or blank line inside short macro argument',
       why: 'A macro argument containing an unclosed brace encountered a blank line / paragraph break.',
@@ -470,12 +470,21 @@ module LaTeXErrorCatalog
     },
     {
       id: :file_ended_while_scanning,
-      pattern: /File ended while scanning (?:use|text) of (\\\S+?|\S+?)\.?$/i,
+      pattern: /File ended while scanning (?:use|text) of (\\\S+?|\S+?) ?\.?$/i,
       title: 'File ended while scanning macro',
+      # beamer's frame, tabularx and environ-based environments read their body
+      # as an argument: a missing \end shows up as this error on the collector.
       hint: lambda { |tok|
-        tok ? "Unclosed brace in argument of '#{tok}'; add missing '}' before EOF" : "Unclosed brace before end of file; add missing '}'"
+        if tok.to_s.match?(/collect@*body|get@body|Collect@Body/i)
+          'Environment never closed; add its \\end{...} (the \\begin is on this line)'
+        elsif tok
+          "Unclosed brace in argument of '#{tok}'; add missing '}' before EOF"
+        else
+          "Unclosed brace before end of file; add missing '}'"
+        end
       },
-      why: 'End of file was reached while TeX was still looking for a closing brace.',
+      why: 'End of file was reached while TeX was still looking for a closing brace, or for the \\end of an ' \
+           'environment that reads its body as an argument (beamer frames, tabularx).',
       fix: 'Add the missing closing curly brace } to terminate the macro argument.',
       doc_slug: '47_file_ended_while_scanning'
     },

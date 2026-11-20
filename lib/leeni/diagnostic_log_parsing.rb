@@ -492,7 +492,8 @@ module LaTeXDiagnostics
       classification = LaTeXErrorCatalog.classify(
         err_text, err_block, file: file_name, line: line_no, junk_dir: diagnostics_junk_dir
       )
-      source_location = locate_error_source(classification, err_text) || locate_package_load(file_name)
+      source_location = locate_error_source(classification, err_text) || locate_package_load(file_name) ||
+                        locate_frame_source(file_name, line_no)
       if source_location
         file_name, line_no = source_location
         classification = LaTeXErrorCatalog.classify(
@@ -519,109 +520,6 @@ module LaTeXDiagnostics
       }
       item[:formatted] = format_error_block(err_block, line_no, catalog: classification, item: item)
       [item, next_idx]
-    end
-
-    # TeX attributes some errors to no source position (a missing file, a glyph
-    # the font lacks); the position is recovered from the source tree instead.
-    def locate_error_source(classification, err_text = '')
-      case classification&.[](:id)
-      when :file_not_found, :include_target_missing
-        locate_missing_resource_request(classification[:token])
-      when :missing_character
-        locate_missing_character(classification[:token])
-      when :pdf_driver_image_failed
-        locate_image_request(classification[:token], err_text[/include page (\d+) of image/, 1])
-      when :pdf_driver_fatal
-        locate_driver_file_request(classification[:token])
-      end
-    end
-
-    DISTRIBUTION_STYLE = %r{/texmf-dist/.+\.(?:sty|cls)\z}
-
-    # TeX reports an error raised while a class or package of the TeX
-    # distribution is being read inside that file (babel.sty:4481), which the
-    # author cannot change; the \usepackage or \documentclass that loads it,
-    # with the option at fault, is the line to fix. A package loaded only by
-    # another package is not found and keeps TeX's location.
-    def locate_package_load(file)
-      path = file.to_s
-      return nil unless path.match?(DISTRIBUTION_STYLE)
-
-      command = path.end_with?('.cls') ? 'documentclass|LoadClass' : 'usepackage|RequirePackage'
-      name = Regexp.escape(File.basename(path, '.*'))
-      pattern = /\\(?:#{command})\s*(?:\[[^\]]*\])?\s*\{(?:[^}]*[,\s])?#{name}\s*(?:,[^}]*)?\}/
-      collect_source_candidates.each do |src_file|
-        LaTeXUtils.safe_read(src_file).each_line.with_index(1) do |line, line_no|
-          return [src_file, line_no] if LaTeXUtils.strip_latex_comments(line).match?(pattern)
-        end
-      end
-      nil
-    end
-
-    DRIVER_MISSING_FILE = /Could not (?:find|open) file:?\s*['`"]?([^\s'"]+)/i
-
-    # A fatal driver message that names a file it could not find ("Image
-    # inclusion failed. Could not find file: x.pdf") points at the
-    # \includegraphics or \special that asked for it. A message naming no file
-    # stays without a location: guessing one would mislead.
-    def locate_driver_file_request(message)
-      file = message.to_s[DRIVER_MISSING_FILE, 1]
-      stem = File.basename(file.to_s).sub(/\.[A-Za-z0-9]+\z/, '')
-      return nil if stem.empty?
-
-      pattern = /\\(?:includegraphics\s*\*?\s*(?:\[[^\]]*\])?\s*\{|special\s*\{)[^}]*#{Regexp.escape(stem)}/
-      collect_source_candidates.each do |src_file|
-        LaTeXUtils.safe_read(src_file).each_line.with_index(1) do |line, line_no|
-          return [src_file, line_no] if LaTeXUtils.strip_latex_comments(line).match?(pattern)
-        end
-      end
-      nil
-    end
-
-    # The \includegraphics of the image, preferring the one that asks for the
-    # failing page; the driver names the file as found, extension and all.
-    def locate_image_request(path, page)
-      stem = File.basename(path.to_s).sub(/\.[A-Za-z0-9]+\z/, '')
-      return nil if stem.empty?
-
-      pattern = /\\includegraphics\s*\*?\s*(?:\[(?<opts>[^\]]*)\])?\s*\{[^}]*#{Regexp.escape(stem)}(?:\.[A-Za-z0-9]+)?\s*\}/
-      hits = collect_source_candidates.flat_map do |file|
-        LaTeXUtils.safe_read(file).each_line.with_index(1).filter_map do |line, line_no|
-          m = LaTeXUtils.strip_latex_comments(line).match(pattern)
-          [file, line_no, m[:opts].to_s] if m
-        end
-      end
-      best = hits.find { |_f, _l, opts| page && opts.match?(/\bpage\s*=\s*\{?#{page}\b/) } || hits.first
-      best&.first(2)
-    end
-
-    def locate_missing_character(glyph)
-      return nil if glyph.to_s.empty? || glyph.to_s.start_with?('^^')
-
-      # An invisible glyph is named by code point in the message; search for the character itself.
-      glyph = [Regexp.last_match(1).hex].pack('U') if glyph =~ /\AU\+([0-9A-Fa-f]{4,6})\z/
-      collect_source_candidates.each do |file|
-        LaTeXUtils.safe_read(file).each_line.with_index(1) do |line, line_no|
-          return [file, line_no] if LaTeXUtils.strip_latex_comments(line).include?(glyph)
-        end
-      end
-      nil
-    end
-
-    def locate_missing_resource_request(resource)
-      stem = resource.to_s.sub(/\.(?:tex|sty|cls|bib)\z/i, '')
-      return nil if stem.empty?
-
-      pattern = /
-        \\(?:input|include|documentclass|LoadClass|usepackage|RequirePackage|includegraphics|bibliography|addbibresource)\s*
-        (?:\[[^\]]*\])?\s*\{[^}]*#{Regexp.escape(stem)}[^}]*\}
-      /x
-      collect_source_candidates.each do |file|
-        LaTeXUtils.safe_read(file).each_line.with_index(1) do |line, line_no|
-          return [file, line_no] if LaTeXUtils.strip_latex_comments(line).match?(pattern)
-        end
-      end
-      nil
     end
 
     def generate_bib_companions(errors)

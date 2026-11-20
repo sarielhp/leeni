@@ -570,6 +570,9 @@ module LatexBuildRuntime
     first = errors.first
     return nil unless first && !first[:bib_entry]
     return truncated_aux_failure(errors, pass_log) unless LeeniQuarantine.generated_file?(first[:file])
+    # A fragile frame's .vrb is written in the same pass that reads it: an
+    # error in it comes from the frame's source, never from a stale cache.
+    return nil if File.extname(first[:file].to_s) == '.vrb'
     # A .bbl no .bib can regenerate is input, not cache: a rebuild reads it again.
     return nil if File.extname(first[:file].to_s) == '.bbl' && bib_files_on_disk.empty?
 

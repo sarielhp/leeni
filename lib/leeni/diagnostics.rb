@@ -14,6 +14,7 @@ require_relative 'bib_checks'
 require_relative 'pdf_checks'
 require_relative 'diagnostic_formatting'
 require_relative 'diagnostic_log_parsing'
+require_relative 'diagnostic_source_location'
 require_relative 'diagnostic_output'
 require_relative 'diagnostic_alerts'
 require_relative 'diagnostic_summary'
@@ -23,6 +24,7 @@ require_relative 'diagnostic_key_suggestions'
 module LaTeXDiagnostics
   include Formatting
   include LogParsing
+  include SourceLocation
   include Output
   include Alerts
   include Summary

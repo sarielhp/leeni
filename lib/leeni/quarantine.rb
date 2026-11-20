@@ -30,7 +30,7 @@ module LeeniQuarantine
   end
 
   GENERATED_EXTENSIONS = %w[
-    .aux .toc .lof .lot .loa .lol .out .nav .snm .vrb .bbl .bcf .blg .idx .ind .ilg .glo .gls .thm .run.xml .fls
+    .aux .toc .lof .lot .loa .lol .out .nav .snm .vrb .bbl .bcf .blg .idx .ind .ilg .glo .gls .glsdefs .thm .run.xml .fls
   ].freeze
   SKIPPED_IN_CASE = %w[.pdf .synctex.gz .xdv .dvi].freeze
   MAX_FILE_BYTES = 10 * 1024 * 1024

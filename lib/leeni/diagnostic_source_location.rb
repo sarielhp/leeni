@@ -1,0 +1,188 @@
+# frozen_string_literal: true
+
+# ==============================================================================
+# lib/leeni/diagnostic_source_location.rb
+#
+# Finding the source line of an error TeX locates badly or not at all: a missing
+# file, a glyph, a driver failure, a package of the distribution, an environment
+# never closed, a line of a fragile frame's .vrb.
+# Part of LaTeXDiagnostics (lib/leeni/diagnostics.rb), which includes it.
+# ==============================================================================
+
+module LaTeXDiagnostics
+  # Finding the source line of an error TeX locates badly or not at all.
+  module SourceLocation
+    # TeX attributes some errors to no source position (a missing file, a glyph
+    # the font lacks); the position is recovered from the source tree instead.
+    def locate_error_source(classification, err_text = '')
+      case classification&.[](:id)
+      when :file_not_found, :include_target_missing
+        locate_missing_resource_request(classification[:token])
+      when :missing_character
+        locate_missing_character(classification[:token])
+      when :pdf_driver_image_failed
+        locate_image_request(classification[:token], err_text[/include page (\d+) of image/, 1])
+      when :pdf_driver_fatal
+        locate_driver_file_request(classification[:token])
+      when :file_ended_while_scanning
+        locate_unclosed_environment
+      end
+    end
+
+    # A [fragile] beamer frame writes its body to <job>.vrb and reads it back,
+    # so TeX reports errors in the frame at a line of that build file. The
+    # body is copied line for line, so the .vrb is aligned with the source by
+    # the offset most of its distinctive lines agree on.
+    def locate_frame_source(file, line)
+      return nil unless file.to_s.end_with?('.vrb') && line.to_i.positive?
+
+      body = LaTeXUtils.safe_read(file).lines.map { |text| text.gsub('^^I', "\t").strip } # TeX writes a tab as ^^I
+      collect_source_candidates.each do |source|
+        offset = frame_offset(body, LaTeXUtils.safe_read(source).lines.map(&:strip))
+        return [source, line.to_i + offset] if offset
+      end
+      nil
+    end
+
+    def frame_offset(body, source)
+      where = Hash.new { |h, k| h[k] = [] }
+      source.each_with_index { |text, idx| where[text] << idx }
+      distinctive = body.each_with_index.select { |text, _| text.length > 3 && where.key?(text) }
+      votes = distinctive.flat_map { |text, idx| where[text].map { |at| at - idx } }.tally
+      best, count = votes.max_by { |_, n| n }
+      best if count && count >= 3 && count * 2 >= distinctive.size
+    end
+
+    VERBATIM_ENVIRONMENTS = %w[verbatim verbatim* Verbatim lstlisting minted comment alltt].freeze
+    ENVIRONMENT_MARK = /\\(begin|end)\s*\{([^}]+)\}/
+
+    # Environments that collect their body as an argument (beamer's frame,
+    # tabularx, environ-based ones) report a missing \end only as "File ended
+    # while scanning use of \beamer@collect@@body", with no line. The fault is
+    # the \begin that is never closed: the first one still open when an outer
+    # environment (or the document) ends, or at the end of the main file.
+    def locate_unclosed_environment
+      state = { stack: [], verbatim: nil }
+      LaTeXUtils.safe_read(@filename).each_line.with_index(1) do |line, line_no|
+        LaTeXUtils.strip_latex_comments(line).scan(ENVIRONMENT_MARK) do |kind, name|
+          found = environment_mark(state, kind, name, line_no)
+          return [@filename, found] if found
+        end
+      end
+      open = state[:stack].find { |name, _| name != 'document' }
+      open && [@filename, open[1]]
+    end
+
+    # One \begin or \end; inside a verbatim body only its own \end counts.
+    def environment_mark(state, kind, name, line_no)
+      if state[:verbatim]
+        state[:verbatim] = nil if kind == 'end' && name == state[:verbatim]
+        return nil
+      end
+      state[:verbatim] = name if kind == 'begin' && VERBATIM_ENVIRONMENTS.include?(name)
+      track_environment(state[:stack], kind, name, line_no)
+    end
+
+    # Pushes or pops one \begin/\end; returns the line of a \begin left open
+    # when an \end closes an environment opened before it.
+    def track_environment(stack, kind, name, line_no)
+      return stack.push([name, line_no]) && nil if kind == 'begin' && !VERBATIM_ENVIRONMENTS.include?(name)
+      return nil unless kind == 'end'
+
+      match = stack.rindex { |open, _| open == name }
+      return nil unless match
+
+      unclosed = stack[match + 1]
+      stack.slice!(match..)
+      unclosed&.last
+    end
+
+    DISTRIBUTION_STYLE = %r{/texmf-dist/.+\.(?:sty|cls)\z}
+
+    # TeX reports an error raised while a class or package of the TeX
+    # distribution is being read inside that file (babel.sty:4481), which the
+    # author cannot change; the \usepackage or \documentclass that loads it,
+    # with the option at fault, is the line to fix. A package loaded only by
+    # another package is not found and keeps TeX's location.
+    def locate_package_load(file)
+      path = file.to_s
+      return nil unless path.match?(DISTRIBUTION_STYLE)
+
+      command = path.end_with?('.cls') ? 'documentclass|LoadClass' : 'usepackage|RequirePackage'
+      name = Regexp.escape(File.basename(path, '.*'))
+      pattern = /\\(?:#{command})\s*(?:\[[^\]]*\])?\s*\{(?:[^}]*[,\s])?#{name}\s*(?:,[^}]*)?\}/
+      collect_source_candidates.each do |src_file|
+        LaTeXUtils.safe_read(src_file).each_line.with_index(1) do |line, line_no|
+          return [src_file, line_no] if LaTeXUtils.strip_latex_comments(line).match?(pattern)
+        end
+      end
+      nil
+    end
+
+    DRIVER_MISSING_FILE = /Could not (?:find|open) file:?\s*['`"]?([^\s'"]+)/i
+
+    # A fatal driver message that names a file it could not find ("Image
+    # inclusion failed. Could not find file: x.pdf") points at the
+    # \includegraphics or \special that asked for it. A message naming no file
+    # stays without a location: guessing one would mislead.
+    def locate_driver_file_request(message)
+      file = message.to_s[DRIVER_MISSING_FILE, 1]
+      stem = File.basename(file.to_s).sub(/\.[A-Za-z0-9]+\z/, '')
+      return nil if stem.empty?
+
+      pattern = /\\(?:includegraphics\s*\*?\s*(?:\[[^\]]*\])?\s*\{|special\s*\{)[^}]*#{Regexp.escape(stem)}/
+      collect_source_candidates.each do |src_file|
+        LaTeXUtils.safe_read(src_file).each_line.with_index(1) do |line, line_no|
+          return [src_file, line_no] if LaTeXUtils.strip_latex_comments(line).match?(pattern)
+        end
+      end
+      nil
+    end
+
+    # The \includegraphics of the image, preferring the one that asks for the
+    # failing page; the driver names the file as found, extension and all.
+    def locate_image_request(path, page)
+      stem = File.basename(path.to_s).sub(/\.[A-Za-z0-9]+\z/, '')
+      return nil if stem.empty?
+
+      pattern = /\\includegraphics\s*\*?\s*(?:\[(?<opts>[^\]]*)\])?\s*\{[^}]*#{Regexp.escape(stem)}(?:\.[A-Za-z0-9]+)?\s*\}/
+      hits = collect_source_candidates.flat_map do |file|
+        LaTeXUtils.safe_read(file).each_line.with_index(1).filter_map do |line, line_no|
+          m = LaTeXUtils.strip_latex_comments(line).match(pattern)
+          [file, line_no, m[:opts].to_s] if m
+        end
+      end
+      best = hits.find { |_f, _l, opts| page && opts.match?(/\bpage\s*=\s*\{?#{page}\b/) } || hits.first
+      best&.first(2)
+    end
+
+    def locate_missing_character(glyph)
+      return nil if glyph.to_s.empty? || glyph.to_s.start_with?('^^')
+
+      # An invisible glyph is named by code point in the message; search for the character itself.
+      glyph = [Regexp.last_match(1).hex].pack('U') if glyph =~ /\AU\+([0-9A-Fa-f]{4,6})\z/
+      collect_source_candidates.each do |file|
+        LaTeXUtils.safe_read(file).each_line.with_index(1) do |line, line_no|
+          return [file, line_no] if LaTeXUtils.strip_latex_comments(line).include?(glyph)
+        end
+      end
+      nil
+    end
+
+    def locate_missing_resource_request(resource)
+      stem = resource.to_s.sub(/\.(?:tex|sty|cls|bib)\z/i, '')
+      return nil if stem.empty?
+
+      pattern = /
+        \\(?:input|include|documentclass|LoadClass|usepackage|RequirePackage|includegraphics|bibliography|addbibresource)\s*
+        (?:\[[^\]]*\])?\s*\{[^}]*#{Regexp.escape(stem)}[^}]*\}
+      /x
+      collect_source_candidates.each do |file|
+        LaTeXUtils.safe_read(file).each_line.with_index(1) do |line, line_no|
+          return [file, line_no] if LaTeXUtils.strip_latex_comments(line).match?(pattern)
+        end
+      end
+      nil
+    end
+  end
+end

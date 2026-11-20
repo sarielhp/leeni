@@ -25,7 +25,7 @@ Errors during compilation originate in one of three layers:
 
 ---
 
-## 3. Master Error Index (68 Errors)
+## 3. Master Error Index (71 Errors)
 
 | # | Error Message / Pattern | Layer | Cause & Summary | Support | Reproducer & Details |
 |---|:--- |:--- |:--- |:--- |:--- |
@@ -97,6 +97,9 @@ Errors during compilation originate in one of three layers:
 | **66** | `! Emergency stop. <*> ... (job aborted, no legal \end found)` | TeX Engine | The main file ends without `\end{document}` (truncated file, stray `\endinput`). `leeni` reports it at the last line of the main file. | **Catalog Hint** | [`66_missing_end_document`](66_missing_end_document/) |
 | **67** | `Paragraph ended before \new@command was complete` | LaTeX Kernel | A brace missing in a preamble `\newcommand`; TeX names the blank line after it and every swallowed macro is undefined. `leeni` reports the open brace first. | **Catalog Hint** | [`67_broken_newcommand`](67_broken_newcommand/) |
 | **68** | `Paragraph ended before \begin was complete` | LaTeX Kernel | `\begin{proof` without its closing brace; TeX names the blank line, then an environment mismatch. `leeni` reports the open brace first. | **Catalog Hint** | [`68_begin_missing_brace`](68_begin_missing_brace/) |
+| **69** | `File ended while scanning use of \textbf .` | LaTeX Kernel | A robust command (`\textbf`, `\eqref`) whose argument is never closed; TeX gives no line. `leeni` reports the open brace. | **Catalog Hint** | [`69_robust_command_unclosed`](69_robust_command_unclosed/) |
+| **70** | `File ended while scanning use of \beamer@collect@@body` | beamer / tabularx | An environment that collects its body (`frame`, `tabularx`) is never closed; TeX gives no line. `leeni` reports the `\begin` left open. | **Catalog Hint** | [`70_frame_not_closed`](70_frame_not_closed/) |
+| **71** | `./example.vrb:5: ...` | beamer | An error inside a `[fragile]` frame is reported in the generated `.vrb`. `leeni` maps it to the frame line in the source. | **Standard** | [`71_fragile_frame_error`](71_fragile_frame_error/) |
 
 ---
 
@@ -114,7 +117,7 @@ The corpus runs in the medium test tier (`test/test_error_corpus.rb`, also `tool
 # Run the corpus expectations
 tools/test_error_corpus
 # Draft expected.json for a new case (check every location by hand before saving)
-tools/test_error_corpus --draft docs/errors/69_new_case
+tools/test_error_corpus --draft docs/errors/72_new_case
 ```
 
 ### Comparing Real Papers with latexmk
@@ -138,3 +141,10 @@ tools/mutate_corpus -n 20 -j 4 -o /tmp/mutate-summary.json CORPUS_DIR
 ```
 
 The papers stay outside the repository, and so do the summaries, which quote source lines. A real bug found this way becomes a synthetic case here.
+
+### Known Faults from TeXFix-Bench
+`tools/fault_corpus` runs the same checks on [TeXFix-Bench](https://arxiv.org/abs/2608.07617) (CC BY 4.0): 6,568 LaTeX documents, each with one fault injected into a document that compiles and the line its fix goes on. Download and prepare it into `datasets/texfix/corpus` (ignored by git); each task's fixed version must build clean, and tasks whose fixed version does not build here (a missing file or package) count only for crashes and hangs.
+
+```bash
+tools/fault_corpus -p 30 -j 4 -o /tmp/fault-summary.json datasets/texfix/corpus
+```

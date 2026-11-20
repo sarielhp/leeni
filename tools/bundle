@@ -54,6 +54,7 @@ module LatexBundler
     presenters.rb
     diagnostic_formatting.rb
     diagnostic_log_parsing.rb
+    diagnostic_source_location.rb
     diagnostic_output.rb
     diagnostic_alerts.rb
     diagnostic_summary.rb

@@ -48,6 +48,19 @@ module LaTeXErrorCatalog
       doc_slug: '86_verbatim_environment_unclosed'
     },
     {
+      id: :control_sequence_already_defined,
+      pattern: /LaTeX Error: Control sequence (\\\S+?) already defined/,
+      title: 'LaTeX Error: Control sequence already defined',
+      token_extractor: ->(match, _block) { match[1] },
+      hint: lambda { |tok|
+        "Two loaded packages both define #{tok}; load only one of them (unicode-math clashes with legacy " \
+          'math-font packages such as newtxmath or stix2; fontawesome5 with the fontawesome6 that moderncv loads)'
+      },
+      why: 'A package defined a command with \\NewDocumentCommand or the expl3 equivalent that another package had already defined. unicode-math raises it for \\not= and similar when a legacy math-font package (newtxmath, stix2) is also loaded.',
+      fix: 'Remove one of the clashing packages; with unicode-math, drop the legacy math-font packages.',
+      doc_slug: '89_control_sequence_already_defined'
+    },
+    {
       id: :unbalanced_write,
       pattern: /Unbalanced write command/,
       title: 'Unbalanced write command',
@@ -70,7 +83,7 @@ module LaTeXErrorCatalog
     },
     {
       id: :engine_required,
-      pattern: /Package (\S+) Error: (XeTeX|LuaTeX) is required to compile this document/,
+      pattern: /Package (\S+) Error: ((?:XeTeX|LuaTeX)(?: or (?:XeTeX|LuaTeX))?) is required to compile this document/,
       title: 'XeTeX or LuaTeX is required to compile this document',
       hint: 'The package works only with the engine the message names: build with -e xelatex (XeTeX) or ' \
             '-e lualatex (LuaTeX), or remove the package (fontspec replaces xltxtra)',

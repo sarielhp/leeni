@@ -15,8 +15,15 @@ judged against TeX.
 
 - Released: 1.0.102, which includes all the TeX.SE work through batch 10
   (branch `texse-tool` merged into master). Installed locally.
-- Batches 11–15 are reviewed and fixed (after 1.0.102; error corpus cases
-  81–88). The full regression over all 490 documents run so far is the new
+- Batches 11–17 are reviewed and fixed (after 1.0.102; error corpus cases
+  81–89).
+- Stopping rule agreed on 2026-11-20 (long tail reached: a fix round now
+  changes under 1% of the corpus, but each fix adds code, and three caused
+  regressions that only the full run caught): from batch 18, fix only
+  mechanisms seen in 2+ documents or with a general cause (engine, catcode,
+  expl3, a silent stop); list one-package oddities under Known open items.
+  Stop after two batches with no such fix; then use tools/mutate_corpus on
+  own papers and rerun the TeX.SE regression after TeX Live updates. The full regression over all 490 documents run so far is the new
   `datasets/texse/regression-baseline.json`.
 - 2026-11-20: questions fetched for `siunitx`, `pgfplots`, `math-mode`,
   `graphics`, `floats`, `fonts`, `xetex`, `luatex`, `babel`, `listings`,
@@ -53,6 +60,8 @@ each was built and what each batch found. Questions fetched so far: tag
 | 13 | graphics, floats, fonts, xetex, luatex, babel, listings, amsmath | 8 (triaged by 15 parallel DeepSeek agents; see below) |
 | 14 | leftovers of the same tags (100 docs) | 8 (LuaTeX-only packages, unbalanced write, runaway brace line, \\text in \\textsc, duplicates, bracket in an option value) |
 | 15 | biber, fontspec, tikz-styles, cross-referencing, macros, expl3, chemistry, algorithms (100 docs) | 1 (dropped-text hint), plus a missing-font entry found in the regression |
+| 16 | next 100 of those tags | 7 (Lua tracebacks and chunk lines, luacode engine refusal, space glyph, unicode-math clash hint, @ in a name without \makeatletter) |
+| 17 | next 100 | 5 (engine refusal wordings, engine primitives in the body, expl3 names kept whole, an unknown option passed on to later packages, clash hint) |
 
 The rate is not clearly falling; what changes is the kind of bug. Early
 batches found faults hitting many documents (locations inside packages and
@@ -113,6 +122,13 @@ document whose result changed.
 
 ## Known open items
 
+- One-package oddities seen and not fixed: endfloat's figure/figure* mismatch
+  (535982: line 0 shown as 1, brace hint); \resizebox{w}{}{...} running to
+  the end of the file (665349); a class option with spaces around = leaking
+  into geometry (696796); a source comment that looks like a log error
+  (557099); alerts for another .tex file of the same directory (514235);
+  siunitx's \ERROR sentinel named as the undefined command (574491); quotes
+  loaded before babel spanish (297933).
 - The system rexml gem (3.2.5, updated 2026-11-19) warns under `-w`;
   `tools/sample_arxiv` silences warnings around its `require`, since the test
   runner fails on warnings. Remove that once the gem is fixed.

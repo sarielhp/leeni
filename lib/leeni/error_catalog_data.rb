@@ -116,7 +116,7 @@ module LaTeXErrorCatalog
     },
     {
       id: :command_already_defined,
-      pattern: /Command '?(\\?[^\s']+)'? already defined/i,
+      pattern: /Command [`']?(\\?[^\s`']+)'? already defined/i,
       title: 'Command already defined',
       hint: lambda { |tok|
         tok ? "Command '#{tok}' already defined; use \\renewcommand or rename" : 'Command already defined; use \\renewcommand or rename'
@@ -501,9 +501,16 @@ module LaTeXErrorCatalog
       pattern: /\[\\directlua\]:\d+: (.+)/,
       title: 'Lua error in \\directlua',
       token_extractor: ->(match, _block) { match[1].to_s.sub(/\.\z/, '') },
-      hint: lambda { |_tok|
-        'Lua error in \\directlua code: TeX expands the code before Lua reads it, so macros and active characters ' \
-          '(csquotes ", babel shorthands) change it; use the luacode environment or a separate .lua file'
+      # Only a syntax error can come from TeX's expansion of the code; a
+      # runtime error (a nil value) is in the Lua itself (TeX.SE 489395).
+      hint: lambda { |tok|
+        if tok.to_s.match?(/attempt to |bad argument|stack overflow|not enough memory|module '.*' not found|in function/)
+          'Lua runtime error: the code ran and failed at this line (a nil value, a wrong argument, a missing file or module); ' \
+            'check the values it uses'
+        else
+          'Lua error in \\directlua code: TeX expands the code before Lua reads it, so macros and active characters ' \
+            '(csquotes ", babel shorthands) change it; use the luacode environment or a separate .lua file'
+        end
       },
       why: '\\directlua passes its argument through TeX first: macros are expanded and active characters, such as the " that csquotes makes into a quote, are replaced before Lua parses the code.',
       fix: 'Put the code in a luacode environment (\\usepackage{luacode}) or a .lua file loaded with dofile(), or switch the active characters off around it.',

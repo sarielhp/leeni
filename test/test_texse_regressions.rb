@@ -569,4 +569,142 @@ class TestTexseRegressions < Minitest::Test
     assert_includes errors.first, "The ] of '[LaTeX]TeX' ends the optional argument early"
     assert_includes errors.first, 'brace the value ({[LaTeX]TeX})'
   end
+
+  # TeX.SE 655907: \tl_if_gput_right:Nn does not exist, but the error names the
+  # whole control sequence as written, not the \tl it starts with (which is
+  # only the expl3 module prefix), and sits on the line of the definition.
+  def test_undefined_expl3_command_is_named_in_full
+    _, errors = build(<<~'TEX')
+      \documentclass{article}
+      \usepackage{xparse}
+
+      \ExplSyntaxOn
+      \NewDocumentCommand\storemydate{m}{\tl_if_gput_right:Nn \g_tmpa_tl {#1}}
+      \ExplSyntaxOff
+
+      \begin{document}
+      \storemydate{x}
+      \end{document}
+    TEX
+    command = errors.grep(/undefined control sequence/)
+    refute_empty command, errors.join
+    assert_match(/\Amain\.tex:5:\d+: error: .*\\tl_if_gput_right:Nn/, command.first)
+    refute_match(/\\tl(?!_if_gput_right:Nn)/, command.first)
+  end
+
+  # TeX.SE 616334: siunitx has no decimalsymbol option; the error is raised at
+  # the \usepackage that gives it, once, in a document xcolor and bookmark
+  # also build in.
+  def test_unknown_siunitx_option_is_one_error_at_its_load_line
+    _, errors = build(<<~'TEX')
+      \documentclass{article}
+      \usepackage[decimalsymbol=comma]{siunitx}
+      \usepackage{xcolor}
+      \usepackage{bookmark}
+      \begin{document}
+      x
+      \end{document}
+    TEX
+    option = errors.grep(/Unknown option 'decimalsymbol'/)
+    assert_equal 1, option.size, errors.join
+    assert_match(/\Amain\.tex:2: error: /, option.first)
+  end
+
+  # TeX.SE 675705: a package that is LuaLaTeX-only (chickenize) fails on
+  # \directlua under pdflatex; the fault is the engine, reported once at the
+  # \usepackage, not at every command used in the body.
+  def test_lualatex_only_package_is_one_error_at_its_load_line
+    skip 'chickenize.sty required' unless system('kpsewhich', 'chickenize.sty', out: File::NULL)
+
+    _, errors = build(<<~'TEX')
+      \documentclass{article}
+      \usepackage{chickenize}
+
+      \begin{document}
+      \addtosubstitutions{a}{A}
+      \substitutewords
+      text
+      \end{document}
+    TEX
+    lua = errors.grep(/\\directlua/)
+    assert_equal 1, lua.size, errors.join
+    assert_match(/\Amain\.tex:2: error: /, lua.first)
+    assert_match(/needs LuaTeX/, lua.first)
+  end
+
+  # TeX.SE 694072: kpfonts-otf needs LuaTeX or XeTeX and refuses pdflatex at
+  # its own \usepackage; that one refusal is the whole fault.
+  def test_kpfonts_otf_on_pdflatex_is_one_engine_error_at_its_load_line
+    skip 'kpfonts-otf.sty required' unless system('kpsewhich', 'kpfonts-otf.sty', out: File::NULL)
+
+    _, errors = build(<<~'TEX')
+      \documentclass{article}
+
+      \usepackage{kpfonts-otf}
+
+      \begin{document}
+      Some text.\mathversion{bold}$a$
+      \end{document}
+    TEX
+    assert_equal 1, errors.size, errors.join
+    assert_match(/\Amain\.tex:3: error: .*LuaTeX or XeTeX is required/, errors.first)
+    assert_match(/needs LuaTeX/, errors.first)
+  end
+
+  # TeX.SE 537582: luacode under pdfTeX stops at its \usepackage line asking
+  # for LuaTeX, not with a missing control sequence in the body.
+  def test_luacode_under_pdftex_asks_for_luatex_at_its_usepackage
+    _, errors = build(<<~'TEX')
+      \documentclass{article}
+      \usepackage{luacode}
+      \begin{document}
+      x
+      \end{document}
+    TEX
+    assert_equal 1, errors.size, errors.join
+    assert_match(/\Amain\.tex:2: error: /, errors.first)
+    assert_match(/LuaTeX is required/, errors.first)
+    assert_match(/needs LuaTeX/, errors.first)
+  end
+
+  # TeX.SE 571019: \makeatletter inside a \newcommand body runs too late, so
+  # the @ in \lst@AddToHook is not a letter; the error belongs at that line.
+  def test_makeatletter_inside_a_macro_body_is_reported_at_the_at_command
+    _, errors = build(<<~'TEX')
+      \documentclass{article}
+      \usepackage{listings}
+
+      \newcommand{\testcmm}{
+          \makeatletter
+          \lst@AddToHook{TextStyle}{\let\lst@basicstyle=\footnotesize}
+          \makeatother
+      }
+
+      \begin{document}
+      \testcmm
+      \end{document}
+    TEX
+    assert_match(/\Amain\.tex:6:\d+: error: /, errors.first.to_s)
+    assert_match(/@ is not a letter here/, errors.first)
+  end
+
+  # TeX.SE 489395: a luacode body that calls an undefined global fails at run
+  # time, at the line that made the call.
+  def test_luacode_runtime_error_is_reported_at_its_line
+    skip 'lualatex required' unless LaTeXUtils.command_available?('lualatex')
+
+    _, errors = build(<<~'TEX', 'l')
+      \documentclass{article}
+      \usepackage{luacode}
+      \begin{document}
+      \begin{luacode}
+      local a = 1
+      x = nosuchfunction()
+      \end{luacode}
+      \end{document}
+    TEX
+    assert_equal 1, errors.size, errors.join
+    assert_match(/\Amain\.tex:6: error: /, errors.first)
+    assert_match(/Lua runtime error/, errors.first)
+  end
 end

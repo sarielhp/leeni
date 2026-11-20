@@ -106,10 +106,14 @@ module LaTeXErrorCatalog
     false
   end
 
+  # A control sequence as TeX shows it; expl3 names keep _ and :
+  # (\tl_if_gput_right:Nn, TeX.SE 655907): TeX breaks the line right after it.
+  CS_TOKEN = /\\[a-zA-Z@_:]+|\\[^\s]/
+
   def self.extract_undefined_cs_info(err_block)
     block_text = err_block.join("\n")
-    return [Regexp.last_match(1), nil] if block_text =~ /<recently read>\s*(\\[a-zA-Z@]+|\\[^\s])/
-    return [Regexp.last_match(1), nil] if block_text =~ /<to be read again>\s*(\\[a-zA-Z@]+|\\[^\s])/
+    return [Regexp.last_match(1), nil] if block_text =~ /<recently read>\s*(#{CS_TOKEN.source})/
+    return [Regexp.last_match(1), nil] if block_text =~ /<to be read again>\s*(#{CS_TOKEN.source})/
 
     # Check macro expansion lines: \macro ...->... \badcs
     # TeX breaks the line immediately after the offending token, so the culprit
@@ -117,29 +121,29 @@ module LaTeXErrorCatalog
     macro_line = err_block.find { |l| l =~ /->/ }
     if macro_line
       before_arrow, after_arrow = macro_line.split('->', 2)
-      enclosing = before_arrow&.scan(/\\[a-zA-Z@]+|\\[^\s]/)&.first
-      cs = after_arrow&.scan(/\\[a-zA-Z@]+|\\[^\s]/)&.last
+      enclosing = before_arrow&.scan(CS_TOKEN)&.first
+      cs = after_arrow&.scan(CS_TOKEN)&.last
       return [cs, enclosing] if cs
     end
 
     # A long expansion is elided ("\beamer@doifinframe ... \par Second \badcs",
     # the body of a beamer frame); the line still ends at the culprit.
     elided = err_block.find { |l| l =~ /\A\\[a-zA-Z@]+ \.\.\. / }
-    cs = elided.sub(/\A\\[a-zA-Z@]+ \.\.\. /, '').scan(/\\[a-zA-Z@]+|\\[^\s]/).last if elided
+    cs = elided.sub(/\A\\[a-zA-Z@]+ \.\.\. /, '').scan(CS_TOKEN).last if elided
     return [cs, nil] if cs
 
     # Check <argument> lines: <argument> ... \badcs
     arg_line = err_block.find { |l| l =~ /<argument>/ }
     if arg_line
       after_arg = arg_line.sub(/\A.*<argument>\s*/, '')
-      cs = after_arg.scan(/\\[a-zA-Z@]+|\\[^\s]/).last
+      cs = after_arg.scan(CS_TOKEN).last
       return [cs, nil] if cs
     end
 
     # Fallback to l.N line
     context = err_block.find { |l| l =~ /\Al\.\d+/ }
     if context
-      tokens = context.scan(/\\[a-zA-Z@]+|\\[^\s]/)
+      tokens = context.scan(CS_TOKEN)
       tokens.reject! { |t| t == '\end' } if tokens.size > 1
       return [tokens.last, nil] if tokens.last
     end

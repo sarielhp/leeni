@@ -354,9 +354,17 @@ module LaTeXDiagnostics
       content.gsub(ERROR_CONTINUATION) { "#{Regexp.last_match(1)} " }.gsub(LUA_ERROR_AFTER_TEXT, "\n")
     end
 
+    # A frame of a Lua stack traceback ("[\directlua]:7: in main chunk.")
+    # belongs to the Lua error above it (TeX.SE 489395, 563794); a frame with
+    # no error above it (require("ffi") failing, 456816) stands for one.
+    LUA_TRACEBACK_FRAME = /\A\s*\S+:\d+: in (?:main chunk|function|upvalue|local|global|field|method|for iterator|\?)|\A\s*stack traceback:/
+
     def error_line_match(line)
       return [false, nil] if typeset_source_echo?(line)
       return [false, nil] if line =~ FATAL_ABORT_PATTERN
+      # A frame of a script run by TeX (extractbb, TeX.SE 549254) is not a
+      # place in the document; only a frame of TeX's own Lua stands alone.
+      return [false, nil] if line.match?(LUA_TRACEBACK_FRAME) && !line.match?(/\A\s*\[/)
 
       if line =~ /^(.+?):(\d+):\s+(?!warning\b)(?!\(see\b)\S+/i
         [true, Regexp.last_match(1)]
@@ -370,12 +378,14 @@ module LaTeXDiagnostics
     def collect_error_block(lines, start_idx)
       err_block = [lines[start_idx]]
       missing_file = lines[start_idx].match?(/File `?[^']+'? not found/i)
-      block_limit = missing_file ? 14 : 6
+      # A Lua error's stack traceback comes before the l.N that places it.
+      block_limit = missing_file || lines[start_idx].match?(/\]:\d+: /) ? 14 : 6
       i = start_idx + 1
       while i < lines.size && err_block.size < block_limit
         curr = lines[i]
         break if curr =~ FATAL_ABORT_PATTERN ||
-                 (curr =~ /^.+:\d+:\s+(?!warning\b)/i && !missing_file_location?(curr, missing_file)) ||
+                 (curr =~ /^.+:\d+:\s+(?!warning\b)/i && !missing_file_location?(curr, missing_file) &&
+                  !curr.match?(LUA_TRACEBACK_FRAME)) ||
                  curr =~ /^!\s+\S+/ || curr =~ /^Runaway argument\?/ ||
                  curr =~ WARNING_LINE_PATTERN ||
                  curr =~ /^(?:Overfull|Underfull) \\(?:hbox|vbox)/ ||
@@ -464,7 +474,7 @@ module LaTeXDiagnostics
     # \RequireXeTeX (xltxtra, xunicode) and \RequireLuaTeX print a banner and
     # stop with an Emergency stop inside the package: no error message at all.
     # The terminal output ends at the banner, before the Emergency stop.
-    ENGINE_REQUIRED = /^\s*\* (XeTeX|LuaTeX) is required to compile this document\./
+    ENGINE_REQUIRED = /^\s*\* ((?:XeTeX|LuaTeX)(?: or (?:XeTeX|LuaTeX))?) is required to compile this document\./
 
     # The error is placed at the \usepackage of the package that stopped
     # (TeX.SE 83773: xltxtra under pdflatex), the innermost .sty still open

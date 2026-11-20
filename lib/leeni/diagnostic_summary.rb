@@ -284,7 +284,9 @@ module LaTeXDiagnostics
     def repeated_fault_key(error)
       case error[:catalog_id]
       when :illegal_parameter_number then [format_display_path(error[:file]), error[:line]]
-      when :unknown_package_option then error[:text].to_s[/Unknown option .*/]
+      # The option is passed on to every later package (siunitx's to xcolor
+      # and bookmark, TeX.SE 616334): one fault, keyed by the option.
+      when :unknown_package_option then error[:text].to_s[/Unknown option [`'][^']+'/]
       # siunitx repeats its refusal at \begin{document}.
       when :siunitx_incompatible_package then error[:text].to_s[/Package [`'][^']+' incompatible/]
       end
@@ -396,6 +398,25 @@ module LaTeXDiagnostics
       nil
     end
 
+    # An undefined \lst written as \lst@AddToHook: @ was not a letter when the
+    # line was read, so the name stopped before it (TeX.SE 571019, 78474).
+    def retag_at_sign_splits(errors)
+      # Errors are placed at their source line later; the name is looked for
+      # in the whole main file.
+      text = LaTeXUtils.safe_read(@filename).lines.map { |l| LaTeXUtils.strip_latex_comments(l) }.join
+      errors.each do |error|
+        next unless error[:catalog_id] == :undefined_control_sequence && error[:token].to_s.match?(/\A\\[A-Za-z]+\z/)
+
+        full = text[/#{Regexp.escape(error[:token])}@[A-Za-z@]*/]
+        next unless full
+
+        error[:catalog] = (error[:catalog] || {}).merge(
+          hint: "@ is not a letter here, so #{full} was read as #{error[:token]} followed by text: put \\makeatletter " \
+                'before the definition and \\makeatother after it (inside a macro body they come too late)'
+        )
+      end
+    end
+
     # Primitives of one engine: undefined, the document runs on another.
     ENGINE_PRIMITIVES = {
       'LuaTeX' => %w[\directlua \luatexversion \latelua \luaescapestring \luafunction \catcodetable
@@ -410,26 +431,48 @@ module LaTeXDiagnostics
       primaries = errors.filter_map { |error| [error, engine_of_primitive(error)] if engine_of_primitive(error) }
       return errors if primaries.empty?
 
+      kept = engine_primary_places(primaries).values
       places = {}
-      primaries.each do |error, engine|
-        next if places.key?(error_place(error))
-
-        places[error_place(error)] = error
-        retag_engine_primitive(error, engine)
-      end
+      primaries.map(&:first).each { |error| places[error_place(error)] ||= error }
+      # A primitive in the body is dropped, and still folds what follows it.
+      dropped = primaries.map(&:first).reject { |error| kept.any? { |k| k.equal?(error) } }
       # Only what follows the primitive is its cascade: a font error fontspec
       # gave before it at that line is a fault of its own (TeX.SE 290592).
       seen = {}
       errors.reject do |error|
         primary = places[error_place(error)]
-        next false unless primary
+        seen[primary] ||= error.equal?(primary) if primary
+        next true if dropped.any? { |other| other.equal?(error) }
 
-        seen[primary] ||= error.equal?(primary)
-        seen[primary] && !error.equal?(primary)
+        primary && seen[primary] && !error.equal?(primary)
       end
     end
 
+    # One primary per line that loads a package or class, and the first one
+    # wherever it is; later undefined primitives in the body are the same
+    # fault, the package's commands used (chickenize, TeX.SE 675705).
+    def engine_primary_places(primaries)
+      lines = LaTeXUtils.safe_read(@filename).lines
+      places = {}
+      primaries.each do |error, engine|
+        next if places.key?(error_place(error))
+        next unless places.empty? || load_line?(lines[error[:line].to_i - 1])
+
+        places[error_place(error)] = error
+        retag_engine_primitive(error, engine)
+      end
+      places
+    end
+
+    def load_line?(text)
+      text.to_s.match?(/\\(?:usepackage|RequirePackage|documentclass|LoadClass)\b/)
+    end
+
+    # A package that refuses the engine itself (luacode, luatextra: "LuaTeX is
+    # required for this package. Aborting.") starts the same cascade (537582).
     def engine_of_primitive(error)
+      required = error[:text].to_s[/\b((?:Lua|Xe)(?:La)?TeX)(?: or (?:Lua|Xe)(?:La)?TeX)? is required\b/, 1]
+      return required if required
       return nil unless error[:catalog_id] == :undefined_control_sequence
 
       ENGINE_PRIMITIVES.find { |_, names| names.include?(error[:token].to_s) }&.first
@@ -438,11 +481,18 @@ module LaTeXDiagnostics
     def error_place(error) = [format_display_path(error[:file]), error[:line].to_i]
 
     def retag_engine_primitive(error, engine)
-      build = engine == 'LuaTeX' ? 'lualatex' : 'xelatex'
+      build = engine.start_with?('Lua') ? 'lualatex' : 'xelatex'
+      what = error[:catalog_id] == :undefined_control_sequence ? "#{error[:token]} is a #{engine} primitive: " : ''
       error[:catalog] = (error[:catalog] || {}).merge(
-        hint: "#{error[:token]} is a #{engine} primitive: a package loaded here needs #{engine} " \
-              "(build with -e #{build}), or remove that package"
+        hint: "#{what}a package or class loaded here needs #{engine} (build with -e #{build}), or remove it"
       )
+    end
+
+    # In a failed build, a box too wide inside a file of the TeX distribution
+    # is code of a package that failed to load, typeset as text (luacode
+    # under pdflatex, TeX.SE 537582); the author cannot fix it there.
+    def distribution_box_alert?(alert)
+      alert[:file].to_s.include?('/texmf-dist/') && alert[:text].to_s.match?(/too wide|too narrow|Overfull|Underfull/i)
     end
 
     # A group note TeX gives for a package file names a line of that file;
@@ -638,6 +688,7 @@ module LaTeXDiagnostics
       compiler_errors = suppress_runaway_group_notes(compiler_errors)
       retag_verbatim_runaways(compiler_errors)
       retag_bracket_runaways(compiler_errors)
+      retag_at_sign_splits(compiler_errors)
       compiler_errors = fold_engine_primitive_cascades(compiler_errors)
       compiler_errors = suppress_foreign_group_notes(compiler_errors)
       compiler_errors = suppress_ampersand_cascades(compiler_errors)
@@ -645,6 +696,7 @@ module LaTeXDiagnostics
       compiler_errors = suppress_unlocated_dropped_text(compiler_errors, brace_errors)
       errors = place_merged_brace_errors(prepare_error_items(compiler_errors), brace_errors)
       alerts, warnings, whatevers = partition_diagnostics(content, extract_warnings(content, verbose: false))
+      alerts = alerts.reject { |alert| distribution_box_alert?(alert) }
       Leeni::DiagnosticAnalysis.new(errors: errors, alerts: alerts, warnings: warnings, whatevers: whatevers,
                                     error_count: errors.size, brace_errors: brace_errors)
     end

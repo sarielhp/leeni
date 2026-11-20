@@ -1,0 +1,23 @@
+{
+  "engine": "xelatex",
+  "diagnostics": [
+    {
+      "file": "example.tex",
+      "line": 5,
+      "tier": "errors",
+      "category": "control_sequence_already_defined"
+    },
+    {
+      "file": "example.tex",
+      "line": 5,
+      "tier": "errors",
+      "category": "control_sequence_already_defined"
+    },
+    {
+      "file": "example.tex",
+      "line": 5,
+      "tier": "errors",
+      "category": "control_sequence_already_defined"
+    }
+  ]
+}

@@ -99,7 +99,7 @@ module LaTeXLogPromoter
   # with the file that lost the glyph.
   def self.rewrite_missing_character(match, state)
     key = [match[:glyph], match[:font]]
-    return '' if state[:seen][key]
+    return '' if state[:seen][key] || space_glyph?(match[:glyph])
 
     state[:seen][key] = true
     count = state[:counts][key]
@@ -107,6 +107,12 @@ module LaTeXLogPromoter
     text = error("Missing character: there is no #{visible_glyph(match[:glyph])} in font #{font_name(match[:font])}, " \
                  "so the glyph was dropped from the PDF#{times}", note: false)
     match[:at] ? text.sub(/\A! /, match[:at]) : text
+  end
+
+  # A font without a space glyph (an initials or symbol font that fontspec
+  # sets up, TeX.SE 499206) loses nothing visible: TeX makes spaces as glue.
+  def self.space_glyph?(glyph)
+    glyph.to_s.match?(/\A\s*(?:\(U\+0020\)|\("20\))?\s*\z/)
   end
 
   # A zero-width or control character would vanish from the message too; name

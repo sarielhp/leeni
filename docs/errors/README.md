@@ -25,7 +25,7 @@ Errors during compilation originate in one of three layers:
 
 ---
 
-## 3. Master Error Index (63 Errors)
+## 3. Master Error Index (65 Errors)
 
 | # | Error Message / Pattern | Layer | Cause & Summary | Support | Reproducer & Details |
 |---|:--- |:--- |:--- |:--- |:--- |
@@ -92,6 +92,8 @@ Errors during compilation originate in one of three layers:
 | **61** | `xdvipdfmx:fatal: Image inclusion failed for "x.pdf" (page=N).` | Driver (XeTeX) | `\includegraphics[page=N]` past the last page; printed only to the terminal, and a long document is killed by SIGPIPE with cut-off `.aux` files. `leeni` promotes it to an error at the `\includegraphics` and discards the cut-off files. | **Catalog Hint** | [`61_pdf_driver_image_failed`](61_pdf_driver_image_failed/) |
 | **62** | `xdvipdfmx:fatal: ...` | Driver (XeTeX) | Any other fatal driver error; terminal-only, no PDF written. `leeni` promotes it to an error. | **Catalog Hint** | [`62_pdf_driver_fatal`](62_pdf_driver_fatal/) |
 | **63** | `I couldn't open database file ...` | BibTeX / Biber | A database named by `\bibliography` or `\addbibresource` cannot be read; TeX reports nothing. `leeni` reports an error at that line. | **Standard** | [`63_bibliography_database_missing`](63_bibliography_database_missing/) |
+| **64** | `LaTeX Error: File '....cls' not found` | LaTeX Kernel | `\documentclass` names a class that is not installed (a journal class missing from the sources). `leeni` reports it at the `\documentclass` line. | **Standard** | [`64_class_not_found`](64_class_not_found/) |
+| **65** | `I found no \bibstyle command` | BibTeX | No active `\bibliographystyle` (or no `\bibliography`): BibTeX writes no bibliography; TeX reports nothing. `leeni` reports an error at the `\bibliography` line. | **Standard** | [`65_bibliography_style_missing`](65_bibliography_style_missing/) |
 
 ---
 
@@ -109,5 +111,17 @@ The corpus runs in the medium test tier (`test/test_error_corpus.rb`, also `tool
 # Run the corpus expectations
 tools/test_error_corpus
 # Draft expected.json for a new case (check every location by hand before saving)
-tools/test_error_corpus --draft docs/errors/63_new_case
+tools/test_error_corpus --draft docs/errors/66_new_case
 ```
+
+### Comparing Real Papers with latexmk
+The corpus above tests known faults. `tools/compare_corpus` looks for unknown ones: it builds real papers with leeni and with `latexmk -norc` (same engine, `-f`, each in a scratch copy with its own cache) and flags each paper where they disagree: an error TeX reported and leeni did not (`missed_error`), a build leeni failed that latexmk finished (`stricter`), a different page count, PDF text agreeing less than 99%, or more unresolved `??` than the reference. Papers stay outside the repository; keep the summaries outside it too, since they name the papers.
+
+```bash
+# arXiv samples from tools/sample_arxiv, or directories with entry.json and paper/
+tools/compare_corpus -j 4 -o /tmp/arxiv-summary.json examples/arxiv
+# After a change: list flags gained or lost against the earlier summary (exit 1 on gains)
+tools/compare_corpus -j 4 -b /tmp/arxiv-summary.json -o /tmp/arxiv-new.json examples/arxiv
+```
+
+`stricter` is expected where leeni deliberately makes an error of what TeX only logs (a missing glyph, a duplicate label); read those before treating them as bugs.

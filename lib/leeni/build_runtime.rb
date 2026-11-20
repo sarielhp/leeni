@@ -147,6 +147,18 @@ module LatexBuildRuntime
     target_subdirs.each { |subdir| FileUtils.mkdir_p(File.join(dir, subdir), mode: 0o700) }
     mirror_project_subdirs_to_junk if @options && @options[:auto_mirror_subdirs] == true
     remove_stale_style_copies(dir)
+    seed_main_aux(dir)
+  end
+
+  # A preamble that does \let\@input\input turns LaTeX's quiet "No file x.aux"
+  # into "File `x.aux' not found" and an emergency stop, so a fresh build of
+  # such a document never gets past its first pass. latexmk avoids this by
+  # writing an empty .aux first; so does leeni. TeX overwrites it on the pass.
+  def seed_main_aux(dir)
+    return unless @bfilename
+
+    aux = File.join(dir, "#{@bfilename}.aux")
+    File.write(aux, "\\relax \n") unless File.exist?(aux)
   end
 
   # Older builds copied styles/, .bst and .bib files here for BibTeX. TeX

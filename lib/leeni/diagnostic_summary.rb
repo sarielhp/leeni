@@ -313,8 +313,7 @@ module LaTeXDiagnostics
       presenter.render_result(result, io: io)
     end
 
-    BIBLIOGRAPHY_FAILED_HINT = 'The bibliography tool stopped; fix the database it names, or the name given to ' \
-                               '\bibliography or \addbibresource'
+    BIBLIOGRAPHY_FAILED_HINT = 'The bibliography tool stopped without writing a bibliography; fix what its message names'
 
     # A fatal bibliography run ends the build with no failed LaTeX pass to read,
     # and printed only a line of text: -cc and -llm had no file:line: error and
@@ -323,9 +322,7 @@ module LaTeXDiagnostics
     def report_bibliography_failure(detail)
       return unless compile_mode?
 
-      match = detail.match(LaTeXBibManager::MISSING_DATABASE)
-      database = (match ? match.captures.compact.first : '').to_s.sub(/[.,;:]+\z/, '')
-      file, line = (locate_missing_resource_request(database) unless database.empty?) || [@filename, 0]
+      file, line = locate_bibliography_failure(detail) || [@filename, 0]
       text = "Bibliography run failed: #{detail.empty? ? 'see the bibliography log' : detail}"
       item = { file: file, line: line, line_str: line.positive? ? line.to_s : '', text: text, err_block: [text],
                category: :bibliography_failed, catalog: { hint: BIBLIOGRAPHY_FAILED_HINT },
@@ -333,6 +330,22 @@ module LaTeXDiagnostics
       analysis = Leeni::DiagnosticAnalysis.new(errors: [item], alerts: [], warnings: [], whatevers: [],
                                                error_count: 1, brace_errors: [])
       report_compile_mode_errors(analysis, '', io: $stderr)
+    end
+
+    # The line naming the database BibTeX could not open, or the \bibliography
+    # line when the style is what is missing.
+    def locate_bibliography_failure(detail)
+      match = detail.match(LaTeXBibManager::MISSING_DATABASE)
+      database = (match ? match.captures.compact.first : '').to_s.sub(/[.,;:]+\z/, '')
+      return locate_missing_resource_request(database) unless database.empty?
+      return unless detail.match?(/no \\bibstyle command/)
+
+      collect_source_candidates.each do |source|
+        LaTeXUtils.safe_read(source).each_line.with_index(1) do |text, line_no|
+          return [source, line_no] if LaTeXUtils.strip_latex_comments(text).match?(/\\bibliography\s*\{/)
+        end
+      end
+      nil
     end
 
     def report_errors(loga, io: $stderr)

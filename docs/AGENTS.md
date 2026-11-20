@@ -45,6 +45,7 @@ This document provides architectural guidelines, core invariants, development wo
   - [`tools/bump`](tools/bump): Increments the version, runs the full gate on that version, commits, and atomically publishes the branch and tag.
   - [`tools/release`](tools/release): Commits checked changes, runs `tools/bump`, and installs after publication unless `--no-install`; steps already done are skipped.
   - [`tools/test_error_corpus`](tools/test_error_corpus): Runs the error-corpus expectations (`docs/errors/*/expected.json`, also in the medium test tier); `--draft` prints the current diagnostics of a new case.
+  - [`tools/compare_corpus`](tools/compare_corpus): Builds real papers (arXiv samples, or entry.json + paper/ directories) with leeni and with latexmk and flags disagreements (missed errors, stricter failures, page count, PDF text, unresolved references); `-b` compares with an earlier summary.
 - **Automated Test Suite** (`test/`):
   - `test/test_*.rb`: Fast regression and end-to-end tests using `minitest`.
   - `test/fixups/`: ArXiv test repair records and schema.

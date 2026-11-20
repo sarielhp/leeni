@@ -1,0 +1,11 @@
+% Some preambles replace LaTeX's \@input with the primitive \input, so
+% \begin{document} stops with "File `main.aux' not found" on a fresh build
+% unless an .aux exists before the first pass (latexmk writes an empty one).
+\documentclass{article}
+\makeatletter
+\let\@input\input
+\makeatother
+\begin{document}
+\section{Intro}\label{sec:intro}
+Section~\ref{sec:intro} builds on a fresh checkout.
+\end{document}

@@ -598,7 +598,7 @@ module LaTeXDiagnostics
       return nil if stem.empty?
 
       pattern = /
-        \\(?:input|include|usepackage|RequirePackage|includegraphics|bibliography|addbibresource)\s*
+        \\(?:input|include|documentclass|LoadClass|usepackage|RequirePackage|includegraphics|bibliography|addbibresource)\s*
         (?:\[[^\]]*\])?\s*\{[^}]*#{Regexp.escape(stem)}[^}]*\}
       /x
       collect_source_candidates.each do |file|

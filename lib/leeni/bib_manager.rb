@@ -206,12 +206,25 @@ class LaTeXBibManager
   def bibliography_failure_detail(output)
     # BibTeX reports every database fault as "<message>---line N of file F".
     detail = output.to_s.each_line.find do |line|
-      line.match?(/I couldn't open database file|(?:ERROR|FATAL)\s+-|---line \d+ of file/i)
+      line.match?(/I couldn't open database file|(?:ERROR|FATAL)\s+-|---line \d+ of file|#{MISSING_AUX_COMMAND}/i)
     end
     return '' unless detail
 
     detail = biber_source_path(output, detail)
-    " #{detail.strip}.#{missing_database_hint(detail)}#{LatexBibChecks.percent_hint(detail)}"
+    " #{detail.strip}.#{missing_database_hint(detail)}#{missing_aux_command_hint(detail)}#{LatexBibChecks.percent_hint(detail)}"
+  end
+
+  # BibTeX stops when the .aux lacks the style or the database list, e.g.
+  # "I found no \bibstyle command---while reading file paper.aux" when every
+  # \bibliographystyle is commented out.
+  MISSING_AUX_COMMAND = /I found no \\(bibstyle|bibdata) command/
+  AUX_COMMAND_HINTS = {
+    'bibstyle' => ' Add \bibliographystyle{plain} (or the style the venue asks for) before \bibliography.',
+    'bibdata' => ' Add \bibliography{name}, naming your .bib file, where the bibliography should appear.'
+  }.freeze
+
+  def missing_aux_command_hint(detail)
+    AUX_COMMAND_HINTS.fetch(detail[MISSING_AUX_COMMAND, 1], '')
   end
 
   MISSING_DATABASE = /I couldn't open database file (\S+)|Cannot find (?:file )?'([^']+)'/i

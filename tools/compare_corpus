@@ -1,0 +1,259 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Differential test of leeni on real papers. Each paper is built twice from a
+# fresh copy: by leeni (--json) and, as the reference, by latexmk with the
+# engine leeni chose. The outcomes are compared: does leeni report an error
+# when TeX did, does it fail a build TeX finished, and do the two PDFs agree
+# in page count, text and unresolved references. The corpus stays outside the
+# repository; only this tool is versioned.
+require 'json'
+require 'open3'
+require 'fileutils'
+require 'optparse'
+require_relative 'settings'
+require_relative '../lib/leeni/tmp_space'
+
+ProjectTmp.project = ToolSettings::PROJECT_NAME
+load File.expand_path('test_arxiv', __dir__) unless defined?(ArxivPaperTest)
+
+module CorpusCompare
+  ROOT = File.expand_path('..', __dir__)
+  LEENI = File.join(ROOT, 'leeni')
+  LATEXMK_ENGINE = { 'xelatex' => '-xelatex', 'lualatex' => '-lualatex', 'pdflatex' => '-pdf' }.freeze
+  TEX_ERROR_LINE = /^(?:! |[^\s:]+:\d+: (?!warning)(?!LaTeX Warning)(?!Package \S+ Warning))/
+  UNRESOLVED = /\?\?|\[\?\]/
+  TEXT_AGREEMENT = 0.99
+
+  HELP = <<~TEXT.freeze
+    Usage: tools/compare_corpus [options] CORPUS_DIR...
+
+    Build every paper of each CORPUS_DIR with leeni and with latexmk (same
+    engine) and report where they disagree. A paper is a directory holding
+    either entry.json ({"main": "paper.tex"}) and paper/, or an arXiv sample
+    from tools/sample_arxiv (metadata.json and source.*).
+
+    Flags per paper:
+      missed_error   TeX reported an error, leeni reported none
+      stricter       leeni failed a build latexmk finished without errors
+      pages          the PDFs differ in page count
+      text           the PDFs' words agree less than #{(TEXT_AGREEMENT * 100).round}%
+      unresolved     leeni's PDF has more ?? / [?] than the reference
+      leeni_timeout, reference_timeout, no_reference_pdf
+
+    Options:
+      -j, --jobs N         papers built in parallel (default 3)
+      -t, --timeout SEC    per build (default 600)
+      -o, --output FILE    summary JSON (default: CORPUS_DIR/compare-summary.json)
+      -b, --baseline FILE  earlier summary; list flags gained and lost, exit 1 on gains
+          --only NAME      build only the paper NAME (repeatable)
+      -h, --help           show this help; nothing is run
+  TEXT
+
+  def self.parse(argv)
+    opts = { jobs: 3, timeout: 600, only: [] }
+    OptionParser.new do |o|
+      o.on('-j', '--jobs N', Integer) { |v| opts[:jobs] = v }
+      o.on('-t', '--timeout SEC', Integer) { |v| opts[:timeout] = v }
+      o.on('-o', '--output FILE') { |v| opts[:output] = File.expand_path(v) }
+      o.on('-b', '--baseline FILE') { |v| opts[:baseline] = File.expand_path(v) }
+      o.on('--only NAME') { |v| opts[:only] << v }
+      o.on('-h', '--help') { puts HELP; exit } # rubocop:disable Style/Semicolon
+    end.parse!(argv)
+    abort HELP if argv.empty?
+    opts.merge(corpora: argv.map { |dir| File.expand_path(dir) })
+  end
+
+  def self.entries(corpora, only)
+    dirs = corpora.flat_map { |corpus| Dir.children(corpus).sort.map { |name| File.join(corpus, name) } }
+    dirs.select do |dir|
+      paper = File.file?(File.join(dir, 'entry.json')) || File.file?(File.join(dir, 'metadata.json'))
+      paper && (only.empty? || only.include?(File.basename(dir)))
+    end
+  end
+
+  # Copies (or unpacks) the paper into dest; returns the main file relative to it.
+  def self.prepare(entry, dest)
+    FileUtils.mkdir_p(dest)
+    spec = File.join(entry, 'entry.json')
+    if File.file?(spec)
+      FileUtils.cp_r(File.join(entry, 'paper', '.'), dest)
+      return JSON.parse(File.read(spec)).fetch('main')
+    end
+
+    meta = JSON.parse(File.read(File.join(entry, 'metadata.json')))
+    bytes = File.binread(File.join(entry, meta.fetch('source_filename')))
+    ArxivPaperTest.extract(bytes, dest, nil)
+  end
+
+  # Runs cmd in its own process group; kills the group after timeout seconds.
+  def self.run(cmd, chdir:, timeout:, env: {})
+    started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+    Open3.popen2e(env, *cmd, chdir: chdir, pgroup: true) do |stdin, out, wait|
+      stdin.close
+      reader = Thread.new { out.read }
+      timed_out = wait.join(timeout).nil?
+      Process.kill('KILL', -wait.pid) if timed_out
+      status = wait.value
+      { output: reader.value.to_s, status: timed_out ? nil : status.exitstatus, timed_out: timed_out,
+        elapsed: (Process.clock_gettime(Process::CLOCK_MONOTONIC) - started).round(1) }
+    end
+  rescue Errno::ESRCH
+    { output: '', status: nil, timed_out: true, elapsed: timeout }
+  end
+
+  def self.pdf_facts(pdf)
+    return nil unless File.file?(pdf)
+
+    info, = Open3.capture2('pdfinfo', pdf)
+    text, = Open3.capture2('pdftotext', '-q', pdf, '-')
+    text = text.scrub
+    { pages: info[/^Pages:\s+(\d+)/, 1].to_i, unresolved: text.scan(UNRESOLVED).size,
+      words: text.downcase.scan(/[[:alnum:]]+/).tally }
+  end
+
+  def self.word_agreement(left, right)
+    total = [left.values.sum, right.values.sum].max
+    return 1.0 if total.zero?
+
+    (left.sum { |word, count| [count, right.fetch(word, 0)].min }.to_f / total).round(4)
+  end
+
+  def self.tex_errors(log_path)
+    return [] unless File.file?(log_path)
+
+    File.read(log_path, mode: 'rb').scrub.each_line.grep(TEX_ERROR_LINE).map { |line| line.strip[0, 160] }
+  end
+
+  def self.leeni_build(dir, main, opts, cache)
+    env = { 'XDG_CACHE_HOME' => cache }
+    run = run([LEENI, '--no-lock', '--json', main], chdir: dir, timeout: opts[:timeout], env: env)
+    data = begin
+      JSON.parse(run[:output][/\{.*\}/m].to_s)
+    rescue JSON::ParserError
+      {}
+    end
+    errors = Array(data['diagnostics']).select { |d| d['tier'] == 'errors' }
+    { exit: run[:status], timed_out: run[:timed_out], elapsed: run[:elapsed], engine: data.dig('build', 'engine'),
+      summary: data['summary'], error_categories: errors.map { |d| d['category'] }.tally,
+      first_errors: errors.first(3).map { |d| "#{d['file']}:#{d['line']}: #{d['category']}" },
+      pdf: pdf_facts(File.join(dir, main.sub(/\.tex\z/i, '.pdf'))) }
+  end
+
+  def self.reference_build(dir, main, engine, opts)
+    flag = LATEXMK_ENGINE.fetch(engine.to_s, '-pdf')
+    # -norc: a personal latexmkrc (output directory, locks) must not shape the reference.
+    run = run(['latexmk', '-norc', flag, '-f', '-interaction=nonstopmode', '-file-line-error', main],
+              chdir: dir, timeout: opts[:timeout])
+    base = main.sub(/\.tex\z/i, '')
+    { exit: run[:status], timed_out: run[:timed_out], elapsed: run[:elapsed],
+      errors: tex_errors(File.join(dir, "#{base}.log")), pdf: pdf_facts(File.join(dir, "#{base}.pdf")) }
+  end
+
+  def self.flags(leeni, ref)
+    return ['leeni_timeout'] if leeni[:timed_out]
+    return ['reference_timeout'] if ref[:timed_out]
+
+    leeni_errors = leeni.dig(:summary, 'errors').to_i
+    out = []
+    out << 'missed_error' if ref[:errors].any? && leeni_errors.zero? && leeni[:exit].to_i.zero?
+    out << 'stricter' if ref[:errors].empty? && ref[:pdf] && !leeni[:exit].to_i.zero?
+    out << 'no_reference_pdf' unless ref[:pdf]
+    out.concat(pdf_flags(leeni[:pdf], ref[:pdf])) if leeni[:pdf] && ref[:pdf]
+    out
+  end
+
+  def self.pdf_flags(mine, theirs)
+    out = []
+    out << 'pages' if mine[:pages] != theirs[:pages]
+    out << 'text' if word_agreement(mine[:words], theirs[:words]) < TEXT_AGREEMENT
+    out << 'unresolved' if mine[:unresolved] > theirs[:unresolved]
+    out
+  end
+
+  def self.compare_entry(entry, opts)
+    ProjectTmp.mktmpdir('corpus-compare') do |tmp|
+      mine = File.join(tmp, 'leeni')
+      main = prepare(entry, mine)
+      theirs = File.join(tmp, 'reference')
+      prepare(entry, theirs)
+      leeni = leeni_build(File.dirname(File.join(mine, main)), File.basename(main), opts, File.join(tmp, 'cache'))
+      ref = reference_build(File.dirname(File.join(theirs, main)), File.basename(main), leeni[:engine], opts)
+      summarize(entry, leeni, ref)
+    end
+  rescue StandardError => e
+    { 'name' => File.basename(entry), 'flags' => ['harness_error'], 'error' => "#{e.class}: #{e.message}" }
+  end
+
+  def self.summarize(entry, leeni, ref)
+    agreement = leeni[:pdf] && ref[:pdf] ? word_agreement(leeni[:pdf][:words], ref[:pdf][:words]) : nil
+    strip = ->(pdf) { pdf&.except(:words) }
+    { 'name' => File.basename(entry), 'corpus' => File.basename(File.dirname(entry)), 'flags' => flags(leeni, ref),
+      'text_agreement' => agreement,
+      'leeni' => JSON.parse(JSON.generate(leeni.merge(pdf: strip.call(leeni[:pdf])))),
+      'reference' => JSON.parse(JSON.generate(ref.merge(errors: ref[:errors].first(3), error_count: ref[:errors].size,
+                                                        pdf: strip.call(ref[:pdf])))) }
+  end
+
+  def self.compare_all(entries, opts)
+    queue = Queue.new
+    entries.each { |entry| queue << entry }
+    results = []
+    lock = Mutex.new
+    Array.new([opts[:jobs], entries.size].min) do
+      Thread.new do
+        while (entry = next_entry(queue))
+          result = compare_entry(entry, opts)
+          lock.synchronize do
+            results << result
+            print_row(result)
+          end
+        end
+      end
+    end.each(&:join)
+    results.sort_by { |r| [r['corpus'].to_s, r['name']] }
+  end
+
+  def self.next_entry(queue)
+    queue.pop(true)
+  rescue ThreadError
+    nil
+  end
+
+  def self.print_row(result)
+    leeni = result['leeni'] || {}
+    ref = result['reference'] || {}
+    pages = [leeni.dig('pdf', 'pages'), ref.dig('pdf', 'pages')].map { |p| p || '-' }.join('/')
+    puts format('%-18<name>s %-8<engine>s errs %3<le>s/%-3<re>s pages %-9<pages>s text %-6<text>s %<flags>s',
+                name: result['name'], engine: leeni['engine'] || '-', le: leeni.dig('summary', 'errors') || '-',
+                re: ref['error_count'] || '-', pages: pages, text: result['text_agreement'] || '-',
+                flags: result['flags'].join(' '))
+  end
+
+  def self.report_baseline(results, baseline_path)
+    old = JSON.parse(File.read(baseline_path)).to_h { |r| [r['name'], r['flags']] }
+    gained = results.flat_map { |r| (r['flags'] - old.fetch(r['name'], [])).map { |f| "#{r['name']}: +#{f}" } }
+    lost = results.flat_map { |r| (old.fetch(r['name'], []) - r['flags']).map { |f| "#{r['name']}: -#{f}" } }
+    puts "\nAgainst #{baseline_path}:", *(gained + lost)
+    puts '  no change' if gained.empty? && lost.empty?
+    gained.empty?
+  end
+
+  def self.main(argv)
+    opts = parse(argv)
+    entries = entries(opts[:corpora], opts[:only])
+    abort 'compare_corpus: no papers found' if entries.empty?
+
+    results = compare_all(entries, opts)
+    output = opts[:output] || File.join(opts[:corpora].first, 'compare-summary.json')
+    File.write(output, JSON.pretty_generate(results) + "\n")
+    counts = results.flat_map { |r| r['flags'] }.tally
+    puts "\n#{results.size} papers; flags: #{counts.empty? ? 'none' : counts.map { |f, n| "#{f}=#{n}" }.join(' ')}"
+    puts "Summary: #{output}"
+    return 0 unless opts[:baseline]
+
+    report_baseline(results, opts[:baseline]) ? 0 : 1
+  end
+end
+
+exit CorpusCompare.main(ARGV) if __FILE__ == $PROGRAM_NAME

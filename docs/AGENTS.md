@@ -2,6 +2,9 @@
 
 This document provides architectural guidelines, core invariants, development workflows, and acceleration instructions for AI agents and maintainers working in the [`leeni`](leeni) repository.
 
+> [!NOTE]
+> **Work in progress**: the diagnostic-correctness work (real-world corpora, `tools/texse_corpus`, `tools/fault_corpus`) has a handoff document, [`docs/handoff.md`](handoff.md), with its state, open items and how to resume. Read it before continuing that work, and update it when you stop.
+
 ---
 
 ## 1. Core Architecture & Repository Layout

@@ -7,7 +7,7 @@
 # ==============================================================================
 
 module Leeni
-  VERSION = '1.0.100'
+  VERSION = '1.0.101'
   EXECUTABLE = File.expand_path('../../leeni', __dir__).freeze
 end
 

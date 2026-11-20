@@ -294,7 +294,10 @@ module LaTeXDiagnostics
         joined, starts = joined_source(file)
         probes.uniq.each do |probe|
           # Not inside a command name: TeX may drop a command's name as text.
-          at = !probe.empty? && joined.index(/(?<!\\)#{Regexp.escape(probe)}/)
+          # A number is not part of a longer one: pgfplots printing 0.00 is
+          # not the 000.00 of a data row (TeX.SE 227793).
+          before = probe.match?(/\A\d/) ? '(?<![\\\\\d])' : '(?<!\\\\)'
+          at = !probe.empty? && joined.index(/#{before}#{Regexp.escape(probe)}/)
           return [file, starts.rindex { |offset| offset <= at } + 1] if at
         end
       end

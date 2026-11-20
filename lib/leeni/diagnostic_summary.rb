@@ -262,9 +262,10 @@ module LaTeXDiagnostics
     # Dropped text that is nowhere in the source (a command's name, printed
     # while TeX recovers from another error) is a symptom of that error, not
     # text the author wrote; it is reported only when nothing else is.
-    def suppress_unlocated_dropped_text(errors)
+    # A brace error (an unclosed table { in pgfplots) counts as something else.
+    def suppress_unlocated_dropped_text(errors, brace_errors = [])
       unlocated = errors.select { |error| error[:catalog_id] == :dropped_text && error[:line].to_i <= 0 }
-      unlocated.size == errors.size ? errors : errors - unlocated
+      unlocated.size == errors.size && brace_errors.empty? ? errors : errors - unlocated
     end
 
     # One # in a frame body is reported for each macro that reads it
@@ -284,6 +285,8 @@ module LaTeXDiagnostics
       case error[:catalog_id]
       when :illegal_parameter_number then [format_display_path(error[:file]), error[:line]]
       when :unknown_package_option then error[:text].to_s[/Unknown option .*/]
+      # siunitx repeats its refusal at \begin{document}.
+      when :siunitx_incompatible_package then error[:text].to_s[/Package [`'][^']+' incompatible/]
       end
     end
 
@@ -304,7 +307,8 @@ module LaTeXDiagnostics
 
     # An error whose recovery TeX reports as more errors on the same line: an
     # improper \hyphenation, a TikZ picture whose external build failed.
-    SAME_LINE_CASCADE_PRIMARIES = %i[improper_hyphenation tikz_external_failed].freeze
+    # siunitx next to units: \unit is reported as already defined there.
+    SAME_LINE_CASCADE_PRIMARIES = %i[improper_hyphenation tikz_external_failed siunitx_incompatible_package].freeze
 
     def suppress_hyphenation_cascades(errors)
       primary = errors.find { |error| SAME_LINE_CASCADE_PRIMARIES.include?(error[:catalog_id]) }
@@ -315,6 +319,21 @@ module LaTeXDiagnostics
         next false if error.equal?(primary)
 
         [format_display_path(error[:file]), error[:line]] == place || external_cascade?(primary, error)
+      end
+    end
+
+    # fontenc without the encoding's file (T5 without vntex): LaTeX then
+    # reports "Encoding scheme `T5' unknown" at the \usepackage and at every
+    # later font change; all of it is the one missing file.
+    def suppress_missing_encoding_cascades(errors)
+      missing = errors.filter_map do |error|
+        error[:catalog_id] == :file_not_found && error[:text].to_s[/[`'](\w+)enc\.def' not found/, 1]&.upcase
+      end
+      return errors if missing.empty?
+
+      errors.reject do |error|
+        enc = error[:text].to_s[/Encoding scheme [`'](\w+)' unknown/, 1]
+        enc && missing.include?(enc.upcase)
       end
     end
 
@@ -482,9 +501,10 @@ module LaTeXDiagnostics
       compiler_errors = suppress_compiler_brace_cascades(compiler_errors, brace_errors)
       compiler_errors = suppress_environment_mismatch_cascades(compiler_errors)
       compiler_errors = suppress_hyphenation_cascades(compiler_errors)
+      compiler_errors = suppress_missing_encoding_cascades(compiler_errors)
       compiler_errors = suppress_ampersand_cascades(compiler_errors)
       compiler_errors = merge_repeated_faults(compiler_errors)
-      compiler_errors = suppress_unlocated_dropped_text(compiler_errors)
+      compiler_errors = suppress_unlocated_dropped_text(compiler_errors, brace_errors)
       errors = place_merged_brace_errors(prepare_error_items(compiler_errors), brace_errors)
       alerts, warnings, whatevers = partition_diagnostics(content, extract_warnings(content, verbose: false))
       Leeni::DiagnosticAnalysis.new(errors: errors, alerts: alerts, warnings: warnings, whatevers: whatevers,

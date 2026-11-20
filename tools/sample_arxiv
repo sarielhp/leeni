@@ -9,7 +9,12 @@ require 'fileutils'
 require 'json'
 require 'net/http'
 require 'optparse'
+# The system rexml 3.2.5 warns under -w (an unused variable in source.rb);
+# the warning is not this script's, and the test runner fails on warnings.
+verbose = $VERBOSE
+$VERBOSE = nil
 require 'rexml/document'
+$VERBOSE = verbose
 require 'rubygems/package'
 require 'stringio'
 require 'tmpdir'

@@ -1,6 +1,6 @@
 # Handoff: Diagnostic Oracles and Real-World Corpora
 
-Last updated 2026-11-19. Read this before resuming work on leeni's diagnostics
+Last updated 2026-11-20. Read this before resuming work on leeni's diagnostics
 or its test corpora.
 
 ## Goal
@@ -15,10 +15,13 @@ judged against TeX.
 
 - Released: 1.0.102, which includes all the TeX.SE work through batch 10
   (branch `texse-tool` merged into master). Installed locally.
-- The run was stopped by request after batch 11. Batch 11's flags are **not
-  reviewed yet** (see below).
-- The fetched TeX.SE questions are used up: every downloaded document that
-  still fails has been in a batch. The next batch needs a new `fetch`.
+- Batches 11 and 12 are reviewed and fixed (after 1.0.102; error corpus cases
+  81–83). The full regression over all 490 documents run so far is the new
+  `datasets/texse/regression-baseline.json`.
+- 2026-11-20: questions fetched for `siunitx`, `pgfplots`, `math-mode`,
+  `graphics`, `floats`, `fonts`, `xetex`, `luatex`, `babel`, `listings`,
+  `amsmath` ("error" in the title, pages 1–2), so many failing documents are
+  still unrun: continue with `prepare` and `run`, no fetch needed yet.
 
 ## Corpora (all in `datasets/`, ignored by git)
 
@@ -45,7 +48,8 @@ each was built and what each batch found. Questions fetched so far: tag
 | 8 | tikz-pgf, tables, hyperref | 2 |
 | 9 | same | 1 |
 | 10 | same | 2 |
-| 11 | 28 leftovers | not reviewed |
+| 11 | 28 leftovers | 2 (fontenc encoding cascade, memoize hint) |
+| 12 | siunitx, pgfplots, math-mode | 3 (siunitx with units, number inside a longer number, dropped text beside a brace error) |
 
 The rate is not clearly falling; what changes is the kind of bug. Early
 batches found faults hitting many documents (locations inside packages and
@@ -56,20 +60,18 @@ TeX's line is not useful (at `\end{frame}`, inside a `.sty`). New tags bring
 new packages and so new bugs; a clean batch is likelier once tags repeat
 packages already covered.
 
-## Batch 11: flags to review
+## Working method (2026-11-20)
 
-- 644444: undefined control sequence at line 11 (a `\newcolumntype` using
-  `\currentprecision`) where TeX reports line 17 (the table row); probably
-  right, check what is undefined. Its second error is siunitx's
-  `Illegal parameter number in definition of \l__siunitx_table_collect_tl`.
-- 654633: `[T5]{fontenc}` without the Vietnamese fonts: file_not_found at the
-  `\usepackage` line, plus "Encoding scheme T5 unknown" on the same line, which
-  could be folded into it.
-- 749679: memoize's "No suitable Perl module for PDF processing": `generic`, no
-  hint (install PDF::API2 or use memoize's python extraction); second error at
-  line 570.
-- 751123: undefined `\TTTa` at line 9 vs TeX's 14 (the use of a macro defined
-  at 9); probably right.
+- The machine has 20 cores: run corpus jobs with `-j 14` (full regression
+  about 12 minutes); more risks timeouts that show up as false flags.
+- Mechanical work goes to opencode with the Lumen DeepSeek model:
+  `opencode run -m litellm/lumen/deepseek-v4.1-flash-1017 "<task>"`, given a
+  precise task file (what changed, exact files, tests to run, no lib/ or tools/
+  edits, no commits). It wrote error corpus cases 81–83, the index counts and
+  the regression tests well. Planned next: one opencode agent per flagged
+  document to triage (reproduce, read both lines, propose a verdict and a
+  minimal reproducer) in parallel; verdicts and lib/ changes stay with the
+  main agent.
 
 ## Resuming
 
@@ -84,12 +86,12 @@ tools/texse_corpus run datasets/texse          # lists documents where leeni's f
 tools/texse_corpus run -b datasets/texse/corpus/selected.json -o <scratch>/texse-all.json datasets/texse
 ```
 
-Unused tags worth trying: `graphics`, `floats`, `math-mode`, `fonts`,
-`xetex`, `luatex`, `babel`, `listings`, `siunitx`, `pgfplots`, `amsmath`.
+Tags not fetched yet: `tikz-styles`, `biber`, `fontspec`, `cross-referencing`,
+`hyperref` pages 3+, `macros`, `expl3`, `chemistry`, `algorithms`.
 
 For each flagged document, compare leeni's line with the source and TeX's line.
 A real fault gets a fix, an error corpus case (`docs/errors/NN_*`, drafted with
-`tools/test_error_corpus --draft`; the last is 80) or a test in
+`tools/test_error_corpus --draft`; the last is 83) or a test in
 `test/test_texse_regressions.rb` that fails without the fix, and the index
 count in `docs/errors/README.md` and `docs/architecture.md`. After a fix that
 touches log parsing or a locator, rerun the full regression and look at every
@@ -97,6 +99,12 @@ document whose result changed.
 
 ## Known open items
 
+- The system rexml gem (3.2.5, updated 2026-11-19) warns under `-w`;
+  `tools/sample_arxiv` silences warnings around its `require`, since the test
+  runner fails on warnings. Remove that once the gem is fixed.
+- A pgfplots boxplot of all-zero data on a log axis gives "Missing number" at
+  the plot's `};` with the generic hint (TeX.SE 227793); a hint naming log of
+  zero would help.
 - Load-sensitive tests fail now and then in the gate and pass alone:
   `test_relatex_synctex.rb` (`test_next_build_stops_previous_run`) and
   `test_engine_killed_by_sigpipe_leaves_no_cut_off_aux_behind`

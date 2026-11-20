@@ -1,0 +1,11 @@
+{
+  "engine": "pdflatex",
+  "diagnostics": [
+    {
+      "file": "example.tex",
+      "line": 3,
+      "tier": "errors",
+      "category": "memoize_no_perl_pdf_module"
+    }
+  ]
+}

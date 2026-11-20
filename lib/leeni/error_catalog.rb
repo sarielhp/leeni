@@ -608,11 +608,23 @@ module LaTeXErrorCatalog
   # diagnostics run in the document directory, where TeX resolves the name).
   def self.file_not_found_hint(tok)
     return 'File not found; check file path or spelling' unless tok
+    return font_encoding_hint(tok) if tok.match?(FONT_ENCODING_FILE)
 
     found = LeeniKeySuggester.suggest_file(tok)
     return "File '#{tok}' not found; check file path or spelling" if found.empty?
 
     "Did you mean #{found.map { |path| "'#{path}'" }.join(' or ')}? File '#{tok}' not found"
+  end
+
+  # fontenc's file for an encoding: t5enc.def for T5.
+  FONT_ENCODING_FILE = /\A([a-z0-9]+)enc\.def\z/i
+
+  # A missing <enc>enc.def means the font encoding is not installed (T5 needs
+  # vntex), not that a file name is misspelled.
+  def self.font_encoding_hint(tok)
+    enc = tok[FONT_ENCODING_FILE, 1].upcase
+    "Font encoding '#{enc}' is not installed; install the package that provides #{tok} " \
+      "(tlmgr search --global --file #{tok}), or remove #{enc} from \\usepackage[...]{fontenc}"
   end
 
   def self.resolve_hint(hint, token, file: nil, macro: nil, junk_dir: nil)

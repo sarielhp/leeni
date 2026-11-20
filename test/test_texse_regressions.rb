@@ -151,4 +151,97 @@ class TestTexseRegressions < Minitest::Test
     TEX
     assert_match(/\Amain\.tex:11: error: file ended while scanning .*\\addplot was never ended: it must end with ;/, errors.first.to_s)
   end
+
+  # TeX.SE 654633: a missing encoding file (T5 without vntex) makes every later
+  # "Encoding scheme unknown" from the same fault; one error, with a hint.
+  def test_missing_font_encoding_is_one_error_with_an_install_hint
+    ok, errors = build(<<~'TEX')
+      \documentclass{article}
+      \usepackage[XQ9]{fontenc}
+      \begin{document}
+      Text \textbf{bold}.
+      \end{document}
+    TEX
+    refute ok
+    assert_equal 1, errors.size
+    assert_match(/main\.tex:2: error: .*xq9enc\.def.*Font encoding 'XQ9' is not installed/, errors.first.to_s)
+  end
+
+  # TeX.SE 749679: memoize's Perl extraction without a PDF module; TeX reports
+  # it from main.mmz.log, leeni places it at the \usepackage with a hint.
+  def test_memoize_without_perl_pdf_module_gets_a_hint
+    ok, errors = build(<<~'TEX')
+      \documentclass{article}
+      \PackageError{memoize (perl-based extraction)}{No suitable Perl module for PDF processing was found, options are PDF::API2, PDF::Builder}{Have you followed the instructions is section 1.1 of the manual?}
+      \begin{document}
+      Text.
+      \end{document}
+    TEX
+    refute ok
+    assert_match(/main\.tex:2: error: .*No suitable Perl module.*PDF::API2.*extract=python/, errors.first.to_s)
+  end
+
+  # TeX.SE 37700: units and siunitx both define \unit. siunitx reports the
+  # clash, then "Command '\unit' already defined", then repeats itself at
+  # \begin{document}; one error, at the \usepackage{siunitx}, with a hint.
+  def test_siunitx_with_units_is_one_error_with_a_hint
+    ok, errors = build(<<~'TEX')
+      \documentclass{article}
+      \usepackage{units}
+      \usepackage{siunitx}
+      \begin{document}
+      \unit{m}
+      \end{document}
+    TEX
+    refute ok
+    assert_equal 1, errors.size
+    assert_match(/main\.tex:3: error: .*Package 'units' incompatible.*remove \\usepackage\{units\}/, errors.first.to_s)
+  end
+
+  # TeX.SE 227793: a pgfplots boxplot over all-zero data on a log axis prints
+  # "0.00" with no font. It starts with a digit, so it was placed inside a
+  # longer number of a data row (000.00) instead of being left unlocated.
+  def test_number_inside_a_longer_number_is_not_dropped_text
+    _, errors = build(<<~'TEX')
+      \documentclass{article}
+      \usepackage{pgfplots}
+      \usetikzlibrary{pgfplots.statistics}
+      \pgfplotsset{compat=1.9}
+      \begin{document}
+      \begin{tikzpicture}
+      \begin{axis}[boxplot/draw direction=y, ymode=log]
+      \addplot+[boxplot] table[row sep=\\,y index=0] {
+      000.00\\
+      000.00\\
+      };
+      \end{axis}
+      \end{tikzpicture}
+      \end{document}
+    TEX
+    assert(errors.none? { |e| e.include?('dropped') }, errors.join)
+    assert_match(/\Amain\.tex:11: error: missing number, treated as zero/, errors.first.to_s)
+  end
+
+  # TeX.SE 142458: an \addplot table { never closed before the next \addplot.
+  # The unclosed brace is already reported; the dropped '^^M' it leaves behind
+  # is unlocated and was reported beside it as a second error.
+  def test_unlocated_dropped_text_is_not_reported_beside_a_brace_error
+    _, errors = build(<<~'TEX')
+      \documentclass{article}
+      \usepackage{pgfplots}
+      \begin{document}
+      \begin{tikzpicture}
+      \begin{axis}
+      \addplot table {
+      1 2
+      \addplot table {
+      3 4
+      };
+      \end{axis}
+      \end{tikzpicture}
+      \end{document}
+    TEX
+    assert_equal 1, errors.size
+    assert_match(/\Amain\.tex:6:16: error: unclosed open brace/, errors.first.to_s)
+  end
 end

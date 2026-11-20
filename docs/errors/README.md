@@ -25,7 +25,7 @@ Errors during compilation originate in one of three layers:
 
 ---
 
-## 3. Master Error Index (80 Errors)
+## 3. Master Error Index (83 Errors)
 
 | # | Error Message / Pattern | Layer | Cause & Summary | Support | Reproducer & Details |
 |---|:--- |:--- |:--- |:--- |:--- |
@@ -109,6 +109,9 @@ Errors during compilation originate in one of three layers:
 | **78** | `[\directlua]:1: unexpected symbol near ...` | LuaTeX | Lua code in `\directlua` is expanded by TeX first; active characters (csquotes `"`) break it. LuaTeX names the Lua chunk, not the file; `leeni` reports the TeX line that ran it. | **Catalog Hint** | [`78_lua_directlua_error`](78_lua_directlua_error/) |
 | **79** | `Package tikz Error: Sorry, the system call ... did NOT result in a usable output file` | Package (tikz) | `\tikzexternalize` needs shell escape to build each picture. The failed call and the unclosed environment and groups it leaves are one error. | **Catalog Hint** | [`79_tikz_external_failed`](79_tikz_external_failed/) |
 | **80** | `LaTeX Error: Unknown option ... for package ...` | LaTeX Kernel | An option the package does not declare. Repeated by every later package that loads the same one (tikz loading xcolor); `leeni` reports one error at the `\usepackage` that gave it. | **Catalog Hint** | [`80_unknown_package_option`](80_unknown_package_option/) |
+| **81** | `Package fontenc Error: Encoding file ... not found` | LaTeX Package | An encoding passed to `fontenc` whose `...enc.def` is not installed; every later `Encoding scheme ... unknown` is the same fault. | **Catalog Hint** | [`81_missing_font_encoding`](81_missing_font_encoding/) |
+| **82** | `Package memoize Error: No suitable Perl module for PDF processing` | LaTeX Package | memoize's Perl extraction needs `PDF::API2` or `PDF::Builder`; TeX reports it from `main.mmz.log`, `leeni` at the `\usepackage` line. | **Catalog Hint** | [`82_memoize_no_perl_pdf_module`](82_memoize_no_perl_pdf_module/) |
+| **83** | `Package siunitx Error: Package 'units' incompatible` | LaTeX Package | `units` defines the commands siunitx provides (`\unit`). The "Command `\unit` already defined" clash and siunitx's repeat at `\begin{document}` are one error, at the `\usepackage{siunitx}` line. | **Catalog Hint** | [`83_siunitx_incompatible_package`](83_siunitx_incompatible_package/) |
 
 ---
 

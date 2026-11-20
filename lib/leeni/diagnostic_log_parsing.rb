@@ -493,7 +493,8 @@ module LaTeXDiagnostics
         err_text, err_block, file: file_name, line: line_no, junk_dir: diagnostics_junk_dir
       )
       source_location = locate_error_source(classification, err_text) || locate_package_load(file_name) ||
-                        locate_frame_source(file_name, line_no)
+                        locate_frame_source(file_name, line_no) || locate_key_source(classification, file_name, line_no) ||
+                        locate_frame_body(classification, err_text, file_name, line_no)
       if source_location
         file_name, line_no = source_location
         classification = LaTeXErrorCatalog.classify(

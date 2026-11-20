@@ -110,6 +110,12 @@ module LaTeXErrorCatalog
       return [cs, enclosing] if cs
     end
 
+    # A long expansion is elided ("\beamer@doifinframe ... \par Second \badcs",
+    # the body of a beamer frame); the line still ends at the culprit.
+    elided = err_block.find { |l| l =~ /\A\\[a-zA-Z@]+ \.\.\. / }
+    cs = elided.sub(/\A\\[a-zA-Z@]+ \.\.\. /, '').scan(/\\[a-zA-Z@]+|\\[^\s]/).last if elided
+    return [cs, nil] if cs
+
     # Check <argument> lines: <argument> ... \badcs
     arg_line = err_block.find { |l| l =~ /<argument>/ }
     if arg_line

@@ -25,7 +25,7 @@ Errors during compilation originate in one of three layers:
 
 ---
 
-## 3. Master Error Index (72 Errors)
+## 3. Master Error Index (74 Errors)
 
 | # | Error Message / Pattern | Layer | Cause & Summary | Support | Reproducer & Details |
 |---|:--- |:--- |:--- |:--- |:--- |
@@ -101,6 +101,8 @@ Errors during compilation originate in one of three layers:
 | **70** | `File ended while scanning use of \beamer@collect@@body` | beamer / tabularx | An environment that collects its body (`frame`, `tabularx`) is never closed; TeX gives no line. `leeni` reports the `\begin` left open. | **Catalog Hint** | [`70_frame_not_closed`](70_frame_not_closed/) |
 | **71** | `./example.vrb:5: ...` | beamer | An error inside a `[fragile]` frame is reported in the generated `.vrb`. `leeni` maps it to the frame line in the source. | **Standard** | [`71_fragile_frame_error`](71_fragile_frame_error/) |
 | **72** | `Missing character: There is no s in font nullfont!` | TikZ / pgf | Text inside a picture but outside any node is dropped, one log note per character, with no line. `leeni` reports the dropped text once, at its line. | **Catalog Hint** | [`72_dropped_text`](72_dropped_text/) |
+| **73** | `Package keyval Error: widht undefined.` | keyval / graphicx | An unknown `key=value` option, reported where the command was read to its end (a frame's `\end{frame}`). `leeni` finds the key; a key reported with its value points at an active `=` (babel shorthand). | **Catalog Hint** | [`73_keyval_unknown_key`](73_keyval_unknown_key/) |
+| **74** | `./example.tex:13: ...` at `\end{frame}` | beamer | Errors inside a frame are all reported at its `\end{frame}`. `leeni` places them in the frame body by the command, `_`/`^` or `\end{...}` they name. | **Standard** | [`74_error_inside_frame`](74_error_inside_frame/) |
 
 ---
 
@@ -118,7 +120,7 @@ The corpus runs in the medium test tier (`test/test_error_corpus.rb`, also `tool
 # Run the corpus expectations
 tools/test_error_corpus
 # Draft expected.json for a new case (check every location by hand before saving)
-tools/test_error_corpus --draft docs/errors/73_new_case
+tools/test_error_corpus --draft docs/errors/75_new_case
 ```
 
 ### Comparing Real Papers with latexmk

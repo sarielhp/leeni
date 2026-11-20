@@ -158,6 +158,51 @@ module LaTeXDiagnostics
       best&.first(2)
     end
 
+    # A beamer frame reads its body whole before typesetting it, so TeX reports
+    # an error inside it at the \end{frame}, often with no context. What the
+    # error names is looked for in the frame's body instead: the \end{...}
+    # that closed the wrong environment, or a _ or ^ outside math.
+    def locate_frame_body(classification, err_text, file, line)
+      lines = LaTeXUtils.safe_read(file).lines
+      return nil unless line.to_i.positive? && lines[line.to_i - 1].to_s.match?(/\A\s*\\end\{frame\}/)
+
+      start = (line.to_i - 2).downto(0).find { |idx| lines[idx].match?(/\\begin\{frame\}/) }
+      probe = frame_body_probe(classification&.[](:id), err_text)
+      return nil unless start && probe
+
+      found = ((start + 1)...(line.to_i - 1)).find { |idx| frame_text(lines[idx]).match?(probe) }
+      found && [file, found + 1]
+    end
+
+    def frame_body_probe(category, err_text)
+      case category
+      when :mismatched_environment
+        name = err_text[/ended by \\end\{([^}]+)\}/, 1]
+        name && /\\end\s*\{#{Regexp.escape(name)}\}/
+      when :missing_dollar
+        /(?<!\\)[_^]/
+      end
+    end
+
+    # A line without comments and without its inline math.
+    def frame_text(line)
+      LaTeXUtils.strip_latex_comments(line).gsub(/(?<!\\)\$[^$]*(?<!\\)\$|\\\(.*?\\\)/, '')
+    end
+
+    # keyval names the key it does not know, not where it was given: TeX reports
+    # the line where the command was read to its end, which for a beamer frame
+    # is the \end{frame}. The key is looked for on that line and above it.
+    def locate_key_source(classification, file, line)
+      return nil unless classification&.[](:id) == :keyval_unknown_key && line.to_i.positive?
+
+      key = /(?<![\w@])#{Regexp.escape(classification[:token].to_s)}(?![\w@])/
+      lines = LaTeXUtils.safe_read(file).lines
+      (line.to_i - 1).downto([line.to_i - 50, 0].max) do |idx|
+        return [file, idx + 1] if lines[idx] && LaTeXUtils.strip_latex_comments(lines[idx]).match?(key)
+      end
+      nil
+    end
+
     # The dropped text has lost its spaces and braces and may span lines, so it is looked
     # up in the source with whitespace removed; a run of one or two characters
     # (a stray ';' or two) falls back to its first character.
@@ -198,7 +243,8 @@ module LaTeXDiagnostics
     end
 
     def locate_missing_resource_request(resource)
-      stem = resource.to_s.sub(/\.(?:tex|sty|cls|bib)\z/i, '')
+      # epstopdf asks for x-eps-converted-to.pdf where the source names x.eps.
+      stem = resource.to_s.sub(/-eps-converted-to\.pdf\z/i, '').sub(/\.(?:tex|sty|cls|bib)\z/i, '')
       return nil if stem.empty?
 
       pattern = /

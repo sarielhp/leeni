@@ -1,0 +1,24 @@
+{
+  "engine": "xelatex",
+  "diagnostics": [
+    {
+      "file": "example.tex",
+      "line": 6,
+      "col": 8,
+      "tier": "errors",
+      "category": "undefined_control_sequence"
+    },
+    {
+      "file": "example.tex",
+      "line": 8,
+      "tier": "errors",
+      "category": "missing_dollar"
+    },
+    {
+      "file": "example.tex",
+      "line": 10,
+      "tier": "errors",
+      "category": "mismatched_environment"
+    }
+  ]
+}

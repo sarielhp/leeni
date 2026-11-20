@@ -14,7 +14,7 @@ class TestRelatexSynctex < LeeniTestBase
     puts "date: \#{ENV['SOURCE_DATE_EPOCH']} \#{ENV['FORCE_SOURCE_DATE']} tz=\#{ENV['TZ']}"
     $stdout.flush
     Signal.trap('TERM') { puts 'got TERM'; $stdout.flush; exit 0 }
-    sleep 30
+    sleep 300 # outlives the slowest gate; teardown kills it
   RUBY
 
   def setup

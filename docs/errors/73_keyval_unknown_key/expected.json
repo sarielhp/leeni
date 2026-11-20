@@ -1,0 +1,17 @@
+{
+  "engine": "xelatex",
+  "diagnostics": [
+    {
+      "file": "example.tex",
+      "line": 6,
+      "tier": "errors",
+      "category": "keyval_unknown_key"
+    },
+    {
+      "file": "example.tex",
+      "line": 9,
+      "tier": "alerts",
+      "category": "overfull_vbox"
+    }
+  ]
+}

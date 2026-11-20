@@ -429,6 +429,22 @@ module LaTeXErrorCatalog
       doc_slug: '42_package_babel_unknown_language'
     },
     {
+      id: :keyval_unknown_key,
+      pattern: /Package keyval Error: (\S+) undefined/,
+      title: 'Package keyval Error: unknown key',
+      token_extractor: ->(match, _block) { match[1] },
+      hint: lambda { |tok|
+        if tok.to_s.include?('=')
+          "'#{tok}' was read as one key: '=' is active here (a babel shorthand, e.g. turkish); add \\shorthandoff{=} or load babel with shorthands=off"
+        else
+          "Unknown option key '#{tok}'; check its spelling and the command's documented options"
+        end
+      },
+      why: 'A command that takes key=value options (\\includegraphics, \\usepackage options, tikz) was given a key it does not define, usually a misspelling. A key that still carries its value means = was not read as a plain character.',
+      fix: 'Correct the key name, or remove the option the command does not support.',
+      doc_slug: '73_keyval_unknown_key'
+    },
+    {
       id: :bad_register_code,
       pattern: /Bad register code/i,
       title: 'Bad register code',

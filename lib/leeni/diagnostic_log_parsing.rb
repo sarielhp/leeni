@@ -341,6 +341,15 @@ module LaTeXDiagnostics
       deduplicate_box_warnings(raw_warnings)
     end
 
+    # Some packages leave the error line empty and give the message on the
+    # next one, after " => file:line: " (minted) or two spaces (fancyvrb); the
+    # message is joined to the error line, so it is neither lost nor read as a
+    # second error.
+    ERROR_CONTINUATION = /^(.+? Error:) *\n(?: => \S+?:\d+: | {2}(?=\S))/
+    def join_error_continuations(content)
+      content.gsub(ERROR_CONTINUATION) { "#{Regexp.last_match(1)} " }
+    end
+
     def error_line_match(line)
       return [false, nil] if typeset_source_echo?(line)
       return [false, nil] if line =~ FATAL_ABORT_PATTERN
@@ -400,7 +409,7 @@ module LaTeXDiagnostics
 
     def extract_errors(content)
       errors = []
-      clean_content = LaTeXUtils.filter_subcommand_noise(content)
+      clean_content = join_error_continuations(LaTeXUtils.filter_subcommand_noise(content))
       lines = clean_content.lines
       file_stack = [@filename]
       last_bib_entry_key = nil

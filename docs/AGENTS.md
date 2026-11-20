@@ -48,6 +48,7 @@ This document provides architectural guidelines, core invariants, development wo
   - [`tools/compare_corpus`](tools/compare_corpus): Builds real papers (arXiv samples, or entry.json + paper/ directories) with leeni and with latexmk and flags disagreements (missed errors, stricter failures, page count, PDF text, unresolved references); `-b` compares with an earlier summary.
   - [`tools/mutate_corpus`](tools/mutate_corpus): Injects realistic faults into papers that build clean and checks leeni against the injected line and against TeX (crashes, hangs, invalid JSON, `-llm`/`--json` disagreement, missed or line-less errors, worse locations than TeX, recovery after the fault is reverted).
   - [`tools/fault_corpus`](tools/fault_corpus): Runs leeni on a corpus of known faults (TeXFix-Bench, prepared in the ignored `datasets/texfix/corpus`): each broken document is judged against its fix line and TeX's first error, and its fixed version must build clean; `-p N` samples N tasks per fault type.
+  - [`tools/texse_corpus`](tools/texse_corpus): Real failing documents from TeX Stack Exchange (in the ignored `datasets/texse`): `fetch` questions by tag and title words, `prepare` the next batch of documents that still fail under pdflatex, `run` leeni on it and list where its first error differs from TeX's, for review.
 - **Automated Test Suite** (`test/`):
   - `test/test_*.rb`: Fast regression and end-to-end tests using `minitest`.
   - `test/fixups/`: ArXiv test repair records and schema.

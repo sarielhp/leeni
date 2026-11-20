@@ -152,3 +152,12 @@ The papers stay outside the repository, and so do the summaries, which quote sou
 ```bash
 tools/fault_corpus -p 30 -j 4 -o /tmp/fault-summary.json datasets/texfix/corpus
 ```
+
+### Real Failures from TeX Stack Exchange
+`tools/texse_corpus` takes documents from TeX.SE questions (CC BY-SA) that still fail today, for a reason other than a missing file. Each batch is run with pdflatex and leeni's first error is compared with TeX's; there is no known fault line, so every difference is listed for review rather than scored. Crashes, hangs, invalid JSON and `-llm`/`--json` disagreements are flagged as with the other corpora.
+
+```bash
+tools/texse_corpus fetch -t beamer -q error -p 1-3 datasets/texse
+tools/texse_corpus prepare -n 50 datasets/texse
+tools/texse_corpus run datasets/texse
+```

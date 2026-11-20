@@ -221,7 +221,8 @@ module LaTeXDiagnostics
       collect_source_candidates.each do |file|
         joined, starts = joined_source(file)
         probes.uniq.each do |probe|
-          at = !probe.empty? && joined.index(probe)
+          # Not inside a command name: TeX may drop a command's name as text.
+          at = !probe.empty? && joined.index(/(?<!\\)#{Regexp.escape(probe)}/)
           return [file, starts.rindex { |offset| offset <= at } + 1] if at
         end
       end

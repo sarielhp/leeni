@@ -171,7 +171,7 @@ module MutateCorpus
   # file) counts as an error at line 0.
   def tex_first_error(dir)
     logs = Dir.glob(File.join(dir, 'err_*_*')).sort_by { |f| f[/_(\d+)\z/, 1].to_i }
-    text = logs.map { |log| File.read(log, mode: 'rb').scrub }.join
+    text = logs.map { |log| File.read(log, mode: 'rb').force_encoding(Encoding::UTF_8).scrub }.join
     located = text.each_line.lazy.map { |line| line.match(TEX_LOCATED) }.find { |m| m && !m[3].match?(/warning/i) }
     return { file: File.basename(located[1]), line: located[2].to_i, message: located[3].strip[0, 100] } if located
 

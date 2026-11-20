@@ -133,7 +133,7 @@ module CorpusCompare
   def self.tex_errors(log_path)
     return [] unless File.file?(log_path)
 
-    File.read(log_path, mode: 'rb').scrub.each_line.grep(TEX_ERROR_LINE).map { |line| line.strip[0, 160] }
+    File.read(log_path, mode: 'rb').force_encoding(Encoding::UTF_8).scrub.each_line.grep(TEX_ERROR_LINE).map { |line| line.strip[0, 160] }
   end
 
   def self.leeni_build(dir, main, opts, cache)

@@ -259,6 +259,14 @@ module LaTeXDiagnostics
     # TeX expand its commands inside the list: an "Improper \hyphenation" for
     # each, and Missing \begin{document}, Extra } and the like. Every later
     # error on that line is part of it and is counted in the first.
+    # Dropped text that is nowhere in the source (a command's name, printed
+    # while TeX recovers from another error) is a symptom of that error, not
+    # text the author wrote; it is reported only when nothing else is.
+    def suppress_unlocated_dropped_text(errors)
+      unlocated = errors.select { |error| error[:catalog_id] == :dropped_text && error[:line].to_i <= 0 }
+      unlocated.size == errors.size ? errors : errors - unlocated
+    end
+
     def suppress_hyphenation_cascades(errors)
       primary = errors.find { |error| error[:catalog_id] == :improper_hyphenation }
       return errors unless primary
@@ -426,6 +434,7 @@ module LaTeXDiagnostics
       compiler_errors = suppress_compiler_brace_cascades(compiler_errors, brace_errors)
       compiler_errors = suppress_environment_mismatch_cascades(compiler_errors)
       compiler_errors = suppress_hyphenation_cascades(compiler_errors)
+      compiler_errors = suppress_unlocated_dropped_text(compiler_errors)
       errors = place_merged_brace_errors(prepare_error_items(compiler_errors), brace_errors)
       alerts, warnings, whatevers = partition_diagnostics(content, extract_warnings(content, verbose: false))
       Leeni::DiagnosticAnalysis.new(errors: errors, alerts: alerts, warnings: warnings, whatevers: whatevers,

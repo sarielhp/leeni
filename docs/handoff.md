@@ -25,8 +25,11 @@ judged against TeX.
   regressions that only the full run caught): from batch 18, fix only
   mechanisms seen in 2+ documents or with a general cause (engine, catcode,
   expl3, a silent stop); list one-package oddities under Known open items.
-  Stop after two batches with no such fix; then use tools/mutate_corpus on
-  own papers and rerun the TeX.SE regression after TeX Live updates. The full regression over all 490 documents run so far is the new
+  Stop after two batches with no such fix; then rerun the TeX.SE regression
+  after TeX Live updates. (Not tools/mutate_corpus on own papers: its fault
+  kinds are synthetic and already covered by the error corpus and TeXFix,
+  and the maintainer already uses leeni on those papers daily.) The full
+  regression over all 490 documents run so far was then the
   `datasets/texse/regression-baseline.json`.
 - 2026-11-20: questions fetched for `siunitx`, `pgfplots`, `math-mode`,
   `graphics`, `floats`, `fonts`, `xetex`, `luatex`, `babel`, `listings`,

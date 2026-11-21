@@ -102,6 +102,10 @@ class TestRelatexSynctex < LeeniTestBase
       second = start(builder)
       refute_equal first, second
       assert wait_for(STOP_TIMEOUT) { !alive?(first) }, 'the previous relatex must be stopped'
+      # Checked too soon, the new run may still be exec'ing nice -> env -> ruby,
+      # when /proc/PID/cmdline reads empty. Its spawn truncated the log, so an
+      # args: line now is the second stub running.
+      assert(wait_for { log_text.include?('args:') }, 'the new relatex must start')
       assert alive?(second)
       assert_equal second, File.read('junk/relatex_synctex.pid').to_i
     end

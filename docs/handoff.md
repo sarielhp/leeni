@@ -15,8 +15,11 @@ judged against TeX.
 
 - Released: 1.0.102, which includes all the TeX.SE work through batch 10
   (branch `texse-tool` merged into master). Installed locally.
-- Batches 11–17 are reviewed and fixed (after 1.0.102; error corpus cases
-  81–89).
+- STOPPED on 2026-11-20 after batch 21 by the stopping rule below: batches 20
+  and 21 gave no recurring mechanism. Batches 11-19 are fixed (after 1.0.102,
+  local commits, not released; error corpus cases 81-89). Unbatched failing
+  documents remain (fetched for batch 21); resume only to recheck after a
+  TeX Live update or for a new class of fault.
 - Stopping rule agreed on 2026-11-20 (long tail reached: a fix round now
   changes under 1% of the corpus, but each fix adds code, and three caused
   regressions that only the full run caught): from batch 18, fix only
@@ -62,6 +65,10 @@ each was built and what each batch found. Questions fetched so far: tag
 | 15 | biber, fontspec, tikz-styles, cross-referencing, macros, expl3, chemistry, algorithms (100 docs) | 1 (dropped-text hint), plus a missing-font entry found in the regression |
 | 16 | next 100 of those tags | 7 (Lua tracebacks and chunk lines, luacode engine refusal, space glyph, unicode-math clash hint, @ in a name without \makeatletter) |
 | 17 | next 100 | 5 (engine refusal wordings, engine primitives in the body, expl3 names kept whole, an unknown option passed on to later packages, clash hint) |
+| 18 | last 38 fetched | 1 recurring (blank line inside an argument closed after it) |
+| 19 | minted, glossaries, tcolorbox, titlesec, ... (100) | 3 recurring (wrapped minted without \VerbatimEnvironment, end-of-file runaway at line 1, grouping across TeX lines) |
+| 20 | rest of those (64) | none recurring: stop count 1 |
+| 21 | tikz-pgf, beamer, tables pages 3-4 (100) | none recurring: stop count 2, corpus work stopped |
 
 The rate is not clearly falling; what changes is the kind of bug. Early
 batches found faults hitting many documents (locations inside packages and
@@ -122,6 +129,14 @@ document whose result changed.
 
 ## Known open items
 
+- Seen once in batches 20-21, not fixed: an undefined command in a beamer
+  frame reported again with token \end at \end{frame} (377031); an unclosed
+  brace inside \newglossarystyle blamed on the outer brace (668443); minted's
+  deferred 'Cannot locate file' taking TeX's l.N, not its own './main:16:'
+  (686219); pgf arrow declarations typesetting values as dropped text
+  (352096); fancyvrb's stray space after \VerbatimEnvironment (526284).
+- A chained command that pipes the gate through tail hides its failure (batch
+  19 was committed past a failing medium gate): check the gate's exit status.
 - One-package oddities seen and not fixed: endfloat's figure/figure* mismatch
   (535982: line 0 shown as 1, brace hint); \resizebox{w}{}{...} running to
   the end of the file (665349); a class option with spaces around = leaking

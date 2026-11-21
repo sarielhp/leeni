@@ -749,10 +749,11 @@ module LaTeXDiagnostics
       root = (error[:root_line] || error.dig(:catalog, :root_line)).to_i
       line = error[:line].to_i
       text = error[:text].to_s
-      if root.positive? && root != line
-        text = text.lines.grep_v(/\Al\.\d+ /).join.sub(/\A\S*?:\d+: /, '')
-        line = root
-      end
+      # TeX's own place (a .sty line, l.N) is left out: errors placed at one
+      # source line are one fault however TeX located them (titleps re-read
+      # by titlesec, TeX.SE 276029: 19 errors at one \usepackage).
+      text = text.lines.grep_v(/\Al\.\d+ /).join.sub(/\A\S*?:\d+: /, '')
+      line = root if root.positive? && root != line
       # One undefined command at one place is one fault, whatever context TeX
       # showed with each report (TeX.SE 373592: \text listed twice).
       token = error[:token] || error.dig(:catalog, :token)

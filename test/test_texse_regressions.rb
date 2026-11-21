@@ -728,4 +728,61 @@ class TestTexseRegressions < Minitest::Test
     assert_match(/\Amain\.tex:6: error: /, errors.first)
     assert_match(/Lua runtime error/, errors.first)
   end
+
+  # TeX.SE 272310: a \newenvironment wrapping minted needs \VerbatimEnvironment
+  # in its begin code; without it fancyvrb reads to the file end. One error,
+  # at the \begin{pythoncode} that opened it.
+  def test_minted_in_a_newenvironment_needs_verbatimenvironment
+    skip 'minted.sty required' unless system('kpsewhich', 'minted.sty', out: File::NULL)
+
+    _, errors = build(<<~'TEX')
+      \documentclass{article}
+      \usepackage{minted}
+      \newenvironment{pythoncode}{\begin{minted}{python}}{\end{minted}}
+      \begin{document}
+      \begin{pythoncode}
+      x = 1
+      \end{pythoncode}
+      \end{document}
+    TEX
+    assert_equal 1, errors.size, errors.join
+    assert_match(/\Amain\.tex:5: error: .*VerbatimEnvironment/, errors.first)
+  end
+
+  # TeX.SE 151317: collect* left open after its matching \end is a runaway to
+  # the end of a balanced file; TeX names no line, and the fault is the last
+  # line, not line 1.
+  def test_runaway_to_the_end_of_a_balanced_file_is_at_its_last_line
+    _, errors = build(<<~'TEX')
+      \documentclass{article}
+      \usepackage{xparse}
+      \usepackage{collect}
+
+      \NewDocumentEnvironment{dup}{m}
+        {\begin{collect*}{#1dupcollection}{}{}{}{}}
+        {\end{collect*}}
+      \begin{document}
+      \begin{dup}{atest}
+      content...
+      \end{dup}
+      \end{document}
+    TEX
+    assert_equal 1, errors.size, errors.join
+    assert_match(/\Amain\.tex:12: error: file ended while scanning/, errors.first)
+  end
+
+  # TeX.SE 276029: titlesec and titleps are incompatible; titleps repeats the
+  # package error, which is one error at the \usepackage{titlesec}.
+  def test_titlesec_after_titleps_is_one_repeated_error
+    _, errors = build(<<~'TEX')
+      \documentclass{article}
+      \usepackage{titleps}
+      \usepackage{titlesec}
+      \begin{document}
+      x
+      \end{document}
+    TEX
+    assert_equal 1, errors.size, errors.join
+    assert_match(/main\.tex:\d+: error: .*repeated \d+ times/, errors.first)
+  end
 end

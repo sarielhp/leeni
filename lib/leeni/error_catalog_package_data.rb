@@ -35,7 +35,10 @@ module LaTeXErrorCatalog
       token_extractor: ->(match, _block) { match[0][/\{.*/] },
       hint: lambda { |tok|
         name, stop = tok.to_s.scan(/\{([^}]+)\}/).flatten
-        if name == stop
+        if %w[minted Verbatim BVerbatim LVerbatim].include?(stop)
+          "The begin code of {#{name}} opens {#{stop}} without \\VerbatimEnvironment, so fancyvrb looks for " \
+            "\\end{#{stop}}; put \\VerbatimEnvironment before \\begin{#{stop}} in the definition"
+        elsif name == stop
           "\\end{#{name}} was not recognised, so the rest of the file was read as its body: a comment-package " \
             "environment needs \\end{#{name}} alone at the start of a line (no indentation)"
         else

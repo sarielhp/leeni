@@ -27,7 +27,7 @@ module LaTeXDiagnostics
       when :pdf_driver_fatal
         locate_driver_file_request(classification[:token])
       when :file_ended_while_scanning
-        locate_unclosed_environment
+        locate_unclosed_environment || end_of_main_file
       end
     end
 
@@ -105,6 +105,10 @@ module LaTeXDiagnostics
     COMMENT_DECLARATION = /\\(?:excludecomment|specialcomment|processcomment)\s*\{([^}]+)\}/
     VERBATIM_DECLARATION = /\\(?:DefineVerbatimEnvironment|newtcblisting|newminted)\s*\{([^}]+)\}/
     LISTING_DECLARATION = /\\lstnewenvironment\s*\{([^}]+)\}\s*(?:\[[^\]]*\]\s*)*\{([^\n]*)/
+    # An environment whose begin code opens a fancyvrb one (minted, Verbatim)
+    # without \VerbatimEnvironment: fancyvrb then looks for \end{minted},
+    # which the document never writes (TeX.SE 272310, 400111).
+    WRAPPED_VERBATIM = /\\(?:(?:re)?newenvironment|(?:New|Renew)DocumentEnvironment)\s*\{([^}]+)\}(.{0,200}?)\\begin\s*\{(minted|Verbatim|BVerbatim|LVerbatim)\}/m
 
     # Environments the document declares that read their body verbatim. The
     # comment package ends one only at an \end at the start of a line; a
@@ -115,10 +119,21 @@ module LaTeXDiagnostics
       declared = {}
       text.scan(COMMENT_DECLARATION) { |(name)| declared[name] = { end: name, line_start: true } }
       text.scan(VERBATIM_DECLARATION) { |(name)| declared[name] = { end: name, line_start: false } }
+      text.scan(WRAPPED_VERBATIM) do |name, between, inner|
+        declared[name] = { end: inner, line_start: false } unless between.include?('\VerbatimEnvironment')
+      end
       text.scan(LISTING_DECLARATION) do |name, code|
         declared[name] = { end: code[/\A[^}]*?\\begin\s*\{([^}]+)\}/, 1] || name, line_start: false }
       end
       declared
+    end
+
+    # A runaway that reached the end of the file with nothing left open: TeX
+    # was at the end of the main file, not at its first line (TeX.SE 151317).
+    def end_of_main_file
+      lines = LaTeXUtils.safe_read(@filename).lines
+      last = lines.rindex { |line| !line.strip.empty? }
+      last && [@filename, last + 1]
     end
 
     # Pushes or pops one \begin/\end; returns the line of a \begin left open

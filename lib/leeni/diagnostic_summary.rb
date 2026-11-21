@@ -352,18 +352,21 @@ module LaTeXDiagnostics
     # body of an excluded environment is read to the end of the file when its
     # \end is not recognised (indented, TeX.SE 77920). The \begin it is placed
     # at is that environment; the brace hint does not apply.
+    # What the package says after it at that \begin (fancyvrb's "Couldn't
+    # find \end{minted}", the environment ended by \end{document}) is the
+    # same fault (TeX.SE 272310).
     def retag_verbatim_runaways(errors)
-      errors.each do |error|
-        next unless error[:catalog_id] == :file_ended_while_scanning
-
-        verbatim = scan_environments(LaTeXUtils.safe_read(@filename))[:verbatim]
-        next unless verbatim && verbatim[:line] == error[:line].to_i
-
-        entry = LaTeXErrorCatalog.find_by_id(:verbatim_environment_unclosed)
-        error[:catalog] = (error[:catalog] || {}).merge(
-          hint: LaTeXErrorCatalog.resolve_hint(entry[:hint], "{#{verbatim[:name]}}, \\end{#{verbatim[:end]}}")
-        )
+      verbatim = scan_environments(LaTeXUtils.safe_read(@filename))[:verbatim]
+      primary = verbatim && errors.find do |error|
+        error[:catalog_id] == :file_ended_while_scanning && verbatim[:line] == error[:line].to_i
       end
+      return errors unless primary
+
+      entry = LaTeXErrorCatalog.find_by_id(:verbatim_environment_unclosed)
+      primary[:catalog] = (primary[:catalog] || {}).merge(
+        hint: LaTeXErrorCatalog.resolve_hint(entry[:hint], "{#{verbatim[:name]}}, \\end{#{verbatim[:end]}}")
+      )
+      errors.reject { |error| !error.equal?(primary) && error_place(error) == error_place(primary) }
     end
 
     # An option value with brackets of its own (listings' language=[LaTeX]TeX)
@@ -686,7 +689,7 @@ module LaTeXDiagnostics
       compiler_errors = suppress_hyphenation_cascades(compiler_errors)
       compiler_errors = suppress_missing_encoding_cascades(compiler_errors)
       compiler_errors = suppress_runaway_group_notes(compiler_errors)
-      retag_verbatim_runaways(compiler_errors)
+      compiler_errors = retag_verbatim_runaways(compiler_errors)
       retag_bracket_runaways(compiler_errors)
       retag_at_sign_splits(compiler_errors)
       compiler_errors = fold_engine_primitive_cascades(compiler_errors)

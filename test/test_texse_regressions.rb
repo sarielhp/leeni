@@ -454,9 +454,10 @@ class TestTexseRegressions < Minitest::Test
     assert_match(/\Amain\.tex:2:23: error: .*undefined control sequence \\text/, errors.first.to_s)
   end
 
-  # TeX.SE 289768: \numberwithin{ ends its line 5 with the body below and a
-  # blank line inside it; the paragraph it ends is at the { on line 5.
-  def test_paragraph_ended_before_numberwithin_is_at_its_brace
+  # TeX.SE 289768: \numberwithin{ ends its line 5 with the body below, and
+  # the paragraph ends at a blank line inside it. With the } after the blank
+  # line the argument was closed: the blank line is the fault (760647).
+  def test_blank_line_inside_a_closed_argument_is_the_fault
     _, errors = build(<<~'TEX')
       \documentclass{article}
       \usepackage{amsmath}
@@ -472,7 +473,27 @@ class TestTexseRegressions < Minitest::Test
       }
       \end{document}
     TEX
-    assert_match(/\Amain\.tex:5:14: error: .*paragraph ended before \\numberwithin/, errors.first.to_s)
+    assert_match(/\Amain\.tex:10: error: .*paragraph ended before \\numberwithin.*remove the blank line/, errors.first.to_s)
+  end
+
+  # TeX.SE 289768, with the } missing: the argument is never closed, and its
+  # start is the { that ends line 5.
+  def test_paragraph_ended_before_an_unclosed_argument_is_at_its_brace
+    _, errors = build(<<~'TEX')
+      \documentclass{article}
+      \usepackage{amsmath}
+
+      \begin{document}
+      \numberwithin{
+      \[
+      x
+      \]
+
+      Text.
+      \end{document}
+    TEX
+    # The pre-flight brace check merges in and words it as an unclosed brace.
+    assert_match(/\Amain\.tex:5:14: error: .*(?:paragraph ended before \\numberwithin|unclosed open brace)/, errors.first.to_s)
   end
 
   # TeX.SE 373592: \usepackage{amsfonts] leaves amsmath unloaded, and the

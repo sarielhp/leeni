@@ -584,6 +584,7 @@ module LaTeXDiagnostics
     def root_runaway_error(err)
       return if err[:root_line].to_i.positive? && err[:root_line].to_i != err[:line].to_i
       return if err[:text].to_s.match?(AMS_BODY_RUNAWAY)
+      return retag_blank_line_runaway(err) if blank_line_inside_closed_argument?(err)
 
       root_line, root_col = LaTeXErrorCatalog.runaway_start(err[:file], err[:line], err[:runaway_text])
       return unless root_line
@@ -594,6 +595,42 @@ module LaTeXDiagnostics
       err[:root_line] = root_line
       err[:root_col] = root_col
       err[:formatted] = format_error_block(err[:err_block], err[:line], catalog: err[:catalog], item: err)
+    end
+
+    # "Paragraph ended" at a blank line, with the argument's ] or } after it:
+    # nothing was left open, the blank line itself ends the argument (a blank
+    # line inside \begin{axis}[...] or \documentclass[...] options; TeX.SE
+    # 760647, 401031). TeX's line, the blank line, is the fault.
+    def blank_line_inside_closed_argument?(err)
+      return false unless err[:text].to_s.match?(/Paragraph ended before/)
+
+      lines = LaTeXUtils.safe_read(LaTeXErrorCatalog.find_source_file(err[:file]).to_s).lines
+      at = err[:line].to_i
+      return false unless at.positive? && lines[at - 1].to_s.strip.empty?
+
+      closes_after?(lines[at, 60] || [])
+    end
+
+    def retag_blank_line_runaway(err)
+      err[:catalog] = (err[:catalog] || {}).merge(
+        hint: 'A blank line inside this argument (an option list, a braced argument) ends it: remove the blank line'
+      )
+      err[:formatted] = format_error_block(err[:err_block], err[:line], catalog: err[:catalog], item: err)
+    end
+
+    # Whether a ] or } closes something opened before these lines.
+    def closes_after?(following)
+      depth = { '[' => 0, '{' => 0 }
+      following.each do |line|
+        LaTeXUtils.strip_latex_comments(line).gsub(/\\./, '').each_char do |ch|
+          kind = { '[' => '[', ']' => '[', '{' => '{', '}' => '{' }[ch]
+          next unless kind
+
+          depth[kind] += '[{'.include?(ch) ? 1 : -1
+          return true if depth[kind].negative?
+        end
+      end
+      false
     end
 
     def build_error_entry(lines, idx, err_file, file_stack = [], bib_entry: nil)

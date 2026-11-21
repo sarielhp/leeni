@@ -14,7 +14,7 @@ module LaTeXDiagnostics
   module SourceLocation
     # TeX attributes some errors to no source position (a missing file, a glyph
     # the font lacks); the position is recovered from the source tree instead.
-    def locate_error_source(classification, err_text = '')
+    def locate_error_source(classification, err_text = '', file = nil)
       case classification&.[](:id)
       when :file_not_found, :include_target_missing
         locate_missing_resource_request(classification[:token])
@@ -27,7 +27,9 @@ module LaTeXDiagnostics
       when :pdf_driver_fatal
         locate_driver_file_request(classification[:token])
       when :file_ended_while_scanning
-        locate_unclosed_environment || end_of_main_file
+        # A runaway in a generated file (a cut-off .aux) stays there: the
+        # cache recovery looks for it.
+        locate_unclosed_environment || (end_of_main_file unless file.to_s.match?(/\.(?:aux|toc|lof|lot|bbl|out|nav|vrb)\z/))
       end
     end
 

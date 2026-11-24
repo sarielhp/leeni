@@ -112,6 +112,7 @@ class LatexArxivPackager
     File.write(File.join(stage_dir, @filename), flattened_tex)
 
     stage_bbl(stage_dir)
+    stage_bib_sources(stage_dir)
     stage_active_figures(stage_dir)
     stage_local_styles(stage_dir)
     stage_revtex4_files(stage_dir)
@@ -138,6 +139,20 @@ class LatexArxivPackager
       FileUtils.cp(bbl_source, File.join(stage_dir, "#{@bfilename}.bbl"))
     else
       warn Rainbow("[WARN] No bibliography entries found in #{@bfilename}.bbl!").yellow
+    end
+  end
+
+  # arXiv builds from the shipped .bbl, but people who download the source may
+  # rerun BibTeX or Biber, so the databases and styles the build read travel
+  # too. One outside the paper directory stays out, with a warning.
+  def stage_bib_sources(stage_dir)
+    real_cwd = File.realpath(Dir.pwd) + File::SEPARATOR
+    LaTeXPackagingShared.bibliography_sources(@bfilename, junk_dir).each do |src|
+      if File.realpath(src).start_with?(real_cwd)
+        copy_preserving_path(src, stage_dir)
+      else
+        warn Rainbow("[WARN] #{src} is outside the paper directory; not included in the arXiv package").yellow
+      end
     end
   end
 
@@ -365,7 +380,8 @@ class LatexArxivPackager
 
   def verify_arxiv_authors_match(rebuilt_pdf)
     source = LaTeXUtils.safe_read(@filename)
-    authors = LaTeXMetaExtractor.extract_author_names(source)
+    authors = LaTeXMetaExtractor.extract_author_names(source,
+                                                      definitions: LaTeXMetaExtractor.definitions_source(@filename))
     if authors.empty?
       message = '[FAIL] arXiv verification could not extract any authors from the original source. ' \
                 'Add a non-empty \\author declaration.'

@@ -63,7 +63,7 @@ module LaTeXMetaExtractor
   def self.extract(main_tex, base_dir: '.', pdf_path: nil, fls_path: nil, log_path: nil, extra_comments: nil)
     raw_content = LaTeXUtils.safe_read(File.join(base_dir, main_tex))
     title = extract_title(raw_content)
-    authors = extract_authors(raw_content)
+    authors = extract_authors(raw_content, definitions: definitions_source(main_tex, base_dir))
     abstract = extract_abstract(raw_content)
     page_count = extract_page_count(pdf_path, log_path)
     fig_count = extract_figure_count(fls_path, base_dir)
@@ -203,12 +203,64 @@ module LaTeXMetaExtractor
     clean.gsub(/\s+/, ' ').strip
   end
 
-  def self.extract_authors(content)
-    names = extract_author_names(content)
+  def self.extract_authors(content, definitions: content)
+    names = extract_author_names(content, definitions: definitions)
     names.empty? ? 'Unknown' : names.join(', ')
   end
 
+  # The main file with its \input and \include files inlined, comments kept,
+  # so macros defined in a preamble file are seen; the file alone when it
+  # cannot be flattened.
+  def self.definitions_source(main_tex, base_dir = '.')
+    LaTeXFlattener.flatten(main_tex, base_dir, nil, strip_comments: false)
+  rescue StandardError
+    LaTeXUtils.safe_read(File.join(base_dir, main_tex))
+  end
+
+  # A % not escaped by an odd run of backslashes starts a comment, which also
+  # eats the line break and the next line's indentation (Har-%\nPeled is one word).
+  TEX_COMMENT = /(?<!\\)((?:\\\\)*)%[^\n]*(?:\n[ \t]*)?/
+
+  def self.strip_tex_comments(text) = text.gsub(TEX_COMMENT) { Regexp.last_match(1) }
+
+  AUTHOR_NOTE_MACROS = %w[thanks footnote affil orcid email inst institution address].freeze
+  MACRO_DEFINITION = /\\(?:(?:re|provide)?newcommand\*?\s*\{?\s*\\([A-Za-z@]+)\s*\}?\s*(?:\[(\d)\])?(?:\s*\[[^\]]*\])?|
+                      [gex]?def\s*\\([A-Za-z@]+)([^{]*))\s*\{/x
+
+  # Document macros whose body is an author note, as in
+  # \newcommand{\DrorThanks}[1]{\thanks{Google; #1}}: name => argument count.
+  def self.author_note_wrappers(definitions)
+    notes = /\\(?:#{AUTHOR_NOTE_MACROS.join('|')})(?![A-Za-z])/
+    wrappers = {}
+    strip_tex_comments(definitions).scan(MACRO_DEFINITION) do
+      match = Regexp.last_match
+      body = extract_balanced_braces(match.string, match.end(0) - 1)
+      next unless body&.match?(notes)
+
+      wrappers[match[1] || match[3]] = match[1] ? match[2].to_i : match[4].count('#')
+    end
+    wrappers
+  end
+
+  # Removes each call of \name together with its argc braced arguments.
+  def self.remove_macro_calls(str, name, argc)
+    call = /\\#{Regexp.escape(name)}(?![A-Za-z@])/
+    while (match = str.match(call))
+      finish = match.end(0)
+      argc.times do
+        brace = finish + (str[finish..][/\A\s*/]&.length || 0)
+        inner = extract_balanced_braces(str, brace)
+        break unless inner
+
+        finish = brace + inner.length + 2
+      end
+      str[match.begin(0)...finish] = ''
+    end
+    str
+  end
+
   def self.extract_author_blocks(content)
+    content = strip_tex_comments(content)
     raw_blocks = []
     content.scan(/\\author(?:\[[^\]]*\])?\s*\{/) do
       idx = Regexp.last_match.begin(0)
@@ -219,9 +271,10 @@ module LaTeXMetaExtractor
     raw_blocks
   end
 
-  def self.clean_author_block(raw)
+  def self.clean_author_block(raw, wrappers = {})
     str = raw.dup
-    %w[thanks footnote affil orcid email inst institution address].each do |macro|
+    wrappers.each { |name, argc| remove_macro_calls(str, name, argc) }
+    AUTHOR_NOTE_MACROS.each do |macro|
       while (idx = str.index(/\\#{macro}\s*\{/))
         brace_start = str.index('{', idx)
         inner = extract_balanced_braces(str, brace_start)
@@ -242,13 +295,16 @@ module LaTeXMetaExtractor
          .strip
   end
 
-  def self.extract_author_names(content)
+  # DEFINITIONS is where the document's macros are read from (the flattened
+  # source, see definitions_source); by default the content itself.
+  def self.extract_author_names(content, definitions: content)
     raw_blocks = extract_author_blocks(content)
     return [] if raw_blocks.empty?
 
+    wrappers = author_note_wrappers(definitions)
     authors = []
     raw_blocks.each do |raw|
-      str = clean_author_block(raw)
+      str = clean_author_block(raw, wrappers)
       str.split('\\and').each do |block|
         lines = block.split(/\\\\|\\newline/).map { |l| parse_single_author_line(l) }
         lines.reject! do |l|

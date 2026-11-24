@@ -89,6 +89,33 @@ module LaTeXPackagingShared
     [source, warnings + bbl_format_warnings(source, root, File.join(junk_dir, "#{bfilename}.fls"))]
   end
 
+  BIB_SOURCE_EXTS = %w[.bib .bst].freeze
+
+  # The bibliography databases and BibTeX styles the build read, as existing
+  # paths: biblatex datasources from the .bcf, \bibdata and \bibstyle from the
+  # .aux files, and the data sources the .blg reports. A copy in the build
+  # directory maps back to its project file. Callers decide which paths lie in
+  # the project tree (copy_preserving_path ships only those).
+  def bibliography_sources(bfilename, junk_dir)
+    names = recorded_bcf_datasources(File.join(junk_dir, "#{bfilename}.bcf"))
+    aux = Dir.glob(File.join(junk_dir, '**', '*.aux')).map { |f| LaTeXUtils.safe_read(f) }.join("\n")
+    names += aux.scan(/\\bibdata\{([^}]+)\}/).flatten.flat_map { |s| s.split(',') }.map { |s| with_ext(s, '.bib') }
+    names += aux.scan(/\\bibstyle\{([^}]+)\}/).flatten.map { |s| with_ext(s, '.bst') }
+    names += LaTeXUtils.safe_read(File.join(junk_dir, "#{bfilename}.blg"))
+                       .scan(/(?:Found BibTeX data source|Looking for bibtex file)\s+'([^']+)'|Database file #\d+:\s*(\S+)/)
+                       .flatten.compact
+    names.map { |n| project_twin(n, junk_dir, BIB_SOURCE_EXTS) }.uniq.select { |p| File.file?(p) }
+  end
+
+  def recorded_bcf_datasources(bcf)
+    LaTeXUtils.safe_read(bcf).scan(%r{<bcf:datasource[^>]*>([^<]+)</bcf:datasource>}).flatten.map(&:strip)
+  end
+
+  def with_ext(name, ext)
+    name = name.strip
+    File.extname(name).casecmp?(ext) ? name : "#{name}#{ext}"
+  end
+
   def bbl_format_warnings(source, root, fls)
     loaded = LaTeXUtils.recorded_biblatex_load(fls)
     written_by_biber = LaTeXUtils.biblatex_bbl?(source)

@@ -179,6 +179,7 @@ class TestArxivSupport < Minitest::Test
         INPUT ./paper.tex
       FLS
       File.write(File.join(dir, 'junk', 'paper.fls'), fls_content)
+      File.write(File.join(dir, 'junk', 'paper.aux'), "\\bibstyle{alpha}\n\\bibdata{paper}\n")
 
       builder = LatexBuilder.new('paper.tex', { junk_dir: 'junk' })
       packager = LatexArxivPackager.new(builder, { arxiv_verify: false })
@@ -204,9 +205,9 @@ class TestArxivSupport < Minitest::Test
         assert_includes entries, 'paper.tex'
         assert_includes entries, 'paper.bbl'
         assert_includes entries, 'figs/fig1.pdf'
+        assert_includes entries, 'paper.bib'
 
         refute_includes entries, 'paper.pdf'
-        refute_includes entries, 'paper.bib'
         refute_includes entries, 'figs/fig1.fig'
         refute_includes entries, 'figs/fig1.ipe'
       end
@@ -231,6 +232,32 @@ class TestArxivSupport < Minitest::Test
           staged = File.join(stage, 'figs/nested/plot.EPS')
           assert_equal 'EPS-CONTENTS', File.read(staged)
           refute File.exist?(File.join(stage, 'figs/unrecorded.eps'))
+        ensure
+          FileUtils.remove_entry(stage)
+        end
+      end
+    end
+  end
+
+  def test_arxiv_stages_the_bibliography_sources_the_build_read
+    Dir.mktmpdir do |dir|
+      Dir.chdir(dir) do
+        FileUtils.mkdir_p(%w[junk bib])
+        File.write('paper.tex', "\documentclass{article}\n")
+        File.write('bib/refs.bib', "@article{a, title={A}}\n")
+        File.write('extra.bib', "@article{b, title={B}}\n")
+        File.write('mystyle.bst', "ENTRY {} {} {}\n")
+        File.write('unused.bst', "ENTRY {} {} {}\n")
+        File.write('junk/paper.bcf', '<bcf:datasource type="file" datatype="bibtex">bib/refs.bib</bcf:datasource>')
+        File.write('junk/paper.aux', "\\bibstyle{mystyle}\n\\bibstyle{alpha}\n")
+
+        builder = LatexBuilder.new('paper.tex', { junk_dir: 'junk' })
+        packager = LatexArxivPackager.new(builder)
+        stage = Dir.mktmpdir('arxiv_stage_')
+        begin
+          packager.send(:stage_bib_sources, stage)
+          staged = Dir.glob('**/*', base: stage).select { |p| File.file?(File.join(stage, p)) }.sort
+          assert_equal %w[bib/refs.bib mystyle.bst], staged
         ensure
           FileUtils.remove_entry(stage)
         end

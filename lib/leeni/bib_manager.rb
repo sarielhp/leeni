@@ -503,12 +503,26 @@ class LaTeXBibManager
     true
   end
 
+  # Sources shipped with their .bbl but without the databases (an arXiv
+  # download, a package's sandbox): the .bbl covers every citation and none of
+  # the databases the document names can be found, so a bibliography run could
+  # only fail. The .bbl is used as is; biblatex's first-pass "Please (re)run
+  # Biber" is not a reason to run.
+  def bbl_without_databases?(fnbbl, aux_contents = nil)
+    names = LatexBibChecks.bibliography_sources(junk_dir, bfilename)
+    return false if names.empty? || !bbl_satisfies_citations?(fnbbl, aux_contents)
+
+    bib_dirs = options[:bib_dirs] || LaTeXUtils::DEFAULT_BIB_DIRS
+    names.none? { |name| LatexBibChecks.locate(name, bib_dirs) }
+  end
+
   def needs_bib_pass?(tool, loga, aux_contents = nil)
     return false if options[:bib] == false
     return true if options[:bib] == true
 
     fnbbl = File.join(junk_dir, "#{bfilename}.bbl")
     return true unless File.exist?(fnbbl)
+    return false if bbl_without_databases?(fnbbl, aux_contents)
 
     log = LaTeXUtils.safe_read(loga)
     return true if (tool == :biber && log =~ /Please \(re\)run Biber/i) || log =~ /Package natbib Warning: Citation\(s\) may have changed/i

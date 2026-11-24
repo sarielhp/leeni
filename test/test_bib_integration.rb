@@ -457,6 +457,38 @@ class TestBibIntegration < Minitest::Test
     end
   end
 
+  # Sources shipped with their .bbl but not their database (an arXiv
+  # download, the --arxiv sandbox): the .bbl is used as is, no Biber or BibTeX
+  # run, even though biblatex's first pass asks for Biber.
+  def test_shipped_bbl_without_database_builds_without_a_bibliography_run
+    {
+      'biber' => "\\usepackage[backend=biber]{biblatex}\n\\addbibresource{refs.bib}\n",
+      'bibtex' => ''
+    }.each do |tool, preamble|
+      Dir.mktmpdir("shipped_bbl_#{tool}") do |dir|
+        src = File.join(dir, 'src')
+        shipped = File.join(dir, 'shipped')
+        FileUtils.mkdir_p([src, shipped])
+        bibliography = tool == 'biber' ? '\\printbibliography' : "\\bibliographystyle{plain}\n\\bibliography{refs}"
+        File.write(File.join(src, 'main.tex'),
+                   "\\documentclass{article}\n#{preamble}\\begin{document}\nSee \\cite{itemA}.\n#{bibliography}\n\\end{document}\n")
+        File.write(File.join(src, 'refs.bib'),
+                   "@article{itemA, author={Author, Real}, title={Shipped Title}, journal={J}, year={2020}}\n")
+
+        bin_path = File.expand_path('../leeni', __dir__)
+        out1, status1 = Open3.capture2e(bin_path, 'main.tex', chdir: src)
+        assert_equal 0, status1.exitstatus, "#{tool} setup failed:\n#{out1}"
+        FileUtils.cp([File.join(src, 'main.tex'), File.join(src, 'main.bbl')], shipped)
+
+        out2, status2 = Open3.capture2e(bin_path, 'main.tex', chdir: shipped)
+        assert_equal 0, status2.exitstatus, "#{tool}: build from the shipped .bbl failed:\n#{out2}"
+        refute_match(/Running (biber|bibtex)/i, out2, "#{tool}: no bibliography run without a database")
+        text, = Open3.capture2('pdftotext', File.join(shipped, 'main.pdf'), '-')
+        assert_match(/Shipped title/i, text, "#{tool}: bibliography from the shipped .bbl")
+      end
+    end
+  end
+
   def test_biber_reruns_when_bcf_options_change_in_source
     Dir.mktmpdir('biber_bcf_option_test') do |dir|
       tex1 = <<~'TEX'

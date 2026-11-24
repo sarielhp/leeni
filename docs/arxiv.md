@@ -49,6 +49,10 @@ arXiv prefers a single `.tex` file or a shallow hierarchy. The flattener (`LaTeX
 - Packages only the necessary `.pdf`, `.png`, or `.jpg` figures.
 - Strictly excludes raw figure sources (`.fig`, `.ipe`, `.svg`, `.asy`, `.gp`, `.gnuplot`, `.py`, `.R`) and backup copies (`*.bak`, `figs/bak/`).
 
+### Bibliography Sources
+- Ships the `.bbl` the PDF was built with; arXiv compiles from it and never runs BibTeX or Biber.
+- Also ships the `.bib` databases and local `.bst` styles the build actually read (from the `.bcf`, the `.aux` files and the `.blg`), with their paths kept, so people who download the source can regenerate the bibliography. Unreferenced `.bib` files stay out; a database outside the paper directory stays out with a warning.
+
 ### BibLaTeX Version Shielding
 arXiv's TeX Live environment may run a different version of `biblatex` than your local machine, leading to `wrong format version` errors. When `biblatex` is detected, `leeni`:
 - Bundles local distribution files (`biblatex.sty`, `biblatex.cfg`, `*.bbx`, `*.cbx`, `*.lbx`) directly into the archive.

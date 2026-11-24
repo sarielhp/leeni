@@ -219,4 +219,42 @@ class TestFlattener < Minitest::Test
     assert_includes res, '\\path{/a/%20b}'
     refute_includes res, 'strip me'
   end
+  # arXiv rejects a source naming both bibliography systems ("multiple
+  # bibliography types used"), even inside a branch that never runs.
+  BOTH_SYSTEMS = <<~'TEX'
+    \documentclass{article}
+    \BibLatexMode{\usepackage[style=alphabetic,backend=biber]{biblatex}}
+    \usepackage{amsmath}
+    \BibLatexMode{\bibliography{refs, more.bib}}
+    \ExecuteBibliographyOptions{maxnames=40}
+    \begin{document}
+    \begin{verbatim}\bibliography{kept}\end{verbatim}
+    \BibTexMode{%
+       \bibliographystyle{alpha}
+       \bibliography{refs}
+    }%
+    \BibLatexMode{\printbibliography[heading=none]}
+    \end{document}
+  TEX
+
+  def test_biblatex_build_drops_bibtex_commands
+    out, changed = LaTeXFlattener.drop_other_bibliography_system(BOTH_SYSTEMS, biblatex: true)
+    assert_equal 3, changed
+    assert_includes out, '\BibLatexMode{\addbibresource{refs.bib}\addbibresource{more.bib}}'
+    assert_includes out, "\\BibTexMode{%\n   \n   \n}%"
+    assert_includes out, '\begin{verbatim}\bibliography{kept}\end{verbatim}'
+    refute_match(/\\bibliographystyle/, out)
+    assert_includes out, '\printbibliography[heading=none]'
+    assert_includes out, '\usepackage[style=alphabetic,backend=biber]{biblatex}'
+  end
+
+  def test_bibtex_build_drops_biblatex_commands
+    out, changed = LaTeXFlattener.drop_other_bibliography_system(BOTH_SYSTEMS, biblatex: false)
+    assert_equal 3, changed
+    assert_includes out, "\\BibLatexMode{}\n\\usepackage{amsmath}"
+    assert_includes out, "\\BibLatexMode{}\n\\end{document}"
+    refute_match(/ExecuteBibliographyOptions|printbibliography/, out)
+    assert_includes out, "\\bibliographystyle{alpha}\n   \\bibliography{refs}"
+    assert_includes out, '\BibLatexMode{\bibliography{refs, more.bib}}'
+  end
 end

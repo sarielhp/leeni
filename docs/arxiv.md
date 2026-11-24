@@ -51,6 +51,7 @@ arXiv prefers a single `.tex` file or a shallow hierarchy. The flattener (`LaTeX
 
 ### Bibliography Sources
 - Ships the `.bbl` the PDF was built with; arXiv compiles from it and never runs BibTeX or Biber.
+- arXiv rejects a source that names both bibliography systems ("multiple bibliography types used"), even inside a branch that never runs. The flattened `.tex` keeps only the system the build loaded (per the `.fls` recorder); the other's commands are deleted, not commented out. With biblatex: `\bibliographystyle` and body `\bibliography` are deleted, and a preamble `\bibliography{a}` (biblatex's legacy alias) becomes `\addbibresource{a.bib}`. With BibTeX: `\usepackage{biblatex}`, `\addbibresource`, `\ExecuteBibliographyOptions` and `\printbibliography` are deleted.
 - Also ships the `.bib` databases and local `.bst` styles the build actually read (from the `.bcf`, the `.aux` files and the `.blg`), with their paths kept, so people who download the source can regenerate the bibliography. Unreferenced `.bib` files stay out; a database outside the paper directory stays out with a warning.
 
 ### BibLaTeX Version Shielding

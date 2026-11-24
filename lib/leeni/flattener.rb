@@ -185,6 +185,78 @@ module LaTeXFlattener
     [nil, start]
   end
 
+  # arXiv's source check rejects a file that names both bibliography systems,
+  # even when one sits in a branch that never runs (\BibTexMode{\bibliography{x}}
+  # beside \printbibliography). The commands of the system the build did not
+  # use are deleted. Under biblatex a preamble \bibliography{a,b}, its legacy
+  # spelling of \addbibresource, becomes \addbibresource{a.bib}\addbibresource{b.bib}.
+  # Returns [content, number of commands deleted or rewritten].
+  BIB_SYSTEM_MACRO = /\\(bibliographystyle|bibliography|printbibliography|addbibresource|ExecuteBibliographyOptions|usepackage)(?![A-Za-z@])/
+
+  def self.drop_other_bibliography_system(content, biblatex:)
+    split = content.index('\begin{document}') || content.length
+    changed = 0
+    result = [[content[0...split], true], [content[split..], false]].map do |part, preamble|
+      transform_tex(part) do |chunk|
+        text, count = drop_bib_calls(chunk, biblatex: biblatex, preamble: preamble)
+        changed += count
+        text
+      end
+    end
+    [result.join, changed]
+  end
+
+  def self.drop_bib_calls(chunk, biblatex:, preamble:)
+    out = +''
+    pos = 0
+    count = 0
+    while (match = BIB_SYSTEM_MACRO.match(chunk, pos))
+      finish, arg = bib_call_extent(chunk, match.end(0), braced: match[1] != 'printbibliography')
+      replacement = bib_call_replacement(match[1], arg, biblatex: biblatex, preamble: preamble)
+      out << chunk[pos...match.begin(0)] << (replacement || chunk[match.begin(0)...finish])
+      count += 1 if replacement
+      pos = finish
+    end
+    [out << chunk[pos..], count]
+  end
+
+  # End of a call's optional [..] and (when BRACED) its {..} argument: [end, argument].
+  def self.bib_call_extent(text, index, braced:)
+    cursor = skip_blanks(text, index)
+    if text[cursor] == '['
+      close = text.index(']', cursor)
+      return [index, nil] unless close
+
+      index = close + 1
+      cursor = skip_blanks(text, index)
+    end
+    return [index, nil] unless braced && text[cursor] == '{'
+
+    arg, after = balanced_group(text, cursor)
+    arg ? [after, arg] : [index, nil]
+  end
+
+  # The text replacing a call, or nil to keep it.
+  def self.bib_call_replacement(name, arg, biblatex:, preamble:)
+    biblatex ? bibtex_call_replacement(name, arg, preamble) : biblatex_call_replacement(name, arg)
+  end
+
+  def self.bibtex_call_replacement(name, arg, preamble)
+    return '' if name == 'bibliographystyle'
+    return nil unless name == 'bibliography'
+    return '' unless preamble && arg
+
+    arg.split(',').map(&:strip).reject(&:empty?)
+       .map { |db| "\\addbibresource{#{db.end_with?('.bib') ? db : "#{db}.bib"}}" }.join
+  end
+
+  def self.biblatex_call_replacement(name, arg)
+    case name
+    when 'printbibliography', 'addbibresource', 'ExecuteBibliographyOptions' then ''
+    when 'usepackage' then arg&.strip == 'biblatex' ? '' : nil
+    end
+  end
+
   def self.strip_comments(content)
     transform_tex(content) { |chunk| strip_comment_chunk(chunk) }
   end

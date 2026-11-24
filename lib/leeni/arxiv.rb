@@ -109,7 +109,7 @@ class LatexArxivPackager
       warn Rainbow("[FAIL] Could not flatten LaTeX source: #{e.message}").red.bright
       return false
     end
-    File.write(File.join(stage_dir, @filename), flattened_tex)
+    File.write(File.join(stage_dir, @filename), single_bibliography_system(flattened_tex))
 
     stage_bbl(stage_dir)
     stage_bib_sources(stage_dir)
@@ -118,6 +118,21 @@ class LatexArxivPackager
     stage_revtex4_files(stage_dir)
     stage_biblatex_shield(stage_dir) unless @options[:biblatex_shield] == false
     true
+  end
+
+  # arXiv rejects a source naming both bibliography systems ("multiple
+  # bibliography types used"); the commands of the one the build did not load
+  # (per the recorder) are deleted. Without a recorder the source is unchanged.
+  def single_bibliography_system(tex)
+    biblatex = LaTeXUtils.recorded_biblatex_load(build_artifact('fls'))
+    return tex if biblatex.nil?
+
+    cleaned, changed = LaTeXFlattener.drop_other_bibliography_system(tex, biblatex: biblatex)
+    unless changed.zero?
+      other = biblatex ? 'BibTeX' : 'biblatex'
+      puts Rainbow(" -- Removed or rewrote #{changed} #{other} command(s): the paper uses #{biblatex ? 'biblatex' : 'BibTeX'}").cyan
+    end
+    cleaned
   end
 
   def stage_revtex4_files(stage_dir)

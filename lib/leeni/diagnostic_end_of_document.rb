@@ -45,7 +45,8 @@ module LaTeXDiagnostics
       return false unless item[:line].to_i.positive?
 
       path = LaTeXErrorCatalog.find_source_file(item[:file])
-      text = path && File.foreach(path).with_index(1).find { |_, no| no == item[:line] }&.first
+      # safe_read: a source with invalid UTF-8 must not crash the report.
+      text = path && LaTeXUtils.safe_read(path).lines[item[:line] - 1]
       text ? LaTeXUtils.strip_latex_comments(text).match?(END_DOCUMENT_LINE) : false
     end
 
@@ -62,13 +63,11 @@ module LaTeXDiagnostics
     # Where the document registers end-of-document code, from its local sources.
     def end_hook_sites
       end_hook_files.each_with_object([]) do |file, sites|
-        File.foreach(file).with_index(1) do |line, no|
+        LaTeXUtils.safe_read(file).each_line.with_index(1) do |line, no|
           sites << "#{file}:#{no}" if LaTeXUtils.strip_latex_comments(line).match?(END_HOOK)
           return sites if sites.size >= MAX_HOOK_SITES
         end
       end
-    rescue SystemCallError, ArgumentError
-      []
     end
 
     def end_hook_files

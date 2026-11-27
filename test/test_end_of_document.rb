@@ -63,6 +63,14 @@ class TestEndOfDocument < Minitest::Test
     end
   end
 
+  def test_invalid_utf8_source_does_not_crash
+    in_project do
+      File.binwrite('main.tex', MAIN.b.sub('Text.', "Text \xff\xfe."))
+      err = errors_for(error_log('LaTeX Error: Unfinished review notes remain.', 6)).first
+      assert_includes err[:catalog][:hint], 'main.tex:4'
+    end
+  end
+
   def test_paragraph_closed_by_end_document_is_left_alone
     in_project do
       err = errors_for(error_log('Missing $ inserted.', 6)).first

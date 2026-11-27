@@ -29,6 +29,7 @@ class TestErrorCorpus < Minitest::Test
   ROOT = File.expand_path('..', __dir__)
   BIN = File.join(ROOT, 'leeni')
   ERROR_CASES = Dir.glob(File.join(ROOT, 'docs', 'errors', '*', 'expected.json')).map { |p| File.dirname(p) }.sort.freeze
+  FIXED_CASES = Dir.glob(File.join(ROOT, 'docs', 'errors', '*', 'fixed.tex')).map { |p| File.dirname(p) }.sort.freeze
   CLEAN_CASES = Dir.glob(File.join(ROOT, 'test', 'corpus', 'clean', '*', 'main.tex')).map { |p| File.dirname(p) }.sort.freeze
   ENGINE_FLAGS = { 'xelatex' => 'x', 'lualatex' => 'l', 'pdflatex' => 'p' }.freeze
   LLM_LOCATION = /\A(?<file>[^\s:]+):(?<line>\d+)(?::\d+)?: error: /
@@ -42,6 +43,10 @@ class TestErrorCorpus < Minitest::Test
 
   ERROR_CASES.each do |dir|
     define_method("test_error_#{File.basename(dir)}") { check_error_case(dir) }
+  end
+
+  FIXED_CASES.each do |dir|
+    define_method("test_fixed_#{File.basename(dir)}") { check_fixed_case(dir) }
   end
 
   CLEAN_CASES.each do |dir|
@@ -68,12 +73,23 @@ class TestErrorCorpus < Minitest::Test
     skip "#{name}: known issue: #{spec['known_issue']}"
   end
 
+  # A case with fixed.tex shows the repair, which must build clean.
+  def check_fixed_case(dir)
+    engine = JSON.parse(File.read(File.join(dir, 'expected.json')))['engine']
+    data = in_copy(dir) { |work| run_json(work, 'fixed.tex', engine) }
+    assert_clean(data, "#{File.basename(dir)}/fixed.tex")
+  end
+
   def check_clean_case(dir)
     data = in_copy(dir) { |work| run_json(work, 'main.tex', 'xelatex') }
+    assert_clean(data, File.basename(dir))
+  end
+
+  def assert_clean(data, name)
     reported = data.fetch('diagnostics').reject { |d| d['tier'] == 'whatevers' }
-    assert data['success'], "#{File.basename(dir)}: clean document failed to build"
+    assert data['success'], "#{name}: clean document failed to build"
     assert_empty reported.map { |d| "#{d['tier']} #{d['file']}:#{d['line']} #{d['category']}: #{d['message']}" },
-                 "#{File.basename(dir)}: clean document reported diagnostics"
+                 "#{name}: clean document reported diagnostics"
   end
 
   def in_copy(dir)

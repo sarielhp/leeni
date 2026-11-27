@@ -203,10 +203,30 @@ module LaTeXErrorCatalog
       id: :not_in_outer_par_mode,
       pattern: /Not in outer par mode/i,
       title: 'Not in outer par mode',
-      hint: 'Float (figure/table) inside a box or minipage; move float outside or use minipage',
-      why: 'A floating environment (figure or table) was placed inside a box (\\mbox, \\fbox) or inside another float.',
-      fix: 'Move the figure/table outside the box, or use a non-floating minipage with \\captionof.',
+      hint: 'Float (figure/table) or \\marginpar (maybe inside a macro such as \\todo) in a box or math; ' \
+            'move it out, or use \\captionof / \\marginnote',
+      why: 'A figure, table or \\marginpar (written directly or produced by a macro such as \\todo) was started ' \
+           'inside a box (\\mbox, \\fbox, a measured caption), in math, or inside another float, where nothing can float.',
+      fix: 'Move the float or \\marginpar out of the box; inside a box use a non-floating minipage with \\captionof, ' \
+           'and \\marginnote (marginnote package) instead of \\marginpar.',
       doc_slug: '19_not_in_outer_par_mode'
+    },
+    {
+      id: :float_lost,
+      pattern: /Float\(s\) lost/i,
+      title: 'LaTeX Error: Float(s) lost',
+      hint: 'A \\marginpar or float (often from a comment or \\todo macro) sits in a box, float or caption; ' \
+            'this line is only where LaTeX noticed. \\FloatBarrier does not help',
+      why: 'A figure, table or \\marginpar was started inside a box: a minipage, \\parbox, footnote, tcolorbox, ' \
+           'table cell, or another float\'s body or caption (often through a macro that uses \\marginpar, such ' \
+           'as \\todo or a comment macro). It never reaches the page, LaTeX\'s float queue falls one step behind, ' \
+           'and the loss surfaces only at the next \\clearpage or \\end{document}; the float reported missing ' \
+           'may be an innocent later one.',
+      fix: 'Move that \\marginpar or float out of the box, or use \\marginnote / \\todo[inline]. If it comes from ' \
+           'a macro in a caption, remove the macro there or rewrite it without \\marginpar. ' \
+           '\\FloatBarrier and \\clearpage cannot recover the lost float.',
+      show_doc: true,
+      doc_slug: '90_float_lost'
     },
     {
       id: :missing_delimiter,
@@ -767,8 +787,7 @@ module LaTeXErrorCatalog
         end
       end,
       why: "TeX attempted to write an auxiliary file ('\\openout'), but the target path cannot be created because the directory does not exist or lacks write permissions.",
-      fix: 'Ensure the target directory exists and is writable, or adjust the path in your LaTeX source.',
-      doc_slug: '56_cannot_write_file'
+      fix: 'Ensure the target directory exists and is writable, or adjust the path in your LaTeX source.'
     }
   ].freeze
 end

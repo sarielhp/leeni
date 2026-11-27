@@ -261,7 +261,7 @@ class TestLeeniDiagnostics < LeeniTestBase
       assert_includes plain, 'Diagnostic Explanation: Note: Underfull \hbox (Loose Line)'
       assert_includes plain, 'TeX stretched inter-word spacing excessively'
       assert_includes plain, 'Might fix: Remove trailing \\\\ before blank lines'
-      assert_includes plain, 'See: https://sarielhp.github.io/leeni/docs/guides/underfull_boxes/'
+      assert_includes plain, 'See: https://sarielhp.github.io/leeni/guides/underfull_boxes/'
     end
   end
 
@@ -288,7 +288,7 @@ class TestLeeniDiagnostics < LeeniTestBase
       assert_includes plain, 'Diagnostic Explanation: Warning: Underfull \vbox (Vertical Stretch)'
       assert_includes plain, 'TeX could not stretch vertical whitespace'
       assert_includes plain, 'Might fix: Add \\raggedbottom to preamble'
-      assert_includes plain, 'See: https://sarielhp.github.io/leeni/docs/guides/underfull_boxes/'
+      assert_includes plain, 'See: https://sarielhp.github.io/leeni/guides/underfull_boxes/'
     end
   end
 
@@ -321,7 +321,7 @@ class TestLeeniDiagnostics < LeeniTestBase
           builder_link.send(:analyze_output)
         end
       end
-      expected_osc8 = "\e]8;;https://sarielhp.github.io/leeni/docs/guides/underfull_boxes/\e\\underfull \\hbox\e]8;;\e\\"
+      expected_osc8 = "\e]8;;https://sarielhp.github.io/leeni/guides/underfull_boxes/\e\\underfull \\hbox\e]8;;\e\\"
       assert_includes out_link, expected_osc8
     end
   end

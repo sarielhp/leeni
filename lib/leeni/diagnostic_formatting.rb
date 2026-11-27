@@ -45,7 +45,7 @@ module LaTeXDiagnostics
       "\e]8;;#{uri}\e\\#{styled}\e]8;;\e\\"
     end
 
-    UNDERFULL_GUIDE_URL = 'https://sarielhp.github.io/leeni/docs/guides/underfull_boxes/'
+    UNDERFULL_GUIDE_URL = 'https://sarielhp.github.io/leeni/guides/underfull_boxes/'
 
     def format_terminal_url(url, display_str, underline: false, color: nil)
       return display_str unless link_enabled? && url && !url.to_s.empty?
@@ -241,6 +241,7 @@ module LaTeXDiagnostics
         append_error_hint(lines, cat, indent)
       end
       append_error_hint(lines, { hint: cat[:note] }, indent) if cat&.[](:note)
+      append_doc_link(lines, cat, indent)
 
       append_repeat_note(lines, repeat_count, item&.[](:repeat_lines) || [line_no], indent) if repeat_count > 1
 
@@ -587,6 +588,18 @@ module LaTeXDiagnostics
       hint_colored = @options[:color] == false ? hint_text : Rainbow(hint_text).cyan
       arrow = @options[:color] == false ? '▸' : Rainbow('▸').cyan.bright
       lines << "#{indent}#{arrow} #{hint_colored}"
+    end
+
+    # Errors whose TeX message says little about the cause (show_doc in the
+    # catalogue) link their docs/errors page under the hint, aligned with it.
+    def append_doc_link(lines, catalog, indent)
+      url = catalog && catalog[:show_doc] && catalog[:doc_url]
+      return unless url
+
+      hint_line = lines.reverse.find { |l| l.include?('▸') }
+      lead = hint_line ? hint_line[/\A */] : indent
+      arrow = @options[:color] == false ? '▸' : Rainbow('▸').cyan.bright
+      lines << "#{lead}#{arrow} See: #{link_enabled? ? format_terminal_url(url, url, color: :blue) : url}"
     end
 
     def format_diagnostic_item_text(item)

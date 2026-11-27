@@ -189,21 +189,21 @@ module LaTeXErrorCatalog
       why: 'TeX stretched inter-word spacing excessively (badness 10000 = infinite stretch) because there were too few words to fill the line. Typically caused by a trailing \\\\ before an empty line or \\end{...}, double \\\\\\\\, using \\linebreak, or unhyphenated words in narrow columns.',
       fix_label: 'Might fix:',
       fix: 'Remove trailing \\\\ before blank lines or \\end{...}, avoid double \\\\\\\\ (use \\vspace or a blank line), replace \\linebreak with \\newline, or reword text.',
-      doc_url: 'https://sarielhp.github.io/leeni/docs/guides/underfull_boxes/'
+      doc_url: 'https://sarielhp.github.io/leeni/guides/underfull_boxes/'
     },
     underfull_vbox: {
       title: 'Warning: Underfull \\vbox (Vertical Stretch)',
       why: 'TeX could not stretch vertical whitespace enough to fill the column or page height.',
       fix_label: 'Might fix:',
       fix: 'Add \\raggedbottom to preamble, adjust figure/table heights, or balance text across pages.',
-      doc_url: 'https://sarielhp.github.io/leeni/docs/guides/underfull_boxes/'
+      doc_url: 'https://sarielhp.github.io/leeni/guides/underfull_boxes/'
     },
     underfull_box: {
       title: 'Warning: Underfull \\vbox or \\hbox',
       why: 'LaTeX could not stretch whitespace enough to fill the target dimension.',
       fix_label: 'Might fix:',
       fix: 'Add \\raggedbottom to preamble, adjust figure heights, or reword text.',
-      doc_url: 'https://sarielhp.github.io/leeni/docs/guides/underfull_boxes/'
+      doc_url: 'https://sarielhp.github.io/leeni/guides/underfull_boxes/'
     },
     undefined_reference: {
       title: 'Warning: Undefined Reference',

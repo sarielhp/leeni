@@ -308,7 +308,7 @@ module LaTeXUtils
     return true if str.empty?
     return true if str.start_with?('(', ')', '!', '[')
     return true if str =~ /^(?:Package|Class|LaTeX|\*|\s*(?:Overfull|Underfull))\b/
-    return true if str =~ /^(?:BIB_ENTRY|LIT_LBL):/
+    return true if str =~ /^(?:BIB_ENTRY|LIT_LBL|LEENI_FLOAT_IN_BOX):/
     return true if str =~ /^.+?:\d+:/
     return true if str =~ /^l\.\d+\b/
     return true if str.start_with?('Runaway argument?')

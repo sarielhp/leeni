@@ -223,7 +223,7 @@ class TestDiagnosticFormatting < Minitest::Test
         base_color: :cyan
       }
       rendered = builder.send(:render_diagnostic_item, item, width: 3)
-      assert_includes rendered, "\e]8;;https://sarielhp.github.io/leeni/docs/guides/underfull_boxes/\e\\underfull \\hbox\e]8;;\e\\"
+      assert_includes rendered, "\e]8;;https://sarielhp.github.io/leeni/guides/underfull_boxes/\e\\underfull \\hbox\e]8;;\e\\"
       # Verify that the suffix text after the link is also colored in cyan
       assert_includes rendered, '(badness 10000)'
       refute_includes rendered, "\e[4m"
@@ -258,7 +258,7 @@ class TestDiagnosticFormatting < Minitest::Test
     begin
       Rainbow.enabled = true
       box = builder.send(:format_boxed_explanation, :underfull_hbox)
-      assert_includes box, "\e]8;;https://sarielhp.github.io/leeni/docs/guides/underfull_boxes/\e\\"
+      assert_includes box, "\e]8;;https://sarielhp.github.io/leeni/guides/underfull_boxes/\e\\"
       # Check that blue color is included in the URL field
       assert_includes box, 'See:'
     ensure

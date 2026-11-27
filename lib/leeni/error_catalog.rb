@@ -12,6 +12,14 @@ require_relative 'macro_harvester'
 require_relative 'key_suggester'
 
 module LaTeXErrorCatalog
+  # The docs/ tree is the site root: docs/errors/<slug>/README.md is served
+  # at <DOCS_SITE>/errors/<slug>/.
+  DOCS_SITE = 'https://sarielhp.github.io/leeni'
+
+  def self.doc_url(slug)
+    slug ? "#{DOCS_SITE}/errors/#{slug}/" : nil
+  end
+
   # TikZ defines its path commands only inside a picture: \draw in a \caption
   # (a moving argument, expanded outside the picture even after \protect\tikz)
   # is undefined although tikz is loaded.
@@ -499,7 +507,9 @@ module LaTeXErrorCatalog
         root_col: root_col,
         why: why,
         fix: fix,
-        doc_slug: entry[:doc_slug]
+        doc_slug: entry[:doc_slug],
+        doc_url: doc_url(entry[:doc_slug]),
+        show_doc: entry[:show_doc]
       }
     end
     nil
@@ -712,7 +722,11 @@ module LaTeXErrorCatalog
 
   def self.find_by_id(id)
     sym = id.to_sym
-    CATALOG.find { |e| e[:id] == sym } || WARNING_EXPLANATIONS[sym]
+    entry = CATALOG.find { |e| e[:id] == sym }
+    return WARNING_EXPLANATIONS[sym] unless entry
+    return entry unless entry[:doc_slug]
+
+    entry.merge(doc_url: doc_url(entry[:doc_slug]))
   end
 end
 

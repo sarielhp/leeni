@@ -72,7 +72,25 @@ class LatexBuilder
 
   # Lost glyphs become errors with their source line (see log_promoter.rb).
   LOST_CHARS_HOOK = '\ifdefined\AddToHook\AddToHook{begindocument/end}{\tracinglostchars=3 }\fi'
-  RUNTIME_HOOK = "\\makeatletter#{LABEL_HOOK}#{BIBLATEX_HOOK}#{LOST_CHARS_HOOK}\\makeatother".freeze
+  # A \marginpar or float started inside a box (minipage, parbox, footnote,
+  # tcolorbox, p-cell, another float's body) never reaches the output routine,
+  # so LaTeX reports "Float(s) lost" only at the next \clearpage. LaTeX's own
+  # check (\ifinner) misses a paragraph inside a box, so every box start
+  # (\@arrayparboxrestore) marks its group and the float entry points log their
+  # line when marked. Installed after the preamble, so class and package
+  # redefinitions are wrapped rather than replaced; float.sty's [H] path is not
+  # a float and is left alone. Silent unless a float starts inside a box.
+  # See diagnostic_lost_floats.rb.
+  FLOAT_BOX_HOOK = '\def\leeni@fltinstall{' \
+                   '\let\leeni@apbr\@arrayparboxrestore' \
+                   '\def\@arrayparboxrestore{\def\leeni@inbox{}\leeni@apbr}' \
+                   '\protected\def\leeni@flt##1{\ifdefined\leeni@inbox\ifinner\else' \
+                   '\typeout{LEENI_FLOAT_IN_BOX:\the\inputlineno:##1}\fi\fi}' \
+                   '\ifdefined\@float@Hx\let\leeni@xf\@float@Hx\def\@float@Hx##1{\leeni@flt{##1}\leeni@xf{##1}}' \
+                   '\else\let\leeni@xf\@xfloat\def\@xfloat##1{\leeni@flt{##1}\leeni@xf{##1}}\fi' \
+                   '\let\leeni@mp\marginpar\def\marginpar{\leeni@flt{marginpar}\leeni@mp}}' \
+                   '\ifdefined\AddToHook\AddToHook{begindocument/end}{\leeni@fltinstall}\fi'
+  RUNTIME_HOOK = "\\makeatletter#{LABEL_HOOK}#{BIBLATEX_HOOK}#{LOST_CHARS_HOOK}#{FLOAT_BOX_HOOK}\\makeatother".freeze
 
   def initialize(target, options)
     @options = options

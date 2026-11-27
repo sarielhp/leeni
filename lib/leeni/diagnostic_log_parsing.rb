@@ -18,7 +18,7 @@ module LaTeXDiagnostics
     def track_log_file(line, file_stack)
       return if line =~ WARNING_LINE_PATTERN ||
                 line =~ /^(?:Overfull|Underfull)/ || line =~ /^!\s+/ ||
-                line =~ /^Missing character:/ || line =~ /^(?:LIT_LBL|BIB_ENTRY):/
+                line =~ /^Missing character:/ || line =~ /^(?:LIT_LBL|BIB_ENTRY|LEENI_FLOAT_IN_BOX):/
 
       pos = 0
       len = line.length
@@ -47,7 +47,7 @@ module LaTeXDiagnostics
     end
 
     def diagnostic_boundary_line?(line)
-      return true if line.strip.empty? || line =~ /^(?:BIB_ENTRY|LIT_LBL):/ ||
+      return true if line.strip.empty? || line =~ /^(?:BIB_ENTRY|LIT_LBL|LEENI_FLOAT_IN_BOX):/ ||
                      line =~ WARNING_LINE_PATTERN ||
                      line =~ /^(?:Overfull|Underfull)/ || line =~ /^\[\d+\]/ ||
                      line =~ /^!\s+/ || line =~ /^.+:\d+:/ ||

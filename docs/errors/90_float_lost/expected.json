@@ -1,0 +1,11 @@
+{
+  "engine": "xelatex",
+  "diagnostics": [
+    {
+      "file": "example.tex",
+      "line": 14,
+      "tier": "errors",
+      "category": "float_lost"
+    }
+  ]
+}

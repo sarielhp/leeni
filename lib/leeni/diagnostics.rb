@@ -20,6 +20,7 @@ require_relative 'diagnostic_alerts'
 require_relative 'diagnostic_summary'
 require_relative 'diagnostic_bib_messages'
 require_relative 'diagnostic_key_suggestions'
+require_relative 'diagnostic_lost_floats'
 
 module LaTeXDiagnostics
   include Formatting
@@ -30,6 +31,7 @@ module LaTeXDiagnostics
   include Summary
   include BibMessages
   include KeySuggestions
+  include LostFloats
 
   DIAGNOSTIC_EXPLANATIONS = LaTeXErrorCatalog::WARNING_EXPLANATIONS
 
@@ -119,6 +121,7 @@ module LaTeXDiagnostics
     raw_warns = extract_warnings(clean_content, verbose: @options[:verbose])
     raw_warns.concat(collect_invisible_character_warnings)
     err_items = extract_errors(clean_content)
+    relocate_lost_floats!(err_items, clean_content)
     append_bib_diagnostics!(raw_warns, err_items) if counts[:cbib].positive?
     consolidate_missing_bib_entries!(raw_warns)
     suggest_undefined_keys!(raw_warns)

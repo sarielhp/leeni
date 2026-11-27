@@ -1,0 +1,28 @@
+\documentclass{article}
+% Typesets each caption directly rather than measuring it in a box first;
+% many classes set it (LIPIcs, for one). LaTeX's own check, which would say
+% "Not in outer par mode" at the caption, then never runs.
+\usepackage[singlelinecheck=false]{caption}
+% A typical review macro: the remark in the text, an arrow in the margin.
+\NewDocumentCommand{\note}{m}{\textbf{[#1]}\marginpar{$\Leftarrow$}}
+\begin{document}
+Some text before the figures.
+
+\begin{figure}[h]
+  \centering
+  \rule{3cm}{1cm}
+  \caption{A rectangle. \note{check the size}}
+  \label{fig:rectangle}
+\end{figure}
+
+More text, which refers to Figure~\ref{fig:rectangle}.
+
+\begin{figure}[h]
+  \centering
+  \rule{2cm}{2cm}
+  \caption{A square.}
+  \label{fig:square}
+\end{figure}
+
+The end, after Figure~\ref{fig:square}.
+\end{document}

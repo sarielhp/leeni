@@ -23,7 +23,7 @@ module LeeniTestSuite
     test_repair_failures.rb test_config.rb test_color_theme.rb test_cli_spellings.rb
     test_author_verification.rb test_visual_verification.rb test_compatibility.rb
     test_arxiv_worker.rb test_arxiv_fixups.rb test_sample_arxiv.rb test_bump.rb
-    test_cli_help.rb test_bundle.rb test_bibkit.rb test_tmp_space.rb test_pdf_driver_failure.rb test_shipped_bbl.rb
+    test_cli_help.rb test_bundle.rb test_lost_floats.rb test_bibkit.rb test_tmp_space.rb test_pdf_driver_failure.rb test_shipped_bbl.rb
   ].freeze
   MEDIUM_TESTS = %w[
     test_compile_mode.rb test_pathological_latex.rb test_llm_mode.rb test_json_mode.rb

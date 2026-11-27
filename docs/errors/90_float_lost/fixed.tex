@@ -1,0 +1,27 @@
+\documentclass{article}
+\usepackage[singlelinecheck=false]{caption}
+% \marginnote puts the arrow in the margin without making a float, so the
+% macro works anywhere, captions and boxes included.
+\usepackage{marginnote}
+\NewDocumentCommand{\note}{m}{\textbf{[#1]}\marginnote{$\Leftarrow$}}
+\begin{document}
+Some text before the figures.
+
+\begin{figure}[h]
+  \centering
+  \rule{3cm}{1cm}
+  \caption{A rectangle. \note{check the size}}
+  \label{fig:rectangle}
+\end{figure}
+
+More text, which refers to Figure~\ref{fig:rectangle}.
+
+\begin{figure}[h]
+  \centering
+  \rule{2cm}{2cm}
+  \caption{A square.}
+  \label{fig:square}
+\end{figure}
+
+The end, after Figure~\ref{fig:square}.
+\end{document}

@@ -25,7 +25,7 @@ Errors during compilation originate in one of three layers:
 
 ---
 
-## 3. Master Error Index (89 Errors)
+## 3. Master Error Index (90 Errors)
 
 | # | Error Message / Pattern | Layer | Cause & Summary | Support | Reproducer & Details |
 |---|:--- |:--- |:--- |:--- |:--- |
@@ -118,6 +118,7 @@ Errors during compilation originate in one of three layers:
 | **87** | `Emergency stop` ... `Unbalanced write command` | TeX Primitive | A moving argument written at shipout (french babel's active `;` in a `\caption` going to the `.toc`) expands to unbalanced braces; TeX names no error line. `leeni` finds the written caption text and reports the `\caption` line. | **Catalog Hint** | [`87_unbalanced_write`](87_unbalanced_write/) |
 | **88** | `Font ... at 10.0pt not loadable: Metric (TFM) file or installed font not found` | TeX (XeTeX/LuaTeX) | `\setmainfont` names a font the system does not have; fontspec reports it too, and the body is then set in `nullfont` and its characters dropped. `leeni` reports one `font_not_loadable` error naming the font, with an install-or-substitute hint. | **Catalog Hint** | [`88_font_not_loadable`](88_font_not_loadable/) |
 | **89** | `LaTeX Error: Control sequence \not= already defined` | LaTeX Package | `unicode-math` defines the negated relations itself and refuses to replace `\not=`, `\not<`, `\not>` already declared by `amssymb` and a legacy math-font package (`stix2`). `leeni` reports each clash at the `\usepackage{unicode-math}` line, with a drop-one-package hint. | **Catalog Hint** | [`89_control_sequence_already_defined`](89_control_sequence_already_defined/) |
+| **90** | `LaTeX Error: Float(s) lost` | LaTeX Kernel | A `\marginpar` or float started inside a box (another float's body or caption, a minipage, footnote, tcolorbox), often through a macro such as `\todo`; LaTeX notices only at the next `\clearpage`, and the float it loses may be an innocent later one. `leeni` watches for floats started in boxes and reports the error at the culprit line. | **Catalog Hint** | [`90_float_lost`](90_float_lost/) |
 
 ---
 
@@ -126,6 +127,7 @@ Errors during compilation originate in one of three layers:
 The reproducer cases in this directory provide verification fixtures. Each subdirectory contains:
 - `example.tex`: Minimal self-contained document triggering the error.
 - `README.md`: Explanation of why the error occurs, the raw log signature, and how to resolve it.
+- `fixed.tex` (some cases): The same document with the error fixed; it must build clean.
 - `expected.json`: The diagnostics leeni must report (file, line, column, tier, category), reviewed by hand against the source. A case leeni does not yet get right adds `known_issue` and the `current` output.
 
 ### Running Corpus Verification

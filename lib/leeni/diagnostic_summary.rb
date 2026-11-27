@@ -677,7 +677,7 @@ module LaTeXDiagnostics
     # environment mismatch dropped) followed by the pre-flight brace errors,
     # and the tiers of the warnings.
     def analyze_failed_log(content)
-      compiler_errors = extract_errors(content)
+      compiler_errors = relocate_lost_floats!(extract_errors(content), content)
       brace_errors = if compiler_errors.empty? || compiler_indicates_brace_error?(content)
                        check_source_braces
                      else

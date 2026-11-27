@@ -140,6 +140,9 @@ The built-in brace checker (`LaTeXBraceChecker`) runs before LaTeX starts, catch
 ### Unclosed Groups at `\end{document}`
 TeX finishes a document whose `\end{document}` sits inside an open `{`, `\begingroup`, `$`, or unfinished `\if` with only a log note (`\end occurred inside a group at level 1`), exit status 0, and a PDF. `leeni` promotes that note to a real error carrying the line TeX recorded, fails the build, and names the offending opener (see [`56_unclosed_group_at_end`](errors/56_unclosed_group_at_end/)).
 
+### Errors Raised While `\end{document}` Runs
+`\end{document}` runs `\AtEndDocument` code, places the floats still waiting, and ships the last page, so an error from any of these lands on its line, often far from the cause. For such an error the hint says so, names the `\AtEndDocument` (or `\AddToHook{enddocument}`) calls it finds in the document's local sources, and gives the manual search: move `\end{document}` halfway up, rebuild, and keep halving the part that still fails; an error that remains with `\end{document}` right after `\begin{document}` comes from the preamble. Errors whose cause *is* at that line are left alone: the paragraph `\end{document}` closes (`Missing $ inserted`), unclosed braces, environments, groups and verbatim. So are errors `leeni` has already moved to their cause, such as a lost float started inside a box (see [`90_float_lost`](errors/90_float_lost/)).
+
 ### Bibliography Source Pinpointing
 When LaTeX crashes during `\printbibliography` or `\bibliography` due to a syntax error in a `.bib` file (such as an unescaped `_` or `&`), standard TeX engines only report `\printbibliography` in `main.tex`. `leeni` hooks BibLaTeX's entry processing, intercepts the active citation key, locates the entry and line in your `.bib` databases, and emits a companion error with line number and token hints. See [Troubleshooting Bibliography Errors](troubleshooting_bibliography_errors.md) for details.
 

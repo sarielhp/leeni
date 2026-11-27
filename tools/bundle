@@ -63,6 +63,7 @@ module LatexBundler
     key_suggester.rb
     diagnostic_key_suggestions.rb
     diagnostic_lost_floats.rb
+    diagnostic_end_of_document.rb
     diagnostics.rb
     bbl_provenance.rb
     bib_manager.rb
